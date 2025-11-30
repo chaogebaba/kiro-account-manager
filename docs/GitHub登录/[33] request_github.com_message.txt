@@ -1,0 +1,30 @@
+POST /session h2
+host: github.com
+content-length: 1484
+cache-control: max-age=0
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+origin: https://github.com
+dnt: 1
+upgrade-insecure-requests: 1
+content-type: application/x-www-form-urlencoded
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: same-origin
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+referer: https://github.com/login?client_id=Ov23lilbEuhqkZak4Bfh&return_to=%2Flogin%2Foauth%2Fauthorize%3Fclient_id%3DOv23lilbEuhqkZak4Bfh%26redirect_uri%3Dhttps%253A%252F%252Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%252Foauth2%252Fidpresponse%26response_type%3Dcode%26scope%3Dread%253Auser%2Buser%253Aemail%2Bopenid%26state%3DH4sIAAAAAAAAAE2RW4_aMBCF_4ufMcRJHAfeWFATyrJsSRCXahXZsZ2EXJdcoKn63zv7UvXtHM13RqM5vxFHC9S3WPG2wyT6fqS3dRvvT2iCBEy8rEt7ASYGQ-dCEqpS21CKNbFppIbI455lEgAJQNp1TbuYzXjTTPPsXk-lGmZtllRZNat536XAKeDiWiqQGuR-s16BTNDiJ1IlzwowdaMq2PkxQSkQxBTSZRbHpjYsbGuXYDGnBCtluizmjFFuQSgDtDw_HuGWEHoi73igO8cZPd-R_dIrXoL149JX0bM_XP22cyFxg0RgUgdkDvJyvJn-5m0bqj5o84d__4zfRD9EwSjeEzamO8OsksY6VinLws1nX-y8-HQcDu44hLcst8SW_Rjk6_m0OVsrt3Oy6zUPV-wShOrVsotUCMKC0k9GZu3lZanzZq3txomexkpob_cSuXlXDEVxcNpce08chJpFZfuLZI6_POtveeLrigZWf1rCxQVc_PVi3Nxrif8VOP368vQ_W_KxruIaKujqaVyXEC3RgjDHpiahczJBDVpoXrRqgu6w0zXcWM4tE5tUC2zHguM5NTSWluuYc00Fpxp2DNDXx5-_PFFt6z4CAAA.H4sIAAAAAAAAAEty-MCp_WA6l1nMYYO1fMxnN_I2HfR42pn9runznw2Mm-0ANl4zVCAAAAA.4
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: _octo=GH1.1.1812755908.1764521593
+cookie: logged_in=no
+cookie: cpu_bucket=lg
+cookie: preferred_color_mode=light
+cookie: tz=Asia%2FShanghai
+cookie: _device_id=2072e1a0c60709d1231fc3951a434141
+cookie: _gh_sess=RP9AonjeJxsv9AAQklrn%2Bzxzal45crEsOzdqO%2FthhSQavgFIpQe5zrb2pM71hpPapstKrEGG1F%2FWiUaLpWGTCP3HmGkA6hEjZOxdO%2Bxsw6pdaHa06XdBV2UsDPDRI6jeKFJt5bX5jDLwVCSkOl7sluOX50ZD%2B1c5Rt1Ok7GOG4AC4slM49bTIQx6bOki%2Fht4mwkGpI76Ha8mOxIOGmQb5de0anj7rrIOD1%2BySu7eTakkjzLeVlEF50xDur5t1LOnfuHgnOS103UgJa2YPLq9wviFAVF9wjaR5DuDVXkuDmdxPNOdD2ulaK4MKJE70eePUc1fgVwXBym%2BumDstZXuv%2BgKyDuMM8KnltYW3FGIbr7tDcjiwJUklSeKawszzW1ipgefwuYi8HG9DeCCVxJ%2Fndm%2FLKjcZ3T%2FdaP9rVFsQW1mC9X%2F6jVMxQzg5XK8xc6ljaD9sdugunIEQzok6oRyRc3cSppt90uX6OO%2BKkIUyIhNeHvd--bKhdTXFhi0zLgNaP--MU9Cl%2FecqetP0mUYK%2F%2B6CQ%3D%3D
+priority: u=0, i
+
+commit=Sign+in&authenticity_token=fm1RR1dO1O2Hj%2FMRKGLiqdQfkguiwdCrkdTI7gKjZVx1YrsiTfHRDWyM9dnMSgPqkqFuH1kKFjOl6Lh9v%2FHOVA%3D%3D&add_account=&login=91154f65%40chatcpt.bffftyhnj.webredirect.org&password=jff19990906&webauthn-conditional=undefined&javascript-support=true&webauthn-support=supported&webauthn-iuvpaa-support=supported&return_to=%2Flogin%2Foauth%2Fauthorize%3Fclient_id%3DOv23lilbEuhqkZak4Bfh%26redirect_uri%3Dhttps%253A%252F%252Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%252Foauth2%252Fidpresponse%26response_type%3Dcode%26scope%3Dread%253Auser%2Buser%253Aemail%2Bopenid%26state%3DH4sIAAAAAAAAAE2RW4_aMBCF_4ufMcRJHAfeWFATyrJsSRCXahXZsZ2EXJdcoKn63zv7UvXtHM13RqM5vxFHC9S3WPG2wyT6fqS3dRvvT2iCBEy8rEt7ASYGQ-dCEqpS21CKNbFppIbI455lEgAJQNp1TbuYzXjTTPPsXk-lGmZtllRZNat536XAKeDiWiqQGuR-s16BTNDiJ1IlzwowdaMq2PkxQSkQxBTSZRbHpjYsbGuXYDGnBCtluizmjFFuQSgDtDw_HuGWEHoi73igO8cZPd-R_dIrXoL149JX0bM_XP22cyFxg0RgUgdkDvJyvJn-5m0bqj5o84d__4zfRD9EwSjeEzamO8OsksY6VinLws1nX-y8-HQcDu44hLcst8SW_Rjk6_m0OVsrt3Oy6zUPV-wShOrVsotUCMKC0k9GZu3lZanzZq3txomexkpob_cSuXlXDEVxcNpce08chJpFZfuLZI6_POtveeLrigZWf1rCxQVc_PVi3Nxrif8VOP368vQ_W_KxruIaKujqaVyXEC3RgjDHpiahczJBDVpoXrRqgu6w0zXcWM4tE5tUC2zHguM5NTSWluuYc00Fpxp2DNDXx5-_PFFt6z4CAAA.H4sIAAAAAAAAAEty-MCp_WA6l1nMYYO1fMxnN_I2HfR42pn9runznw2Mm-0ANl4zVCAAAAA.4&allow_signup=&client_id=Ov23lilbEuhqkZak4Bfh&integration=&required_field_881f=&timestamp=1764521594113&timestamp_secret=631d23d4f2e5226ffca351b47439504e2bb3ca85bec86ec4e09490c28eb59a41

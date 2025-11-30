@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
-import { Home, Key, Settings, Info, LogOut, Plus, User } from 'lucide-react'
+import { Home, Key, Settings, Info, LogOut, User, LogIn } from 'lucide-react'
 
 const menuItems = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'token', label: '账号管理', icon: Key },
+  { id: 'login', label: '登录', icon: LogIn },
   { id: 'settings', label: '设置', icon: Settings },
   { id: 'about', label: '关于', icon: Info },
 ]
 
-function Sidebar({ activeMenu, onMenuChange, user, onLogout, onAddAccount }) {
+function Sidebar({ activeMenu, onMenuChange, user, onLogout }) {
   const [localToken, setLocalToken] = useState(null)
 
   useEffect(() => {
@@ -29,17 +30,6 @@ function Sidebar({ activeMenu, onMenuChange, user, onLogout, onAddAccount }) {
           <span className="font-bold text-xl tracking-wide">KIRO</span>
         </div>
         <p className="text-xs text-blue-200/80">Token Manager</p>
-      </div>
-
-      {/* Add Account Button */}
-      <div className="px-4 pb-4">
-        <button
-          onClick={onAddAccount}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus size={16} />
-          添加账号
-        </button>
       </div>
 
       {/* Menu */}

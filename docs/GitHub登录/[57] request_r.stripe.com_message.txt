@@ -1,0 +1,20 @@
+POST /b h2
+host: r.stripe.com
+content-length: 3191
+sec-ch-ua-platform: "Windows"
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+dnt: 1
+content-type: application/x-www-form-urlencoded
+sec-ch-ua-mobile: ?0
+accept: */*
+origin: https://js.stripe.com
+sec-fetch-site: same-site
+sec-fetch-mode: no-cors
+sec-fetch-dest: empty
+referer: https://js.stripe.com/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+priority: u=4, i
+
+client_id=stripe-js&num_requests=2&events=%5B%7B%22event_name%22%3A%22elements.controller.page_show%22%2C%22created%22%3A1764521414638%2C%22batching_enabled%22%3Atrue%2C%22event_count%22%3A%2244%22%2C%22os%22%3A%22Windows%22%2C%22browserFamily%22%3A%22IE+Edge%22%2C%22version%22%3A%22cba9216f35%22%2C%22event_id%22%3A%2236af5964-f01f-4af2-ba6e-116c5c33b7bc%22%2C%22deploy_status%22%3A%22main%22%2C%22browserClassification%22%3A%22modern%22%2C%22browser_classification_v2%22%3A%222024%22%2C%22connection_rtt%22%3A%22350%22%2C%22connection_downlink%22%3A%220.45%22%2C%22connection_effective_type%22%3A%223g%22%2C%22key%22%3A%22pk_live_51RoAWWIHUhwdEnrTCxILzldlmzs7DAazo1j2WHmEJWqZFtb4adkY2bQt6PIk0siL41hihKOPsDskJx1XJvPDQaJX00aaTmV6D0%22%2C%22key_mode%22%3A%22live%22%2C%22referrer%22%3A%22https%3A%2F%2Fbilling.stripe.com%22%2C%22betas%22%3A%22server_side_confirmation_beta_1%22%2C%22stripe_js_id%22%3A%22daaa4895-6717-4328-935f-d9adbd90eaf2%22%2C%22stripe_obj_id%22%3A%22sobj-172a47d1-58f5-4dcb-9b02-e215d25dff90%22%2C%22controller_load_time%22%3A%221764515298714%22%2C%22stripe_js_release_train%22%3A%22v3%22%2C%22wrapper%22%3A%22react-stripe-js%22%2C%22wrapper_version%22%3A%223.9.0%22%2C%22es_module%22%3A%22true%22%2C%22es_module_version%22%3A%221.54.2%22%2C%22browser_timezone%22%3A%22Asia%2FShanghai%22%2C%22elements_init_source%22%3A%22stripe.elements%22%2C%22deploy_status_time_to_fetch_ms%22%3A%22959%22%2C%22deploy_status_fetch_failed%22%3A%22false%22%2C%22cdn_name%22%3A%22Cloudfront%22%2C%22cdn_pop_dc%22%3A%22SIN%22%2C%22frame_width%22%3A%221488%22%2C%22event_flush_reason%22%3A%22visibilitystate%22%7D%2C%7B%22event_name%22%3A%22elements.controller.page_hide%22%2C%22created%22%3A1764521414919%2C%22batching_enabled%22%3Atrue%2C%22event_count%22%3A%2245%22%2C%22os%22%3A%22Windows%22%2C%22browserFamily%22%3A%22IE+Edge%22%2C%22version%22%3A%22cba9216f35%22%2C%22event_id%22%3A%222ef0f2e2-f38c-4133-9f50-fe8aa8fa3f65%22%2C%22deploy_status%22%3A%22main%22%2C%22browserClassification%22%3A%22modern%22%2C%22browser_classification_v2%22%3A%222024%22%2C%22connection_rtt%22%3A%22350%22%2C%22connection_downlink%22%3A%220.45%22%2C%22connection_effective_type%22%3A%223g%22%2C%22key%22%3A%22pk_live_51RoAWWIHUhwdEnrTCxILzldlmzs7DAazo1j2WHmEJWqZFtb4adkY2bQt6PIk0siL41hihKOPsDskJx1XJvPDQaJX00aaTmV6D0%22%2C%22key_mode%22%3A%22live%22%2C%22referrer%22%3A%22https%3A%2F%2Fbilling.stripe.com%22%2C%22betas%22%3A%22server_side_confirmation_beta_1%22%2C%22stripe_js_id%22%3A%22daaa4895-6717-4328-935f-d9adbd90eaf2%22%2C%22stripe_obj_id%22%3A%22sobj-172a47d1-58f5-4dcb-9b02-e215d25dff90%22%2C%22controller_load_time%22%3A%221764515298714%22%2C%22stripe_js_release_train%22%3A%22v3%22%2C%22wrapper%22%3A%22react-stripe-js%22%2C%22wrapper_version%22%3A%223.9.0%22%2C%22es_module%22%3A%22true%22%2C%22es_module_version%22%3A%221.54.2%22%2C%22browser_timezone%22%3A%22Asia%2FShanghai%22%2C%22elements_init_source%22%3A%22stripe.elements%22%2C%22deploy_status_time_to_fetch_ms%22%3A%22959%22%2C%22deploy_status_fetch_failed%22%3A%22false%22%2C%22cdn_name%22%3A%22Cloudfront%22%2C%22cdn_pop_dc%22%3A%22SIN%22%2C%22frame_width%22%3A%221488%22%2C%22event_flush_reason%22%3A%22visibilitystate%22%7D%5D

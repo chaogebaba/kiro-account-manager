@@ -1,0 +1,16 @@
+h2 302
+date: Sun, 30 Nov 2025 16:33:49 GMT
+content-length: 0
+location: https://app.kiro.dev/signin/oauth?code=3f0d5a84-d116-4dda-a399-496255378f03&state=9055d0d5-8b05-45ec-8785-a2e08b43a1c2
+x-amz-cognito-request-id: 6a8362ba-9617-46fd-8c39-e9185a4e754d
+set-cookie: csrf-state=""; Expires=Thu, 01-Jan-1970 00:00:10 GMT; Path=/; Secure; HttpOnly; SameSite=None
+set-cookie: csrf-state-legacy=""; Expires=Thu, 01-Jan-1970 00:00:10 GMT; Path=/; Secure; HttpOnly
+set-cookie: cognito="H4sIAAAAAAAAAAH1AAr/WfT3/yf5Gg3vxM7qz5EDpmMipnHwVfpVTfR+jQyR0P3MDgC0xmTLgpKENLExQ+CmJ4w3WbA029Bm/BJ3gW3lEn6rzMHKceSxYUd4SbqBsYh5DFRNEHJ+zzIY5EmREc0V2GfLo/FtPP/hSJumsDazwrS1/DcFZX0ZA36YUjIHFYau6cophArpI/eWnqyvbTT/X5nZREVuV+LGTKLHYIg7HZ9YmUyutLK83gl41YhcO1MlCr95xkKZOWlsynBsNwUOstiByO/1LCMCgx39ELT9+nf5Eb5vnVbZEuYyKKRbIuSCiPYfOXzet/GqZ98ZILKxO6dFGLBgac3U9QAAAA==.H4sIAAAAAAAAAHO8tzzR3jAiKVD8qbHF5TnfztwMehX0Yu9U4UkVM+xsbTQBJV+PMCAAAAA=.4"; Version=1; Domain=kiro-prod-us-east-1.auth.us-east-1.amazoncognito.com; Max-Age=3600; Expires=Sun, 30-Nov-2025 17:33:49 GMT; Path=/; Secure; HttpOnly; SameSite=Lax
+cache-control: no-cache, no-store, max-age=0, must-revalidate
+pragma: no-cache
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+strict-transport-security: max-age=31536000 ; includeSubDomains
+x-frame-options: DENY
+server: Server
+

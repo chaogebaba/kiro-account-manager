@@ -1,0 +1,27 @@
+POST /service/KiroWebPortalService/operation/ExchangeToken h2
+host: app.kiro.dev
+content-length: 160
+x-amz-user-agent: aws-sdk-js/1.0.0 ua/2.1 os/Windows#NT-10.0 lang/js md/browser#Microsoft-Edge_142.0.0.0 m/M,E
+sec-ch-ua-platform: "Windows"
+x-kiro-visitorid: 1764521395589-gnfpuptff3
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+amz-sdk-request: attempt=1; max=1
+amz-sdk-invocation-id: 526d7a7d-1e06-45ab-8558-3541d845fc49
+sec-ch-ua-mobile: ?0
+smithy-protocol: rpc-v2-cbor
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0
+accept: application/cbor
+dnt: 1
+content-type: application/cbor
+origin: https://app.kiro.dev
+sec-fetch-site: same-origin
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://app.kiro.dev/signin/oauth?code=ad9ea578-9e69-4c6f-9048-c30c8697d841&state=12bd873a-2f03-4f81-b951-ee287ca775a3
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: kiro-visitor-id=1764521395589-gnfpuptff3
+cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiZDA4ZjQwM2UtNTIzZi00NGNlLWE3YWUtNGU5YmJkMTMwNTk2IiwidiI6IjEifQ==
+priority: u=1, i
+
+¤cidpfGithubdcodex$ad9ea578-9e69-4c6f-9048-c30c8697d841lcodeVerifierx+bgPLc1U2gNteRi_n-GRz1uGVgiufP61_y82ibsKBEbgkredirectUrix!https://app.kiro.dev/signin/oauth

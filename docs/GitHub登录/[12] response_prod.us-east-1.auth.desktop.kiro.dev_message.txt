@@ -1,0 +1,12 @@
+h2 302
+content-type: application/json
+content-length: 2
+location: https://github.com/login/oauth/authorize?client_id=Ov23lilbEuhqkZak4Bfh&redirect_uri=https%3A%2F%2Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%2Foauth2%2Fidpresponse&response_type=code&scope=read%3Auser+user%3Aemail+openid&state=H4sIAAAAAAAAAE2RW4_aMBCF_4ufMcRJHAfeWFATyrJsSRCXahXZsZ2EXJdcoKn63zv7UvXtHM13RqM5vxFHC9S3WPG2wyT6fqS3dRvvT2iCBEy8rEt7ASYGQ-dCEqpS21CKNbFppIbI455lEgAJQNp1TbuYzXjTTPPsXk-lGmZtllRZNat536XAKeDiWiqQGuR-s16BTNDiJ1IlzwowdaMq2PkxQSkQxBTSZRbHpjYsbGuXYDGnBCtluizmjFFuQSgDtDw_HuGWEHoi73igO8cZPd-R_dIrXoL149JX0bM_XP22cyFxg0RgUgdkDvJyvJn-5m0bqj5o84d__4zfRD9EwSjeEzamO8OsksY6VinLws1nX-y8-HQcDu44hLcst8SW_Rjk6_m0OVsrt3Oy6zUPV-wShOrVsotUCMKC0k9GZu3lZanzZq3txomexkpob_cSuXlXDEVxcNpce08chJpFZfuLZI6_POtveeLrigZWf1rCxQVc_PVi3Nxrif8VOP368vQ_W_KxruIaKujqaVyXEC3RgjDHpiahczJBDVpoXrRqgu6w0zXcWM4tE5tUC2zHguM5NTSWluuYc00Fpxp2DNDXx5-_PFFt6z4CAAA.H4sIAAAAAAAAAEty-MCp_WA6l1nMYYO1fMxnN_I2HfR42pn9runznw2Mm-0ANl4zVCAAAAA.4
+date: Sun, 30 Nov 2025 16:53:12 GMT
+x-amzn-requestid: 8e79a54b-3e98-4de7-a0b7-94abaa2ad8b6
+x-cache: Miss from cloudfront
+via: 1.1 c4b03aecdcf96e06645f211bbe2eca94.cloudfront.net (CloudFront)
+x-amz-cf-pop: SIN2-P11
+x-amz-cf-id: nKW1ao6rk1YjNtXXjdNghIqw3rBo6Fwhkb_QWzfS-Cphzo9nKsGaxw==
+
+{}

@@ -1,0 +1,27 @@
+POST /_private/browser/stats h2
+host: api.github.com
+content-length: 1300
+sec-ch-ua-platform: "Windows"
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+dnt: 1
+content-type: text/plain;charset=UTF-8
+sec-ch-ua-mobile: ?0
+accept: */*
+origin: https://github.com
+sec-fetch-site: same-site
+sec-fetch-mode: no-cors
+sec-fetch-dest: empty
+referer: https://github.com/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: _octo=GH1.1.1812755908.1764521593
+cookie: cpu_bucket=lg
+cookie: preferred_color_mode=light
+cookie: tz=Asia%2FShanghai
+cookie: color_mode=%7B%22color_mode%22%3A%22auto%22%2C%22light_theme%22%3A%7B%22name%22%3A%22light%22%2C%22color_mode%22%3A%22light%22%7D%2C%22dark_theme%22%3A%7B%22name%22%3A%22dark%22%2C%22color_mode%22%3A%22dark%22%7D%7D
+cookie: logged_in=yes
+cookie: dotcom_user=hj01857654
+priority: u=4, i
+
+{"stats": [{"webVitalTimings":[{"name":"https://github.com/login?client_id=Ov23lilbEuhqkZak4Bfh&return_to=%2Flogin%2Foauth%2Fauthorize%3Fclient_id%3DOv23lilbEuhqkZak4Bfh%26redirect_uri%3Dhttps%253A%252F%252Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%252Foauth2%252Fidpresponse%26response_type%3Dcode%26scope%3Dread%253Auser%2Buser%253Aemail%2Bopenid%26state%3DH4sIAAAAAAAAAE2RW4_aMBCF_4ufMcRJHAfeWFATyrJsSRCXahXZsZ2EXJdcoKn63zv7UvXtHM13RqM5vxFHC9S3WPG2wyT6fqS3dRvvT2iCBEy8rEt7ASYGQ-dCEqpS21CKNbFppIbI455lEgAJQNp1TbuYzXjTTPPsXk-lGmZtllRZNat536XAKeDiWiqQGuR-s16BTNDiJ1IlzwowdaMq2PkxQSkQxBTSZRbHpjYsbGuXYDGnBCtluizmjFFuQSgDtDw_HuGWEHoi73igO8cZPd-R_dIrXoL149JX0bM_XP22cyFxg0RgUgdkDvJyvJn-5m0bqj5o84d__4zfRD9EwSjeEzamO8OsksY6VinLws1nX-y8-HQcDu44hLcst8SW_Rjk6_m0OVsrt3Oy6zUPV-wShOrVsotUCMKC0k9GZu3lZanzZq3txomexkpob_cSuXlXDEVxcNpce08chJpFZfuLZI6_POtveeLrigZWf1rCxQVc_PVi3Nxrif8VOP368vQ_W_KxruIaKujqaVyXEC3RgjDHpiahczJBDVpoXrRqgu6w0zXcWM4tE5tUC2zHguM5NTSWluuYc00Fpxp2DNDXx5-_PFFt6z4CAAA.H4sIAAAAAAAAAEty-MCp_WA6l1nMYYO1fMxnN_I2HfR42pn9runznw2Mm-0ANl4zVCAAAAA.4","cpu":"lg","inp":16,"networkConnType":"3g","ssr":false,"lazy":false,"alternate":false,"app":"rails","domNodes":371,"previousDomNodes":0}],"timestamp":1764521409854,"loggedIn":false,"staff":false,"bundler":"webpack"}], "target": "full"}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
-import { Search, Download, RefreshCw, Edit2, Trash2, Plus, Copy, Check } from 'lucide-react'
+import { Search, Download, RefreshCw, Edit2, Trash2, Plus, Copy, Check, X, Loader } from 'lucide-react'
 import EditTokenModal from './EditTokenModal'
 
 function TokenManager() {
@@ -12,14 +12,65 @@ function TokenManager() {
   const [currentPage, setCurrentPage] = useState(1)
   const [editingToken, setEditingToken] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addForm, setAddForm] = useState({ refreshToken: '' })
+  const [addLoading, setAddLoading] = useState(false)
+  const [addError, setAddError] = useState('')
+  const [autoRefreshing, setAutoRefreshing] = useState(false)
+  const [lastRefreshTime, setLastRefreshTime] = useState(null)
+
+  // 自动刷新所有账号的配额
+  const autoRefreshAll = async (tokenList) => {
+    if (autoRefreshing || tokenList.length === 0) return
+    setAutoRefreshing(true)
+    console.log('开始自动刷新所有账号...')
+    
+    const updatedTokens = []
+    for (const token of tokenList) {
+      try {
+        const updated = await invoke('refresh_token_from_api', { id: token.id })
+        updatedTokens.push(updated)
+      } catch (e) {
+        console.warn(`刷新账号 ${token.email} 失败:`, e)
+        updatedTokens.push(token) // 保持原数据
+      }
+    }
+    
+    setTokens(updatedTokens)
+    setLastRefreshTime(new Date().toLocaleTimeString())
+    setAutoRefreshing(false)
+    console.log('自动刷新完成')
+  }
 
   useEffect(() => {
-    loadTokens()
-    // 监听登录成功事件，自动刷新列表
+    // 初始加载
+    const init = async () => {
+      const data = await invoke('get_tokens')
+      setTokens(data)
+      // 启动时自动刷新一次
+      if (data.length > 0) {
+        setTimeout(() => autoRefreshAll(data), 1000)
+      }
+    }
+    init()
+
+    // 监听登录成功事件
     const unlisten = listen('login-success', () => {
       loadTokens()
     })
-    return () => { unlisten.then(fn => fn()) }
+
+    // 定时刷新（每5分钟）
+    const interval = setInterval(async () => {
+      const data = await invoke('get_tokens')
+      if (data.length > 0) {
+        autoRefreshAll(data)
+      }
+    }, 5 * 60 * 1000)
+
+    return () => {
+      unlisten.then(fn => fn())
+      clearInterval(interval)
+    }
   }, [])
 
   const loadTokens = async () => {
@@ -90,6 +141,25 @@ function TokenManager() {
     a.click()
   }
 
+  const handleAddByRefresh = async () => {
+    if (!addForm.refreshToken.trim()) {
+      setAddError('请输入 RefreshToken')
+      return
+    }
+    setAddLoading(true)
+    setAddError('')
+    try {
+      await invoke('add_token_by_refresh', { refreshToken: addForm.refreshToken.trim() })
+      setShowAddModal(false)
+      setAddForm({ refreshToken: '' })
+      loadTokens()
+    } catch (e) {
+      setAddError(e.toString())
+    } finally {
+      setAddLoading(false)
+    }
+  }
+
   const handleCopyEmail = (email, id) => {
     navigator.clipboard.writeText(email)
     setCopiedId(id)
@@ -113,6 +183,7 @@ function TokenManager() {
       const usage = await invoke('verify_token', {
         accessToken: token.access_token,
         refreshToken: token.refresh_token,
+        csrfToken: token.csrf_token || null,
         provider: token.provider || 'Google'
       })
       console.log('Token verified, usage:', usage)
@@ -166,6 +237,15 @@ function TokenManager() {
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-semibold text-gray-800">账号管理</h1>
           <span className="text-sm text-gray-500">{tokens.length} 个账号</span>
+          {autoRefreshing && (
+            <span className="text-xs text-blue-500 flex items-center gap-1">
+              <RefreshCw size={12} className="animate-spin" />
+              自动刷新中...
+            </span>
+          )}
+          {lastRefreshTime && !autoRefreshing && (
+            <span className="text-xs text-gray-400">上次刷新: {lastRefreshTime}</span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -187,6 +267,13 @@ function TokenManager() {
               删除 ({selectedIds.length})
             </button>
           )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 flex items-center gap-1.5 transition-colors"
+          >
+            <Plus size={16} />
+            添加账号
+          </button>
           <button
             onClick={handleExport}
             className="p-2 border rounded-lg hover:bg-gray-50 transition-colors"
@@ -405,6 +492,53 @@ function TokenManager() {
           onClose={() => setEditingToken(null)}
           onSuccess={() => { setEditingToken(null); loadTokens() }}
         />
+      )}
+
+      {/* Add Account Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAddModal(false)}>
+          <div className="bg-white rounded-xl w-[480px] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-800">添加账号</h2>
+              <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                <X size={18} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">RefreshToken</label>
+                <textarea
+                  value={addForm.refreshToken}
+                  onChange={(e) => setAddForm({ refreshToken: e.target.value })}
+                  placeholder="从 Kiro IDE 的 kiro-auth-token.json 文件中获取"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 h-24 resize-none font-mono"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  文件位置: ~/.aws/sso/cache/kiro-auth-token.json
+                </p>
+              </div>
+              {addError && (
+                <div className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{addError}</div>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleAddByRefresh}
+                  disabled={addLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {addLoading && <Loader size={14} className="animate-spin" />}
+                  {addLoading ? '添加中...' : '添加'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

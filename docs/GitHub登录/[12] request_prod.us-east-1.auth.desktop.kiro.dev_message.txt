@@ -1,0 +1,18 @@
+GET /github/authorize?client_id=Ov23lilbEuhqkZak4Bfh&redirect_uri=https%3A%2F%2Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%2Foauth2%2Fidpresponse&scope=read%3Auser+user%3Aemail+openid&response_type=code&state=H4sIAAAAAAAAAE2RW4_aMBCF_4ufMcRJHAfeWFATyrJsSRCXahXZsZ2EXJdcoKn63zv7UvXtHM13RqM5vxFHC9S3WPG2wyT6fqS3dRvvT2iCBEy8rEt7ASYGQ-dCEqpS21CKNbFppIbI455lEgAJQNp1TbuYzXjTTPPsXk-lGmZtllRZNat536XAKeDiWiqQGuR-s16BTNDiJ1IlzwowdaMq2PkxQSkQxBTSZRbHpjYsbGuXYDGnBCtluizmjFFuQSgDtDw_HuGWEHoi73igO8cZPd-R_dIrXoL149JX0bM_XP22cyFxg0RgUgdkDvJyvJn-5m0bqj5o84d__4zfRD9EwSjeEzamO8OsksY6VinLws1nX-y8-HQcDu44hLcst8SW_Rjk6_m0OVsrt3Oy6zUPV-wShOrVsotUCMKC0k9GZu3lZanzZq3txomexkpob_cSuXlXDEVxcNpce08chJpFZfuLZI6_POtveeLrigZWf1rCxQVc_PVi3Nxrif8VOP368vQ_W_KxruIaKujqaVyXEC3RgjDHpiahczJBDVpoXrRqgu6w0zXcWM4tE5tUC2zHguM5NTSWluuYc00Fpxp2DNDXx5-_PFFt6z4CAAA.H4sIAAAAAAAAAEty-MCp_WA6l1nMYYO1fMxnN_I2HfR42pn9runznw2Mm-0ANl4zVCAAAAA.4 h2
+host: prod.us-east-1.auth.desktop.kiro.dev
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: cross-site
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+referer: https://app.kiro.dev/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+priority: u=0, i
+

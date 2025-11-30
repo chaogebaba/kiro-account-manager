@@ -1,0 +1,35 @@
+h2 200
+date: Sun, 30 Nov 2025 16:33:49 GMT
+content-type: text/html
+content-length: 1379
+x-amzn-requestid: fb68d735-d5cd-4ddc-8559-764a9b4345cb
+strict-transport-security: max-age=47304000; includeSubDomains
+x-frame-options: DENY
+content-security-policy: default-src 'none'; script-src 'nonce-Mz3NMkCEU6dvRghMwqgSeg' 'self' https://d1v5rszgiinzl5.cloudfront.net https://prod.assets.shortbread.aws.dev; style-src 'nonce-Mz3NMkCEU6dvRghMwqgSeg' 'self' https://d1v5rszgiinzl5.cloudfront.net https://fonts.googleapis.com https://prod.assets.shortbread.aws.dev; font-src 'self' https://fonts.gstatic.com data: https://d1v5rszgiinzl5.cloudfront.net; img-src 'self' data: https:; connect-src 'self' https: https://d1v5rszgiinzl5.cloudfront.net https://prod.log.shortbread.aws.dev https://prod.tools.shortbread.aws.dev; frame-src 'none'; media-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+cache-control: no-cache, no-store
+x-content-type-options: nosniff
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="nonce" value="Mz3NMkCEU6dvRghMwqgSeg" />
+  <meta name="csp-nonce" content="Mz3NMkCEU6dvRghMwqgSeg">
+  <meta property="csp-nonce" nonce="Mz3NMkCEU6dvRghMwqgSeg" />
+  <meta name="stage" content="prod">
+  <!-- CSRF token not available for unauthenticated user -->
+  <!-- User ID not available for unauthenticated user -->
+  <meta name="user-status" content="anonymous">
+  <meta name="allowlisted-features" value="enableBlinkingGhost,enableCoupons" />
+  <title>Kiro Web Portal</title>
+  <link rel="icon" type="image/svg+xml" href="https://d1v5rszgiinzl5.cloudfront.net/releases/600b78a69a58bd37/favicon.svg" />
+  <link rel="stylesheet" href="https://d1v5rszgiinzl5.cloudfront.net/releases/600b78a69a58bd37/main.css" nonce="Mz3NMkCEU6dvRghMwqgSeg">
+  <link rel="modulepreload" href="https://d1v5rszgiinzl5.cloudfront.net/releases/600b78a69a58bd37/vendor.js" nonce="Mz3NMkCEU6dvRghMwqgSeg">
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="https://d1v5rszgiinzl5.cloudfront.net/releases/600b78a69a58bd37/vendor.js" nonce="Mz3NMkCEU6dvRghMwqgSeg"></script>
+  <script type="module" src="https://d1v5rszgiinzl5.cloudfront.net/releases/600b78a69a58bd37/main.js" nonce="Mz3NMkCEU6dvRghMwqgSeg"></script>
+</body>
+</html>

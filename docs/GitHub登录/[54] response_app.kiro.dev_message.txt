@@ -1,0 +1,15 @@
+h2 200
+date: Sun, 30 Nov 2025 16:53:23 GMT
+content-type: application/cbor
+content-length: 395
+x-amzn-requestid: 62c74743-bda5-4bb7-803b-a1b6714e61e8
+access-control-allow-origin: https://app.kiro.dev
+set-cookie: AccessToken=aoaAAAAAGkshJM-Iyj37QUGTbKTD663spi41Q5DA3Pdhr7s5uKeaAxt_dN8IjF9qSahxMDiEyU5XKGQbfR2GzWS0YBkc0:MGUCMC6UeeT76XOyb4uQMo8xo6+CSPtFBxVNN30lC27wS4gccwEKhN7GERUmNpRXJ2ZyFQIxAKzog04Iotrc/kKP3sCye7ybL3opuZgU1B7CQ6Ivf/21CfKVkcWed1ErKGNpxt5vFQ; HttpOnly; Secure; SameSite=Lax; Max-Age=604800; Path=/
+set-cookie: RefreshToken=aorAAAAAGmjHYEYFZWKkE91qAYkiPZHFo5ThgUXcAS4AVJa88kzbmEcXfbyV2BZkjwZgjlKh9TtemUhqlEQNbiraYBkc0:MGUCMAh2z5Bnbm4vOpGXVnS+feAiJHYp9TbTuWo1XU/uygk3eqP990vcDB5yA8+nmJFAtQIxAIiR4Q+u1gT9t0hvi2uXkyhOqdFYEEXJfpCO2op94GhfEHytq2QMvSBrbV1J8wphjg; HttpOnly; Secure; SameSite=Lax; Max-Age=604800; Path=/
+set-cookie: Idp=Github; HttpOnly; Secure; SameSite=Lax; Max-Age=604800; Path=/
+smithy-protocol: rpc-v2-cbor
+vary: Origin
+access-control-expose-headers: x-amzn-RequestId,x-amzn-ErrorType,x-amzn-ErrorMessage,Date,smithy-protocol
+access-control-allow-credentials: true
+
+¿kaccessTokenxèaoaAAAAAGkshJM-Iyj37QUGTbKTD663spi41Q5DA3Pdhr7s5uKeaAxt_dN8IjF9qSahxMDiEyU5XKGQbfR2GzWS0YBkc0:MGUCMC6UeeT76XOyb4uQMo8xo6+CSPtFBxVNN30lC27wS4gccwEKhN7GERUmNpRXJ2ZyFQIxAKzog04Iotrc/kKP3sCye7ybL3opuZgU1B7CQ6Ivf/21CfKVkcWed1ErKGNpxt5vFQicsrfTokenx,mtqD22pQTqYJr4mB9UEzzisG6IUpmGL31rjHxW3gmk0=iexpiresInjprofileArnxAarn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUKÿ

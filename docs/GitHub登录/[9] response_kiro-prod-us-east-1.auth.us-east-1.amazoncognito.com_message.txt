@@ -1,0 +1,16 @@
+h2 302
+date: Sun, 30 Nov 2025 16:53:11 GMT
+content-length: 0
+location: https://prod.us-east-1.auth.desktop.kiro.dev/github/authorize?client_id=Ov23lilbEuhqkZak4Bfh&redirect_uri=https%3A%2F%2Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%2Foauth2%2Fidpresponse&scope=read%3Auser+user%3Aemail+openid&response_type=code&state=H4sIAAAAAAAAAE2RW4_aMBCF_4ufMcRJHAfeWFATyrJsSRCXahXZsZ2EXJdcoKn63zv7UvXtHM13RqM5vxFHC9S3WPG2wyT6fqS3dRvvT2iCBEy8rEt7ASYGQ-dCEqpS21CKNbFppIbI455lEgAJQNp1TbuYzXjTTPPsXk-lGmZtllRZNat536XAKeDiWiqQGuR-s16BTNDiJ1IlzwowdaMq2PkxQSkQxBTSZRbHpjYsbGuXYDGnBCtluizmjFFuQSgDtDw_HuGWEHoi73igO8cZPd-R_dIrXoL149JX0bM_XP22cyFxg0RgUgdkDvJyvJn-5m0bqj5o84d__4zfRD9EwSjeEzamO8OsksY6VinLws1nX-y8-HQcDu44hLcst8SW_Rjk6_m0OVsrt3Oy6zUPV-wShOrVsotUCMKC0k9GZu3lZanzZq3txomexkpob_cSuXlXDEVxcNpce08chJpFZfuLZI6_POtveeLrigZWf1rCxQVc_PVi3Nxrif8VOP368vQ_W_KxruIaKujqaVyXEC3RgjDHpiahczJBDVpoXrRqgu6w0zXcWM4tE5tUC2zHguM5NTSWluuYc00Fpxp2DNDXx5-_PFFt6z4CAAA.H4sIAAAAAAAAAEty-MCp_WA6l1nMYYO1fMxnN_I2HfR42pn9runznw2Mm-0ANl4zVCAAAAA.4
+set-cookie: XSRF-TOKEN=4ae76df9-75b3-4767-9cdd-c05dfa7acbab; Path=/; Secure; HttpOnly; SameSite=Lax
+x-amz-cognito-request-id: 808cd932-25fb-4cba-950f-d38629f5ba5f
+cache-control: no-cache, no-store, max-age=0, must-revalidate
+pragma: no-cache
+set-cookie: csrf-state=YUj2HINKTeuSskwHrqcNbuv_SzbPg7zhM02ngp3Unh7iTIqulMGcWUvR8zvTjik3bK7QvdLXWIX3C8t6iZZkTC7YSTeL34lhbb17SmHgz73OdYAfkpDf4p6_x0CbfGMB_8ktlvllR6skfGx-STf7_msy1i6HAXfFkgHfn5S3uWA; Expires=Sun, 30-Nov-2025 16:58:11 GMT; Path=/; Secure; HttpOnly; SameSite=None
+set-cookie: csrf-state-legacy=YUj2HINKTeuSskwHrqcNbuv_SzbPg7zhM02ngp3Unh7iTIqulMGcWUvR8zvTjik3bK7QvdLXWIX3C8t6iZZkTC7YSTeL34lhbb17SmHgz73OdYAfkpDf4p6_x0CbfGMB_8ktlvllR6skfGx-STf7_msy1i6HAXfFkgHfn5S3uWA; Expires=Sun, 30-Nov-2025 16:58:11 GMT; Path=/; Secure; HttpOnly
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+strict-transport-security: max-age=31536000 ; includeSubDomains
+x-frame-options: DENY
+server: Server
+

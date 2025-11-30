@@ -1,0 +1,12 @@
+h2 423
+date: Sun, 30 Nov 2025 16:53:22 GMT
+content-type: application/cbor
+content-length: 209
+x-amzn-requestid: 5700888c-1e1f-4e04-9a98-c96fa202160d
+access-control-allow-origin: https://app.kiro.dev
+smithy-protocol: rpc-v2-cbor
+vary: Origin
+access-control-expose-headers: x-amzn-RequestId,x-amzn-ErrorType,x-amzn-ErrorMessage,Date,smithy-protocol
+access-control-allow-credentials: true
+
+¿f__typex9com.amazon.kirowebportalservice#AccountSuspendedExceptiongmessagexƒThere was an error processing your request. Please contact Support (https://support.aws.amazon.com/#/contacts/kiro) for assistance.ÿ

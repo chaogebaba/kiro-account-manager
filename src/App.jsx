@@ -56,6 +56,7 @@ function App() {
     switch (activeMenu) {
       case 'home': return <Home />
       case 'token': return <TokenManager />
+      case 'login': return <Login onLogin={(user) => { handleLogin(user); setActiveMenu('token'); }} />
       case 'settings': return <Settings />
       case 'about': return <About />
       default: return <Home />
@@ -77,16 +78,12 @@ function App() {
         onMenuChange={setActiveMenu}
         user={user}
         onLogout={handleLogout}
-        onAddAccount={handleAddAccount}
       />
       <main className="flex-1 overflow-hidden">
         {renderContent()}
       </main>
       
-      {/* 登录弹窗 - 用于添加账号 */}
-      {showLogin && (
-        <Login onLogin={handleLogin} onCancel={() => setShowLogin(false)} />
-      )}
+
     </div>
   )
 }

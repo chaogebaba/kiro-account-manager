@@ -1,0 +1,36 @@
+POST /v3/signin/_/AccountsSignInUi/browserinfo?f.sid=-2699898829455604980&bl=boq_identityfrontendauthuiserver_20251118.06_p0&hl=zh-CN&_reqid=1834&rt=j h2
+host: accounts.google.com
+content-length: 169
+sec-ch-ua-full-version-list: "Chromium";v="142.0.7444.176", "Not_A Brand";v="99.0.0.0", "Google Chrome";v="142.0.7444.176"
+sec-ch-ua-platform: "Windows"
+sec-ch-ua: "Chromium";v="142", "Not_A Brand";v="99", "Google Chrome";v="142"
+sec-ch-ua-bitness: "64"
+sec-ch-ua-model: ""
+sec-ch-ua-mobile: ?0
+x-same-domain: 1
+sec-ch-ua-wow64: ?0
+sec-ch-ua-form-factors: "Desktop"
+sec-ch-ua-arch: "x86"
+sec-ch-ua-full-version: "142.0.7444.176"
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36
+dnt: 1
+content-type: application/x-www-form-urlencoded;charset=UTF-8
+sec-ch-ua-platform-version: "19.0.0"
+accept: */*
+origin: https://accounts.google.com
+x-browser-channel: stable
+x-browser-year: 1969
+x-browser-validation: Aj9fzfu+SaGLBY9Oqr3S7RokOtM=
+x-browser-copyright: Copyright 2025 Google LLC. All rights reserved.
+sec-fetch-site: same-origin
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://accounts.google.com/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: __Host-GAPS=1:_D-VL3P8uEj4m-BuWc6RCLRoQGt_2A:EJoACzqIs459V_vf
+cookie: OTZ=8370270_24_24__24_
+cookie: NID=526=QOQ147ofMZV0sQvEDdVlz_7qKfDg6EUfl3i3YenAiN4Xd-xNkE_4ChK09O5evcIffaRy8dzq0x29_w4RYLNUd_ezj1gvVJwFd2D-VboX7WlFz6IzmcJXik46EzhrouZiGnHj4WLieR-tHJsgy0M7vffe-hUAuoPMoRc4p0hJHPQWl_8Gm_uZQroyitBaROE-L-V75mAstKtrew
+priority: u=1, i
+
+f.req=%5B9%2C1%2C1.25%2C%5Bnull%2C1080%2C1920%5D%2C%5Bnull%2C755%2C1488%5D%2C%5B1%2C1%2Cnull%2C1%5D%2C%5B0%2C0%2C0%5D%5D&at=ACnRkCgkU4x2JSrHJ-mIYDG_klBC%3A1764520418201&

@@ -30,19 +30,16 @@ impl AuthState {
 
 const KIRO_API: &str = "https://app.kiro.dev/service/KiroWebPortalService/operation";
 
+// 桌面端 API
+const DESKTOP_AUTH_API: &str = "https://prod.us-east-1.auth.desktop.kiro.dev";
+const DESKTOP_USAGE_API: &str = "https://codewhisperer.us-east-1.amazonaws.com";
+const PROFILE_ARN: &str = "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK";
+
 // AWS Cognito OAuth 配置
 const COGNITO_DOMAIN: &str = "https://kiro-prod-us-east-1.auth.us-east-1.amazoncognito.com";
-const COGNITO_REDIRECT_URI: &str = "https://kiro-prod-us-east-1.auth.us-east-1.amazoncognito.com/oauth2/idpresponse";
+const COGNITO_CLIENT_ID: &str = "59bd15eh40ee7pc20h0bkcu7id";
 
-// GitHub OAuth 配置
-const GITHUB_CLIENT_ID: &str = "Ov23lilbEuhqkZak4Bfh";
-const GITHUB_AUTH_URL: &str = "https://github.com/login/oauth/authorize";
-
-// Google OAuth 配置
-const GOOGLE_CLIENT_ID: &str = "183617306620-gqedod9q1su19ghqs84m1tje4lp761ks.apps.googleusercontent.com";
-const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
-
-// Kiro 原始 redirect_uri (用于 token 交换)
+// Kiro redirect_uri (用于 token 交换)
 const REDIRECT_URI: &str = "https://app.kiro.dev/signin/oauth";
 
 
@@ -123,118 +120,42 @@ fn map_provider_to_idp(provider: &str) -> String {
     }
 }
 
-/// 直接构建 OAuth URL（绕过 Kiro API，直接使用 Cognito）
-pub fn build_direct_oauth_url(provider: &str, code_verifier: &str, state: &str) -> Result<String, String> {
+/// 构建 Cognito OAuth URL（直接跳转 Cognito 授权页面）
+/// 
+/// 流程：Cognito -> Google/GitHub -> Cognito idpresponse -> app.kiro.dev/signin/oauth
+pub fn build_cognito_oauth_url(provider: &str, code_verifier: &str, state: &str) -> Result<String, String> {
     let code_challenge = generate_code_challenge(code_verifier);
     
-    match provider {
-        "GitHub" => {
-            // GitHub OAuth URL
-            let url = format!(
-                "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}",
-                GITHUB_AUTH_URL,
-                GITHUB_CLIENT_ID,
-                urlencoding::encode(COGNITO_REDIRECT_URI),
-                urlencoding::encode("read:user user:email openid"),
-                urlencoding::encode(state)
-            );
-            Ok(url)
-        }
-        "Google" => {
-            // Google OAuth URL with PKCE
-            let url = format!(
-                "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&access_type=offline&code_challenge={}&code_challenge_method=S256",
-                GOOGLE_AUTH_URL,
-                GOOGLE_CLIENT_ID,
-                urlencoding::encode(COGNITO_REDIRECT_URI),
-                urlencoding::encode("email openid"),
-                urlencoding::encode(state),
-                urlencoding::encode(&code_challenge)
-            );
-            Ok(url)
-        }
-        "BuilderId" => {
-            // AWS Builder ID - 使用 Cognito hosted UI
-            let url = format!(
-                "{}/oauth2/authorize?identity_provider=BuilderId&client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=S256",
-                COGNITO_DOMAIN,
-                "your-cognito-client-id", // 需要从 Kiro 获取
-                urlencoding::encode(COGNITO_REDIRECT_URI),
-                urlencoding::encode("openid email"),
-                urlencoding::encode(state),
-                urlencoding::encode(&code_challenge)
-            );
-            Ok(url)
-        }
-        _ => Err(format!("Unsupported provider: {}", provider))
-    }
+    // identity_provider: Google, Github (注意 GitHub 在 Cognito 里是 Github)
+    let identity_provider = match provider {
+        "GitHub" => "Github",
+        "Google" => "Google",
+        _ => return Err(format!("Unsupported provider: {}", provider))
+    };
+    
+    // 构建 Cognito 授权 URL
+    let url = format!(
+        "{}/oauth2/authorize?client_id={}&response_type=code&scope={}&redirect_uri={}&state={}&code_challenge={}&code_challenge_method=S256&identity_provider={}",
+        COGNITO_DOMAIN,
+        COGNITO_CLIENT_ID,
+        urlencoding::encode("email openid"),
+        urlencoding::encode(REDIRECT_URI),
+        urlencoding::encode(state),
+        urlencoding::encode(&code_challenge),
+        identity_provider
+    );
+    
+    Ok(url)
 }
 
-/// 通过 Kiro API 初始化登录（原有方式）
-pub async fn initiate_kiro_login(provider: &str) -> Result<(String, String, String), String> {
-    let code_verifier = generate_code_verifier();
-    let code_challenge = generate_code_challenge(&code_verifier);
-    let state = generate_state();
-    let idp = map_provider_to_idp(provider);
-
-    // 构建 CBOR 请求
-    let request = serde_json::json!({
-        "idp": idp,
-        "redirectUri": REDIRECT_URI,
-        "codeChallenge": code_challenge,
-        "codeChallengeMethod": "S256",
-        "state": state
-    });
-
-    // 序列化为 CBOR
-    let mut cbor_data = Vec::new();
-    ciborium::into_writer(&request, &mut cbor_data)
-        .map_err(|e| format!("CBOR serialize failed: {}", e))?;
-
-    let client = reqwest::Client::new();
-
-    let response = client
-        .post(format!("{}/InitiateLogin", KIRO_API))
-        .header("Content-Type", "application/cbor")
-        .header("Accept", "application/cbor")
-        .header("smithy-protocol", "rpc-v2-cbor")
-        .body(cbor_data)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    let status = response.status();
-    let body = response.bytes().await.unwrap_or_default();
-
-    println!("InitiateLogin status: {}", status);
-
-    if !status.is_success() {
-        let error_text = String::from_utf8_lossy(&body);
-        return Err(format!("InitiateLogin failed ({}): {}", status, error_text));
-    }
-
-    // 解析 CBOR 响应
-    let result: serde_json::Value = ciborium::from_reader(&body[..])
-        .map_err(|e| format!("CBOR parse failed: {} - raw: {:?}", e, &body[..50.min(body.len())]))?;
-
-    println!("InitiateLogin response: {:?}", result);
-
-    let redirect_url = result
-        .get("redirectUrl")
-        .or_else(|| result.get("authorizationUrl"))
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| format!("No redirect URL in response: {:?}", result))?
-        .to_string();
-
-    Ok((redirect_url, code_verifier, state))
-}
-
-/// 直接初始化登录（不调用 Kiro API）
-pub fn initiate_direct_login(provider: &str) -> Result<(String, String, String), String> {
+/// 初始化 Cognito OAuth 登录
+/// 
+/// 直接构建 Cognito 授权 URL，不需要调用 Kiro API
+pub fn initiate_cognito_login(provider: &str) -> Result<(String, String, String), String> {
     let code_verifier = generate_code_verifier();
     let state = generate_state();
     
-    let redirect_url = build_direct_oauth_url(provider, &code_verifier, &state)?;
+    let redirect_url = build_cognito_oauth_url(provider, &code_verifier, &state)?;
     
     Ok((redirect_url, code_verifier, state))
 }
@@ -243,37 +164,62 @@ pub fn initiate_direct_login(provider: &str) -> Result<(String, String, String),
 pub async fn exchange_kiro_token(provider: &str, code: &str, code_verifier: &str, state: &str) -> Result<ExchangeTokenResponse, String> {
     let idp = map_provider_to_idp(provider);
 
-    let request = ExchangeTokenRequest {
-        idp,
-        code: code.to_string(),
-        code_verifier: code_verifier.to_string(),
-        redirect_uri: REDIRECT_URI.to_string(),
-        state: state.to_string(),
-    };
+    // 构建 CBOR body
+    let cbor_body = encode_exchange_token_cbor(&idp, code, code_verifier, REDIRECT_URI, state);
 
     let client = reqwest::Client::new();
     
+    println!("ExchangeToken: idp={}, code={}...", idp, &code[..code.len().min(20)]);
+    
     let response = client
         .post(format!("{}/ExchangeToken", KIRO_API))
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json")
-        .json(&request)
+        .header("Content-Type", "application/cbor")
+        .header("Accept", "application/cbor")
+        .header("smithy-protocol", "rpc-v2-cbor")
+        .header("Origin", "https://app.kiro.dev")
+        .header("Referer", "https://app.kiro.dev/signin/oauth")
+        .body(cbor_body)
         .send()
         .await
         .map_err(|e| format!("ExchangeToken request failed: {}", e))?;
 
-    if !response.status().is_success() {
-        let status = response.status();
-        let text = response.text().await.unwrap_or_default();
+    let status = response.status();
+    
+    // 获取 Set-Cookie 头中的 RefreshToken
+    let mut refresh_token_from_cookie: Option<String> = None;
+    for cookie_header in response.headers().get_all("set-cookie") {
+        if let Ok(cookie_str) = cookie_header.to_str() {
+            if cookie_str.contains("RefreshToken=") {
+                if let Some(start) = cookie_str.find("RefreshToken=") {
+                    let value_start = start + 13;
+                    if let Some(end) = cookie_str[value_start..].find(';') {
+                        refresh_token_from_cookie = Some(cookie_str[value_start..value_start + end].to_string());
+                    }
+                }
+            }
+        }
+    }
+    println!("RefreshToken from cookie: {:?}", refresh_token_from_cookie.as_ref().map(|s| &s[..s.len().min(30)]));
+    
+    let body = response.bytes().await.unwrap_or_default();
+
+    if !status.is_success() {
+        let text = String::from_utf8_lossy(&body);
         return Err(format!("ExchangeToken failed ({}): {}", status, text));
     }
 
-    let result: ExchangeTokenResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Parse ExchangeToken response failed: {}", e))?;
+    // 从 CBOR 响应中提取 token
+    let text = String::from_utf8_lossy(&body);
+    println!("ExchangeToken response: {}", &text[..text.len().min(200)]);
+    
+    let access_token = extract_pattern(&text, r"aoa[A-Za-z0-9_\-:\/+=]+");
+    let csrf_token = extract_pattern(&text, r"csrfToken.{1,5}([A-Za-z0-9+/=]{20,50})");
 
-    Ok(result)
+    Ok(ExchangeTokenResponse {
+        access_token,
+        csrf_token,
+        state: Some(state.to_string()),
+    })
 }
 
 #[allow(dead_code)]
@@ -307,19 +253,6 @@ pub async fn get_kiro_user_info(csrf_token: &str) -> Result<GetUserInfoResponse,
     Ok(result)
 }
 
-/// RefreshToken 响应
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RefreshTokenResponse {
-    #[serde(rename = "accessToken")]
-    pub access_token: Option<String>,
-    #[serde(rename = "csrfToken")]
-    pub csrf_token: Option<String>,
-    #[serde(rename = "expiresIn")]
-    pub expires_in: Option<i64>,
-    #[serde(rename = "profileArn")]
-    pub profile_arn: Option<String>,
-}
-
 /// GetUserUsageAndLimits 响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageAndLimitsResponse {
@@ -334,150 +267,6 @@ pub struct UsageAndLimitsResponse {
     #[serde(rename = "userId")]
     pub user_id: Option<String>,
 }
-
-/// 使用 RefreshToken 刷新 AccessToken（通过 Cookie）
-pub async fn refresh_kiro_token_with_cookie(
-    access_token: &str,
-    refresh_token: &str,
-    idp: &str,
-) -> Result<RefreshTokenResponse, String> {
-    // CBOR 编码: {csrfToken: ""}
-    let cbor_body: Vec<u8> = vec![0xa1, 0x69, 0x63, 0x73, 0x72, 0x66, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x60];
-
-    let client = reqwest::Client::new();
-    
-    let response = client
-        .post(format!("{}/RefreshToken", KIRO_API))
-        .header("Content-Type", "application/cbor")
-        .header("Accept", "application/cbor")
-        .header("smithy-protocol", "rpc-v2-cbor")
-        .header("Cookie", format!("AccessToken={}; RefreshToken={}; Idp={}", access_token, refresh_token, idp))
-        .body(cbor_body)
-        .send()
-        .await
-        .map_err(|e| format!("RefreshToken request failed: {}", e))?;
-
-    let status = response.status();
-    let body = response.bytes().await.unwrap_or_default();
-
-    if !status.is_success() {
-        let text = String::from_utf8_lossy(&body);
-        return Err(format!("RefreshToken failed ({}): {}", status, text));
-    }
-
-    // 从响应文本中提取 token（CBOR 解析可能有问题，用正则提取）
-    let text = String::from_utf8_lossy(&body);
-    let access_token = extract_pattern(&text, r"aoa[A-Za-z0-9_\-:\/+=]+");
-    let csrf_token = extract_pattern(&text, r"csrfToken.{1,5}([A-Za-z0-9+/=]{20,50})");
-
-    Ok(RefreshTokenResponse {
-        access_token,
-        csrf_token,
-        expires_in: Some(3600),
-        profile_arn: None,
-    })
-}
-
-/// 获取用户信息
-pub async fn get_user_info_with_token(
-    access_token: &str,
-    csrf_token: &str,
-) -> Result<GetUserInfoResponse, String> {
-    // CBOR 编码: {origin: "KIRO_IDE"}
-    let cbor_body: Vec<u8> = vec![
-        0xa1, 0x66, 0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 
-        0x68, 0x4b, 0x49, 0x52, 0x4f, 0x5f, 0x49, 0x44, 0x45
-    ];
-
-    let client = reqwest::Client::new();
-    
-    let response = client
-        .post(format!("{}/GetUserInfo", KIRO_API))
-        .header("Content-Type", "application/cbor")
-        .header("Accept", "application/cbor")
-        .header("smithy-protocol", "rpc-v2-cbor")
-        .header("Authorization", format!("Bearer {}", access_token))
-        .header("x-csrf-token", csrf_token)
-        .body(cbor_body)
-        .send()
-        .await
-        .map_err(|e| format!("GetUserInfo request failed: {}", e))?;
-
-    let status = response.status();
-    let body = response.bytes().await.unwrap_or_default();
-
-    if !status.is_success() {
-        let text = String::from_utf8_lossy(&body);
-        return Err(format!("GetUserInfo failed ({}): {}", status, text));
-    }
-
-    // 从响应文本中提取信息
-    let text = String::from_utf8_lossy(&body);
-    let email = extract_email(&text);
-    let idp = extract_pattern(&text, r"cidp.([A-Za-z]+)");
-    let user_id = extract_pattern(&text, r"userId.{1,5}(d-[a-zA-Z0-9\.\-]+)");
-
-    Ok(GetUserInfoResponse {
-        email,
-        name: idp.clone(),
-        user_id,
-        avatar_url: None,
-    })
-}
-
-/// 获取用户配额使用情况
-pub async fn get_user_usage_and_limits(
-    access_token: &str,
-    csrf_token: &str,
-) -> Result<UsageAndLimitsResponse, String> {
-    // CBOR 编码: {isEmailRequired: false, origin: "KIRO_IDE"}
-    let cbor_body: Vec<u8> = vec![
-        0xa2, 0x6f, 0x69, 0x73, 0x45, 0x6d, 0x61, 0x69, 0x6c, 
-        0x52, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0xf4, 
-        0x66, 0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x68, 0x4b, 
-        0x49, 0x52, 0x4f, 0x5f, 0x49, 0x44, 0x45
-    ];
-
-    let client = reqwest::Client::new();
-    
-    let response = client
-        .post(format!("{}/GetUserUsageAndLimits", KIRO_API))
-        .header("Content-Type", "application/cbor")
-        .header("Accept", "application/cbor")
-        .header("smithy-protocol", "rpc-v2-cbor")
-        .header("Authorization", format!("Bearer {}", access_token))
-        .header("x-csrf-token", csrf_token)
-        .body(cbor_body)
-        .send()
-        .await
-        .map_err(|e| format!("GetUserUsageAndLimits request failed: {}", e))?;
-
-    let status = response.status();
-    let body = response.bytes().await.unwrap_or_default();
-
-    if !status.is_success() {
-        let text = String::from_utf8_lossy(&body);
-        return Err(format!("GetUserUsageAndLimits failed ({}): {}", status, text));
-    }
-
-    // 从响应文本中提取配额信息
-    let text = String::from_utf8_lossy(&body);
-    let limit = extract_number(&text, r"usageLimit[^\d]*(\d+)");
-    let used = extract_number(&text, r"currentUsage[^\d]*(\d+)");
-    // 提取订阅类型: subscriptionTitle 后面的值如 "KIRO PRO+"
-    let subscription_type = extract_pattern(&text, r"subscriptionTitle.{1,5}([A-Z][A-Z0-9\s\+]+)");
-    // 提取 userId
-    let user_id = extract_pattern(&text, r"userId.{1,5}(d-[a-zA-Z0-9\.\-]+)");
-
-    Ok(UsageAndLimitsResponse {
-        usage_limit: limit,
-        current_usage: used,
-        reset_date: None,
-        subscription_type,
-        user_id,
-    })
-}
-
 // 辅助函数：提取正则匹配
 fn extract_pattern(text: &str, pattern: &str) -> Option<String> {
     use regex::Regex;
@@ -492,12 +281,159 @@ fn extract_pattern(text: &str, pattern: &str) -> Option<String> {
     None
 }
 
-fn extract_email(text: &str) -> Option<String> {
-    extract_pattern(text, r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
+
+
+
+
+/// CBOR 编码 ExchangeToken 请求
+fn encode_exchange_token_cbor(idp: &str, code: &str, code_verifier: &str, redirect_uri: &str, state: &str) -> Vec<u8> {
+    let mut result = Vec::new();
+    // map(5) - 5个键值对
+    result.push(0xa5);
+    
+    // "idp": value
+    encode_cbor_string(&mut result, "idp");
+    encode_cbor_string(&mut result, idp);
+    
+    // "code": value
+    encode_cbor_string(&mut result, "code");
+    encode_cbor_string(&mut result, code);
+    
+    // "codeVerifier": value
+    encode_cbor_string(&mut result, "codeVerifier");
+    encode_cbor_string(&mut result, code_verifier);
+    
+    // "redirectUri": value
+    encode_cbor_string(&mut result, "redirectUri");
+    encode_cbor_string(&mut result, redirect_uri);
+    
+    // "state": value
+    encode_cbor_string(&mut result, "state");
+    encode_cbor_string(&mut result, state);
+    
+    result
 }
 
-fn extract_number(text: &str, pattern: &str) -> Option<i32> {
-    extract_pattern(text, pattern).and_then(|s| s.parse().ok())
+fn encode_cbor_string(result: &mut Vec<u8>, s: &str) {
+    let bytes = s.as_bytes();
+    if bytes.len() < 24 {
+        result.push(0x60 + bytes.len() as u8);
+    } else if bytes.len() < 256 {
+        result.push(0x78);
+        result.push(bytes.len() as u8);
+    } else {
+        result.push(0x79);
+        result.push((bytes.len() >> 8) as u8);
+        result.push(bytes.len() as u8);
+    }
+    result.extend_from_slice(bytes);
 }
 
+// ===== 桌面端 API =====
 
+/// 桌面端 RefreshToken 响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DesktopRefreshResponse {
+    #[serde(rename = "accessToken")]
+    pub access_token: String,
+    #[serde(rename = "refreshToken")]
+    pub refresh_token: String,
+    #[serde(rename = "expiresIn")]
+    pub expires_in: i64,
+    #[serde(rename = "profileArn")]
+    pub profile_arn: String,
+}
+
+/// 桌面端 GetUsageLimits 响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DesktopUsageResponse {
+    #[serde(rename = "userInfo")]
+    pub user_info: Option<DesktopUserInfo>,
+    #[serde(rename = "subscriptionInfo")]
+    pub subscription_info: Option<DesktopSubscriptionInfo>,
+    #[serde(rename = "usageBreakdownList")]
+    pub usage_breakdown_list: Option<Vec<DesktopUsageBreakdown>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DesktopUserInfo {
+    pub email: Option<String>,
+    #[serde(rename = "userId")]
+    pub user_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DesktopSubscriptionInfo {
+    #[serde(rename = "subscriptionTitle")]
+    pub subscription_title: Option<String>,
+    #[serde(rename = "type")]
+    pub subscription_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DesktopUsageBreakdown {
+    #[serde(rename = "usageLimit")]
+    pub usage_limit: Option<i32>,
+    #[serde(rename = "currentUsage")]
+    pub current_usage: Option<i32>,
+}
+
+/// 使用桌面端 API 刷新 Token（只需要 RefreshToken）
+pub async fn refresh_token_desktop(refresh_token: &str) -> Result<DesktopRefreshResponse, String> {
+    let client = reqwest::Client::new();
+    
+    let body = serde_json::json!({
+        "refreshToken": refresh_token
+    });
+    
+    let response = client
+        .post(format!("{}/refreshToken", DESKTOP_AUTH_API))
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+    
+    let status = response.status();
+    let text = response.text().await.unwrap_or_default();
+    
+    if !status.is_success() {
+        if status.as_u16() == 401 {
+            return Err("RefreshToken 已过期或无效，请重新获取".to_string());
+        }
+        return Err(format!("RefreshToken failed ({}): {}", status, text));
+    }
+    
+    serde_json::from_str(&text)
+        .map_err(|e| format!("Parse response failed: {} - {}", e, text))
+}
+
+/// 使用桌面端 API 获取配额和用户信息
+pub async fn get_usage_limits_desktop(access_token: &str) -> Result<DesktopUsageResponse, String> {
+    let client = reqwest::Client::new();
+    
+    let url = format!(
+        "{}/getUsageLimits?isEmailRequired=true&origin=AI_EDITOR&profileArn={}",
+        DESKTOP_USAGE_API,
+        urlencoding::encode(PROFILE_ARN)
+    );
+    
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", access_token))
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+    
+    let status = response.status();
+    let text = response.text().await.unwrap_or_default();
+    
+    if !status.is_success() {
+        return Err(format!("GetUsageLimits failed ({}): {}", status, text));
+    }
+    
+    serde_json::from_str(&text)
+        .map_err(|e| format!("Parse response failed: {} - {}", e, text))
+}

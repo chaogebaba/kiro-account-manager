@@ -4,10 +4,10 @@ mod auth;
 mod token;
 
 use auth::{
-    AuthState, User, initiate_kiro_login, initiate_direct_login, exchange_kiro_token,
-    refresh_kiro_token_with_cookie, get_user_info_with_token, get_user_usage_and_limits,
-    UsageAndLimitsResponse,
+    AuthState, User, initiate_cognito_login, exchange_kiro_token,
+    UsageAndLimitsResponse, refresh_token_desktop, get_usage_limits_desktop,
 };
+use base64::engine::Engine;
 use std::sync::Mutex;
 use tauri::{Manager, State, Window};
 use token::{Token, TokenStore};
@@ -16,6 +16,7 @@ struct AppState {
     store: Mutex<TokenStore>,
     auth: AuthState,
     pending_login: Mutex<Option<PendingLogin>>,
+    auth_temp_dir: Mutex<Option<std::path::PathBuf>>,
 }
 
 #[derive(Clone)]
@@ -147,28 +148,34 @@ async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> Resul
         store.tokens.iter().find(|t| t.id == id).cloned()
     }.ok_or("Token not found")?;
 
-    let access_token = token.access_token.as_ref().ok_or("No access token")?;
     let refresh_token = token.refresh_token.as_ref().ok_or("No refresh token")?;
-    let provider = token.provider.as_ref().map(|s| s.as_str()).unwrap_or("Google");
 
-    // 1. 先刷新 token 获取新的 accessToken 和 csrfToken
-    let refresh_result = refresh_kiro_token_with_cookie(access_token, refresh_token, provider).await?;
+    // 1. 使用桌面端 API 刷新 token
+    let refresh_result = refresh_token_desktop(refresh_token).await?;
+    let new_access_token = refresh_result.access_token;
+
+    // 2. 使用桌面端 API 获取配额
+    let usage = get_usage_limits_desktop(&new_access_token).await?;
     
-    let new_access_token = refresh_result.access_token.unwrap_or_else(|| access_token.clone());
-    let csrf_token = refresh_result.csrf_token.unwrap_or_default();
-
-    // 2. 获取配额使用情况
-    let usage = get_user_usage_and_limits(&new_access_token, &csrf_token).await?;
+    // 从 usage_breakdown_list 提取配额信息
+    let (quota, used) = if let Some(list) = &usage.usage_breakdown_list {
+        if let Some(first) = list.first() {
+            (first.usage_limit.unwrap_or(50), first.current_usage.unwrap_or(0))
+        } else {
+            (50, 0)
+        }
+    } else {
+        (50, 0)
+    };
 
     // 3. 更新 token 信息
     let mut store = state.store.lock().unwrap();
     let token_idx = store.tokens.iter().position(|t| t.id == id);
     
     if let Some(idx) = token_idx {
-        store.tokens[idx].quota = usage.usage_limit.unwrap_or(store.tokens[idx].quota);
-        store.tokens[idx].used = usage.current_usage.unwrap_or(store.tokens[idx].used);
+        store.tokens[idx].quota = quota;
+        store.tokens[idx].used = used;
         store.tokens[idx].access_token = Some(new_access_token);
-        // 保留原来的 refresh_token，不要覆盖
         
         // 更新状态
         if store.tokens[idx].used >= store.tokens[idx].quota {
@@ -188,18 +195,36 @@ async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> Resul
 // 验证 token 是否有效
 #[tauri::command]
 async fn verify_token(
-    access_token: String,
+    _access_token: String,
     refresh_token: String,
-    provider: String,
+    _csrf_token: Option<String>,
+    _provider: String,
 ) -> Result<UsageAndLimitsResponse, String> {
-    // 先刷新获取 csrf_token
-    let refresh_result = refresh_kiro_token_with_cookie(&access_token, &refresh_token, &provider).await?;
-    
-    let new_access_token = refresh_result.access_token.unwrap_or(access_token);
-    let csrf_token = refresh_result.csrf_token.unwrap_or_default();
+    // 使用桌面端 API 刷新
+    let refresh_result = refresh_token_desktop(&refresh_token).await?;
+    let new_access_token = refresh_result.access_token;
 
-    // 获取配额
-    get_user_usage_and_limits(&new_access_token, &csrf_token).await
+    // 使用桌面端 API 获取配额
+    let usage = get_usage_limits_desktop(&new_access_token).await?;
+    
+    // 转换为 UsageAndLimitsResponse 格式
+    let (quota, used) = if let Some(list) = &usage.usage_breakdown_list {
+        if let Some(first) = list.first() {
+            (first.usage_limit, first.current_usage)
+        } else {
+            (None, None)
+        }
+    } else {
+        (None, None)
+    };
+    
+    Ok(UsageAndLimitsResponse {
+        usage_limit: quota,
+        current_usage: used,
+        reset_date: None,
+        subscription_type: usage.subscription_info.and_then(|s| s.subscription_type),
+        user_id: usage.user_info.and_then(|u| u.user_id),
+    })
 }
 
 // 通过 RefreshToken 添加账号（获取真实邮箱和配额）
@@ -211,43 +236,55 @@ pub struct AddTokenResult {
     pub used: i32,
 }
 
+/// 通过 RefreshToken 添加账号（使用桌面端 API，只需要 RefreshToken）
 #[tauri::command]
 async fn add_token_by_refresh(
     state: State<'_, AppState>,
-    access_token: String,
     refresh_token: String,
-    provider: String,
+    provider: Option<String>,
 ) -> Result<Token, String> {
-    println!("Adding token by refresh: provider={}", provider);
+    println!("Adding token by refresh (desktop API)");
     
-    // 1. 刷新获取 csrfToken
-    let refresh_result = refresh_kiro_token_with_cookie(&access_token, &refresh_token, &provider).await?;
-    let new_access_token = refresh_result.access_token.unwrap_or_else(|| access_token.clone());
-    let csrf_token = refresh_result.csrf_token.unwrap_or_default();
+    // 1. 使用桌面端 API 刷新获取 AccessToken
+    let refresh_result = refresh_token_desktop(&refresh_token).await?;
+    let access_token = refresh_result.access_token;
+    println!("Got accessToken: {}...", &access_token[..30.min(access_token.len())]);
     
-    // 2. 获取用户信息（邮箱）
-    let user_info = get_user_info_with_token(&new_access_token, &csrf_token).await?;
-    let email = user_info.email.unwrap_or_else(|| format!("{}@kiro.dev", provider.to_lowercase()));
-    println!("Got email: {}", email);
+    // 2. 使用桌面端 API 获取用户信息和配额
+    let usage_result = get_usage_limits_desktop(&access_token).await?;
     
-    // 3. 获取配额信息
-    let usage = get_user_usage_and_limits(&new_access_token, &csrf_token).await?;
-    let quota = usage.usage_limit.unwrap_or(50);
-    let used = usage.current_usage.unwrap_or(0);
-    let subscription_type = usage.subscription_type.clone();
-    let user_id = usage.user_id.or(user_info.user_id);
-    println!("Got usage: {}/{}, subscription: {:?}", used, quota, subscription_type);
+    let email = usage_result.user_info.as_ref()
+        .and_then(|u| u.email.clone())
+        .unwrap_or_else(|| "unknown@kiro.dev".to_string());
+    let user_id = usage_result.user_info.as_ref()
+        .and_then(|u| u.user_id.clone());
+    let subscription_type = usage_result.subscription_info.as_ref()
+        .and_then(|s| s.subscription_title.clone());
     
-    // 4. 添加到 token 列表
+    let (quota, used) = usage_result.usage_breakdown_list.as_ref()
+        .and_then(|list| list.first())
+        .map(|u| (u.usage_limit.unwrap_or(50), u.current_usage.unwrap_or(0)))
+        .unwrap_or((50, 0));
+    
+    // 从邮箱推断 provider
+    let idp = provider.unwrap_or_else(|| {
+        if email.contains("gmail") { "Google".to_string() }
+        else if email.contains("github") { "Github".to_string() }
+        else { "Google".to_string() }
+    });
+    
+    println!("Got: email={}, quota={}, used={}, subscription={:?}", email, quota, used, subscription_type);
+    
+    // 3. 添加到 token 列表
     let token = state.store.lock().unwrap().add_with_tokens(
         email.clone(),
-        format!("Kiro {} 账号", provider),
+        format!("Kiro {} 账号", idp),
         quota,
-        new_access_token,
+        access_token.clone(),
         refresh_token,
-        provider.clone(),
-        user_id.clone(),
-        subscription_type.clone(),
+        idp.clone(),
+        user_id,
+        subscription_type,
     );
     
     // 更新 used
@@ -265,9 +302,10 @@ async fn add_token_by_refresh(
         email: email.clone(),
         name: email.split('@').next().unwrap_or("User").to_string(),
         avatar: None,
-        provider,
+        provider: idp,
     };
     *state.auth.user.lock().unwrap() = Some(user);
+    *state.auth.access_token.lock().unwrap() = Some(access_token);
     
     Ok(token)
 }
@@ -309,30 +347,31 @@ async fn login_with_github(window: Window, state: State<'_, AppState>) -> Result
 async fn start_oauth_flow(
     window: Window,
     state: State<'_, AppState>,
-    provider: &str,
+    _provider: &str,
 ) -> Result<String, String> {
-    println!("Starting {} login...", provider);
+    println!("Opening Kiro signin page...");
 
-    // 调用 Kiro API 获取授权 URL
-    let (redirect_url, code_verifier, login_state) = initiate_kiro_login(provider).await?;
-    println!("Got redirect URL: {}", redirect_url);
+    // 直接打开 Kiro 登录页面
+    let signin_url = "https://app.kiro.dev/signin";
 
-    // 保存登录状态
-    *state.pending_login.lock().unwrap() = Some(PendingLogin {
-        provider: provider.to_string(),
-        code_verifier,
-        state: login_state,
-    });
+    // 清空之前的登录状态
+    *state.pending_login.lock().unwrap() = None;
 
-    // 创建内置浏览器窗口
+    // 创建内置浏览器窗口（使用临时数据目录实现隔离，避免 Cognito session 复用）
+    let temp_data_dir = std::env::temp_dir().join(format!("kiro-auth-{}", uuid::Uuid::new_v4()));
+    
+    // 保存临时目录路径，关闭窗口时清理
+    *state.auth_temp_dir.lock().unwrap() = Some(temp_data_dir.clone());
+    
     let auth_window = tauri::WindowBuilder::new(
         &window.app_handle(),
         "auth",
-        tauri::WindowUrl::External(redirect_url.parse().unwrap()),
+        tauri::WindowUrl::External(signin_url.parse().unwrap()),
     )
     .title("登录 - Kiro")
     .inner_size(500.0, 700.0)
     .center()
+    .data_directory(temp_data_dir)
     .initialization_script(r#"
         (async function() {
             if (window.location.hostname !== 'app.kiro.dev') return;
@@ -343,72 +382,59 @@ async fn start_oauth_flow(
             console.log('Login detected, fetching user info...');
             
             try {
-                // 1. RefreshToken 获取 accessToken 和 csrfToken
-                const refreshRes = await fetch('/service/KiroWebPortalService/operation/RefreshToken', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/cbor', 'Accept': 'application/cbor', 'smithy-protocol': 'rpc-v2-cbor' },
-                    body: new Uint8Array([0xa1, 0x69, 0x63, 0x73, 0x72, 0x66, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x60]),
-                    credentials: 'include'
-                });
-                if (!refreshRes.ok) throw new Error('RefreshToken failed');
-                const refreshText = new TextDecoder().decode(await refreshRes.arrayBuffer());
+                // 0. 从页面 meta 标签获取 csrfToken
+                let metaCsrf = document.querySelector('meta[name="csrf-token"]');
+                let csrfToken = metaCsrf ? metaCsrf.getAttribute('content') : '';
+                console.log('csrfToken from meta:', csrfToken);
                 
-                const accessToken = (refreshText.match(/aoa[A-Za-z0-9_\-:\/+=]+/) || [''])[0];
-                const csrfToken = (refreshText.match(/csrfToken.{1,5}([A-Za-z0-9+\/=]{20,50})/) || ['',''])[1];
-                console.log('accessToken:', accessToken.substring(0,30) + '...');
-                
-                // 2. GetUserInfo 获取邮箱和 idp
-                const userRes = await fetch('/service/KiroWebPortalService/operation/GetUserInfo', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/cbor', 'Accept': 'application/cbor', 'smithy-protocol': 'rpc-v2-cbor', 'Authorization': 'Bearer ' + accessToken, 'x-csrf-token': csrfToken },
-                    body: new Uint8Array([0xa1, 0x66, 0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x68, 0x4b, 0x49, 0x52, 0x4f, 0x5f, 0x49, 0x44, 0x45]),
-                    credentials: 'include'
-                });
-                if (!userRes.ok) throw new Error('GetUserInfo failed');
-                const userText = new TextDecoder().decode(await userRes.arrayBuffer());
-                
-                const email = (userText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/) || ['unknown@kiro.dev'])[0];
-                const idp = (userText.match(/cidp.([A-Za-z]+)/) || ['','Google'])[1];
-                console.log('email:', email, 'idp:', idp);
-                
-                // 3. GetUserUsageAndLimits 获取配额信息
-                // body: {isEmailRequired: false, origin: "KIRO_IDE"}
-                const usageRes = await fetch('/service/KiroWebPortalService/operation/GetUserUsageAndLimits', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/cbor', 'Accept': 'application/cbor', 'smithy-protocol': 'rpc-v2-cbor', 'Authorization': 'Bearer ' + accessToken, 'x-csrf-token': csrfToken },
-                    body: new Uint8Array([0xa2, 0x6f, 0x69, 0x73, 0x45, 0x6d, 0x61, 0x69, 0x6c, 0x52, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0xf4, 0x66, 0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x68, 0x4b, 0x49, 0x52, 0x4f, 0x5f, 0x49, 0x44, 0x45]),
-                    credentials: 'include'
-                });
-                
-                let quota = 50, used = 0;
-                if (usageRes.ok) {
-                    const usageText = new TextDecoder().decode(await usageRes.arrayBuffer());
-                    // 尝试提取 usageLimit 和 currentUsage
-                    const limitMatch = usageText.match(/usageLimit[^\d]*(\d+)/);
-                    const usedMatch = usageText.match(/currentUsage[^\d]*(\d+)/);
-                    if (limitMatch) quota = parseInt(limitMatch[1]) || 50;
-                    if (usedMatch) used = parseInt(usedMatch[1]) || 0;
-                    console.log('quota:', quota, 'used:', used);
+                // 如果没有 csrfToken，跳转到 account/usage 页面
+                if (!csrfToken) {
+                    if (!window.location.pathname.includes('/account')) {
+                        console.log('No csrfToken, redirecting to /account/usage...');
+                        window.location.href = '/account/usage';
+                        return;
+                    }
+                    // 等待页面加载完成后重试
+                    await new Promise(r => setTimeout(r, 500));
+                    metaCsrf = document.querySelector('meta[name="csrf-token"]');
+                    csrfToken = metaCsrf ? metaCsrf.getAttribute('content') : '';
+                    if (!csrfToken) throw new Error('No csrfToken found');
                 }
                 
-                // 4. 从 Cookie 中获取 RefreshToken
+                // 1. 从 Cookie 获取 AccessToken
                 const getCookie = (name) => {
                     const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
                     return match ? match[2] : '';
                 };
+                const accessToken = getCookie('AccessToken') || '';
                 const refreshToken = getCookie('RefreshToken') || '';
-                console.log('refreshToken:', refreshToken.substring(0,30) + '...');
+                const idp = getCookie('Idp') || 'Google';
                 
-                // 5. 添加到 token 列表
-                if (window.__TAURI__) {
-                    const result = await window.__TAURI__.invoke('add_kiro_token', { email, accessToken, refreshToken, csrfToken, idp, quota, used });
-                    console.log('Token added:', result);
-                    window.__TAURI__.event.emit('login-success', result);
-                    window.__TAURI__.invoke('close_auth_window');
+                console.log('accessToken:', accessToken.substring(0, 30) + '...');
+                console.log('refreshToken:', refreshToken.substring(0, 30) + '...');
+                
+                // 如果 Cookie 读不到（HttpOnly），尝试从 RefreshToken API 获取
+                if (!accessToken || !refreshToken) {
+                    console.log('Cookies not readable, trying RefreshToken API...');
+                    throw new Error('Cookies are HttpOnly, cannot read');
                 }
+                
+                // 2. 从页面 meta 获取 userId
+                const userIdMeta = document.querySelector('meta[name="user-id"]');
+                const userId = userIdMeta ? userIdMeta.getAttribute('content') : '';
+                
+                // 3. 直接把 token 信息传给 Rust，让 Rust 调用 API 获取详细信息
+                // 这里只传基本信息，quota/email 由 Rust 端获取
+                let email = userId || 'unknown';
+                let quota = 50, used = 0;
+                console.log('userId:', userId, 'idp:', idp);
+                
+                // 4. 把数据编码到 document.title，让 Rust 端读取
+                const tokenData = { email, accessToken, refreshToken, csrfToken, idp, quota, used };
+                document.title = 'KIRO_LOGIN_SUCCESS:' + btoa(JSON.stringify(tokenData));
+                console.log('Token data encoded to title');
             } catch (err) {
                 console.error('Error:', err);
-                if (window.__TAURI__) window.__TAURI__.invoke('close_auth_window');
             }
         })();
     "#)
@@ -437,27 +463,44 @@ async fn start_oauth_flow(
                 console.log('Login detected via polling, fetching user info...');
                 
                 try {
-                    const refreshRes = await fetch('/service/KiroWebPortalService/operation/RefreshToken', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/cbor', 'Accept': 'application/cbor', 'smithy-protocol': 'rpc-v2-cbor' },
-                        body: new Uint8Array([0xa1, 0x69, 0x63, 0x73, 0x72, 0x66, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x60]),
-                        credentials: 'include'
-                    });
-                    if (!refreshRes.ok) throw new Error('RefreshToken failed');
-                    const refreshText = new TextDecoder().decode(await refreshRes.arrayBuffer());
-                    const accessToken = (refreshText.match(/aoa[A-Za-z0-9_\-:\/+=]+/) || [''])[0];
-                    const csrfToken = (refreshText.match(/csrfToken.{1,5}([A-Za-z0-9+\/=]{20,50})/) || ['',''])[1];
+                    // 从页面 meta 标签获取 csrfToken
+                    let metaCsrf = document.querySelector('meta[name="csrf-token"]');
+                    let csrfToken = metaCsrf ? metaCsrf.getAttribute('content') : '';
                     
+                    // 如果没有 csrfToken，跳转到 account/usage 页面
+                    if (!csrfToken) {
+                        if (!window.location.pathname.includes('/account')) {
+                            window.location.href = '/account/usage';
+                            return;
+                        }
+                        await new Promise(r => setTimeout(r, 500));
+                        metaCsrf = document.querySelector('meta[name="csrf-token"]');
+                        csrfToken = metaCsrf ? metaCsrf.getAttribute('content') : '';
+                        if (!csrfToken) throw new Error('No csrfToken found');
+                    }
+                    
+                    // 从 Cookie 获取 token
+                    const getCookie = (name) => {
+                        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+                        return match ? match[2] : '';
+                    };
+                    const accessToken = getCookie('AccessToken') || '';
+                    const refreshToken = getCookie('RefreshToken') || '';
+                    const idp = getCookie('Idp') || 'Google';
+                    
+                    // GetUserInfo 获取邮箱
                     const userRes = await fetch('/service/KiroWebPortalService/operation/GetUserInfo', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/cbor', 'Accept': 'application/cbor', 'smithy-protocol': 'rpc-v2-cbor', 'Authorization': 'Bearer ' + accessToken, 'x-csrf-token': csrfToken },
                         body: new Uint8Array([0xa1, 0x66, 0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x68, 0x4b, 0x49, 0x52, 0x4f, 0x5f, 0x49, 0x44, 0x45]),
                         credentials: 'include'
                     });
-                    if (!userRes.ok) throw new Error('GetUserInfo failed');
-                    const userText = new TextDecoder().decode(await userRes.arrayBuffer());
-                    const email = (userText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/) || ['unknown@kiro.dev'])[0];
-                    const idp = (userText.match(/cidp.([A-Za-z]+)/) || ['','Google'])[1];
+                    let email = 'unknown@kiro.dev';
+                    if (userRes.ok) {
+                        const userText = new TextDecoder().decode(await userRes.arrayBuffer());
+                        const emailMatch = userText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+                        if (emailMatch) email = emailMatch[0];
+                    }
                     
                     // GetUserUsageAndLimits
                     const usageRes = await fetch('/service/KiroWebPortalService/operation/GetUserUsageAndLimits', {
@@ -475,28 +518,36 @@ async fn start_oauth_flow(
                         if (usedMatch) used = parseInt(usedMatch[1]) || 0;
                     }
                     
-                    // 从 Cookie 获取 RefreshToken
-                    const getCookie = (name) => {
-                        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-                        return match ? match[2] : '';
-                    };
-                    const refreshToken = getCookie('RefreshToken') || '';
-                    
-                    if (window.__TAURI__) {
-                        const result = await window.__TAURI__.invoke('add_kiro_token', { email, accessToken, refreshToken, csrfToken, idp, quota, used });
-                        window.__TAURI__.event.emit('login-success', result);
-                        window.__TAURI__.invoke('close_auth_window');
-                    }
+                    // 把数据编码到 document.title，让 Rust 端读取
+                    const tokenData = { email, accessToken, refreshToken, csrfToken, idp, quota, used };
+                    document.title = 'KIRO_LOGIN_SUCCESS:' + btoa(JSON.stringify(tokenData));
+                    console.log('Token data encoded to title');
                 } catch (err) {
                     console.error('Polling error:', err);
-                    if (window.__TAURI__) window.__TAURI__.invoke('close_auth_window');
                 }
             })();
         "#;
         
-        for _ in 0..60 {
+        for _ in 0..120 {
             std::thread::sleep(std::time::Duration::from_millis(500));
             if let Some(auth_win) = app_handle.get_window("auth") {
+                // 检查窗口标题是否包含登录数据
+                if let Ok(title) = auth_win.title() {
+                    if title.starts_with("KIRO_LOGIN_SUCCESS:") {
+                        let data_base64 = title.trim_start_matches("KIRO_LOGIN_SUCCESS:");
+                        if let Ok(data_json) = base64::engine::general_purpose::STANDARD.decode(data_base64) {
+                            if let Ok(data_str) = String::from_utf8(data_json) {
+                                println!("Got login data from title: {}", &data_str[..data_str.len().min(100)]);
+                                // 发送事件到主窗口
+                                let _ = app_handle.emit_all("kiro-login-data", data_str);
+                                // 关闭 auth 窗口
+                                let _ = auth_win.close();
+                                break;
+                            }
+                        }
+                    }
+                }
+                // 注入检查脚本
                 let _ = auth_win.eval(check_script);
             } else {
                 break;
@@ -525,9 +576,9 @@ async fn start_direct_oauth_flow(
 ) -> Result<String, String> {
     println!("Starting direct {} login...", provider);
 
-    // 直接构建 OAuth URL（不调用 Kiro API）
-    let (redirect_url, code_verifier, login_state) = initiate_direct_login(provider)?;
-    println!("Direct OAuth URL: {}", redirect_url);
+    // 直接构建 Cognito OAuth URL
+    let (redirect_url, code_verifier, login_state) = initiate_cognito_login(provider)?;
+    println!("Cognito OAuth URL: {}", redirect_url);
 
     // 保存登录状态
     *state.pending_login.lock().unwrap() = Some(PendingLogin {
@@ -554,7 +605,7 @@ async fn start_direct_oauth_flow(
 // 使用系统浏览器打开 OAuth（备用方案）
 #[tauri::command]
 fn open_oauth_in_browser(provider: String) -> Result<String, String> {
-    let (redirect_url, _code_verifier, _state) = initiate_direct_login(&provider)?;
+    let (redirect_url, _code_verifier, _state) = initiate_cognito_login(&provider)?;
     open::that(&redirect_url).map_err(|e| format!("Failed to open browser: {}", e))?;
     Ok(redirect_url)
 }
@@ -573,11 +624,24 @@ fn manual_login(state: State<AppState>, email: String, provider: String) -> User
     user
 }
 
-// 关闭 auth 窗口
+// 关闭 auth 窗口并清理临时目录
 #[tauri::command]
-fn close_auth_window(window: Window) {
+fn close_auth_window(window: Window, state: State<AppState>) {
     if let Some(auth_window) = window.app_handle().get_window("auth") {
         let _ = auth_window.close();
+    }
+    
+    // 清理临时数据目录
+    if let Some(temp_dir) = state.auth_temp_dir.lock().unwrap().take() {
+        std::thread::spawn(move || {
+            // 延迟一点再删除，确保窗口已完全关闭
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
+                println!("Failed to cleanup temp dir: {}", e);
+            } else {
+                println!("Cleaned up temp dir: {:?}", temp_dir);
+            }
+        });
     }
 }
 
@@ -641,19 +705,48 @@ fn get_pending_login(state: State<AppState>) -> Option<(String, String)> {
 // 完成 OAuth 登录 - 从 Cookie 中获取 token
 // 添加 Kiro token 到管理列表
 #[tauri::command]
-fn add_kiro_token(
-    state: State<AppState>,
+async fn add_kiro_token(
+    state: State<'_, AppState>,
     email: String,
     access_token: String,
-    refresh_token: String,  // 真正的 RefreshToken (aor开头)
+    refresh_token: String,
     csrf_token: String,
     idp: String,
     quota: Option<i32>,
     used: Option<i32>,
 ) -> Result<Token, String> {
-    println!("Adding Kiro token: email={}, idp={}, quota={:?}, used={:?}", email, idp, quota, used);
+    println!("Adding Kiro token: email={}, idp={}", email, idp);
     println!("  accessToken: {}...", &access_token[..30.min(access_token.len())]);
     println!("  refreshToken: {}...", &refresh_token[..30.min(refresh_token.len())]);
+    
+    // 使用桌面端 API 获取完整信息
+    let (final_email, final_quota, final_used, subscription_type, user_id) = 
+        if !access_token.is_empty() {
+            // 使用桌面端 API 获取配额和用户信息
+            let usage = get_usage_limits_desktop(&access_token).await.ok();
+            
+            let email_from_api = usage.as_ref()
+                .and_then(|u| u.user_info.as_ref())
+                .and_then(|ui| ui.email.clone())
+                .unwrap_or(email.clone());
+            let user_id = usage.as_ref()
+                .and_then(|u| u.user_info.as_ref())
+                .and_then(|ui| ui.user_id.clone());
+            let sub_type = usage.as_ref()
+                .and_then(|u| u.subscription_info.as_ref())
+                .and_then(|si| si.subscription_type.clone());
+            let (quota_from_api, used_from_api) = usage.as_ref()
+                .and_then(|u| u.usage_breakdown_list.as_ref())
+                .and_then(|list| list.first())
+                .map(|b| (b.usage_limit.unwrap_or(50), b.current_usage.unwrap_or(0)))
+                .unwrap_or((quota.unwrap_or(50), used.unwrap_or(0)));
+            
+            (email_from_api, quota_from_api, used_from_api, sub_type, user_id)
+        } else {
+            (email.clone(), quota.unwrap_or(50), used.unwrap_or(0), None, None)
+        };
+    
+    println!("  final: email={}, quota={}, used={}", final_email, final_quota, final_used);
     
     // 保存认证信息
     *state.auth.access_token.lock().unwrap() = Some(access_token.clone());
@@ -663,34 +756,36 @@ fn add_kiro_token(
     // 创建用户
     let user = User {
         id: uuid::Uuid::new_v4().to_string(),
-        email: email.clone(),
-        name: email.split('@').next().unwrap_or("User").to_string(),
+        email: final_email.clone(),
+        name: final_email.split('@').next().unwrap_or("User").to_string(),
         avatar: None,
         provider: idp.clone(),
     };
     *state.auth.user.lock().unwrap() = Some(user);
     *state.pending_login.lock().unwrap() = None;
     
-    // 添加到 token 列表（包含完整的 token 信息用于切号）
+    // 添加到 token 列表
     let mut token = state.store.lock().unwrap().add_with_tokens(
-        email,
+        final_email,
         format!("Kiro {} 账号", idp),
-        quota.unwrap_or(50),
+        final_quota,
         access_token,
-        refresh_token,  // 使用真正的 RefreshToken
+        refresh_token,
         idp,
-        None,  // user_id - 登录时暂时没有
-        None,  // subscription_type - 登录时暂时没有
+        user_id,
+        subscription_type,
     );
     
-    // 更新已使用量
-    if let Some(u) = used {
-        token.used = u;
-        // 重新保存
+    token.used = final_used;
+    
+    // 保存
+    {
         let mut store = state.store.lock().unwrap();
         if let Some(t) = store.tokens.iter_mut().find(|t| t.id == token.id) {
-            t.used = u;
+            t.used = final_used;
+            t.csrf_token = Some(csrf_token);
         }
+        store.save_to_file();
     }
     
     Ok(token)
@@ -730,6 +825,7 @@ fn main() {
             store: Mutex::new(TokenStore::new()),
             auth: AuthState::new(),
             pending_login: Mutex::new(None),
+            auth_temp_dir: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             get_tokens,

@@ -1,0 +1,10 @@
+OPTIONS /csp/report-to/gse_qebhlk h2
+host: csp.withgoogle.com
+origin: https://accounts.google.com
+access-control-request-method: POST
+access-control-request-headers: content-type
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+priority: u=4, i
+

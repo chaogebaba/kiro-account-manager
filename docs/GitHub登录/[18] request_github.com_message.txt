@@ -1,0 +1,26 @@
+GET /u2f/login_fragment?disable_signup=false&is_emu_login=false&mobile_ios=false&return_to=%2Flogin%2Foauth%2Fauthorize%3Fclient_id%3DOv23lilbEuhqkZak4Bfh%26redirect_uri%3Dhttps%253A%252F%252Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%252Foauth2%252Fidpresponse%26response_type%3Dcode%26scope%3Dread%253Auser%2Buser%253Aemail%2Bopenid%26state%3DH4sIAAAAAAAAAE2RW4_aMBCF_4ufMcRJHAfeWFATyrJsSRCXahXZsZ2EXJdcoKn63zv7UvXtHM13RqM5vxFHC9S3WPG2wyT6fqS3dRvvT2iCBEy8rEt7ASYGQ-dCEqpS21CKNbFppIbI455lEgAJQNp1TbuYzXjTTPPsXk-lGmZtllRZNat536XAKeDiWiqQGuR-s16BTNDiJ1IlzwowdaMq2PkxQSkQxBTSZRbHpjYsbGuXYDGnBCtluizmjFFuQSgDtDw_HuGWEHoi73igO8cZPd-R_dIrXoL149JX0bM_XP22cyFxg0RgUgdkDvJyvJn-5m0bqj5o84d__4zfRD9EwSjeEzamO8OsksY6VinLws1nX-y8-HQcDu44hLcst8SW_Rjk6_m0OVsrt3Oy6zUPV-wShOrVsotUCMKC0k9GZu3lZanzZq3txomexkpob_cSuXlXDEVxcNpce08chJpFZfuLZI6_POtveeLrigZWf1rCxQVc_PVi3Nxrif8VOP368vQ_W_KxruIaKujqaVyXEC3RgjDHpiahczJBDVpoXrRqgu6w0zXcWM4tE5tUC2zHguM5NTSWluuYc00Fpxp2DNDXx5-_PFFt6z4CAAA.H4sIAAAAAAAAAEty-MCp_WA6l1nMYYO1fMxnN_I2HfR42pn9runznw2Mm-0ANl4zVCAAAAA.4 h2
+host: github.com
+sec-ch-ua-platform: "Windows"
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+sec-ch-ua-mobile: ?0
+x-github-client-version: 053169ff9e7f6a2cc2a6e68417b1a5ae5352141c
+x-fetch-nonce-to-validate: v2:4bf3f1ec-fa41-0537-3036-eddae36e6b83
+x-requested-with: XMLHttpRequest
+accept: text/html
+x-fetch-nonce: v2:4bf3f1ec-fa41-0537-3036-eddae36e6b83
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0
+dnt: 1
+sec-fetch-site: same-origin
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://github.com/login?client_id=Ov23lilbEuhqkZak4Bfh&return_to=%2Flogin%2Foauth%2Fauthorize%3Fclient_id%3DOv23lilbEuhqkZak4Bfh%26redirect_uri%3Dhttps%253A%252F%252Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%252Foauth2%252Fidpresponse%26response_type%3Dcode%26scope%3Dread%253Auser%2Buser%253Aemail%2Bopenid%26state%3DH4sIAAAAAAAAAE2RW4_aMBCF_4ufMcRJHAfeWFATyrJsSRCXahXZsZ2EXJdcoKn63zv7UvXtHM13RqM5vxFHC9S3WPG2wyT6fqS3dRvvT2iCBEy8rEt7ASYGQ-dCEqpS21CKNbFppIbI455lEgAJQNp1TbuYzXjTTPPsXk-lGmZtllRZNat536XAKeDiWiqQGuR-s16BTNDiJ1IlzwowdaMq2PkxQSkQxBTSZRbHpjYsbGuXYDGnBCtluizmjFFuQSgDtDw_HuGWEHoi73igO8cZPd-R_dIrXoL149JX0bM_XP22cyFxg0RgUgdkDvJyvJn-5m0bqj5o84d__4zfRD9EwSjeEzamO8OsksY6VinLws1nX-y8-HQcDu44hLcst8SW_Rjk6_m0OVsrt3Oy6zUPV-wShOrVsotUCMKC0k9GZu3lZanzZq3txomexkpob_cSuXlXDEVxcNpce08chJpFZfuLZI6_POtveeLrigZWf1rCxQVc_PVi3Nxrif8VOP368vQ_W_KxruIaKujqaVyXEC3RgjDHpiahczJBDVpoXrRqgu6w0zXcWM4tE5tUC2zHguM5NTSWluuYc00Fpxp2DNDXx5-_PFFt6z4CAAA.H4sIAAAAAAAAAEty-MCp_WA6l1nMYYO1fMxnN_I2HfR42pn9runznw2Mm-0ANl4zVCAAAAA.4
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: _octo=GH1.1.1812755908.1764521593
+cookie: _gh_sess=71Slz3JSTQAvQrP5wBxoEz5cY8NakCQcfUEbEDsa39aUIRFec8ikuFSkDb3SNe%2FIc%2FaiBdyblcSaPTPOiO%2BmhEH6mxBW%2FhxE%2B%2B1MLmLrvVbj5OBEaOdMGFzZWWBFz7jwyRPC7h56BRrNdfdIZzaVlg%2FkYQcQG39KgZ7jOp0ulMTNaC4Txia0idMNWEN4eb0GbI%2F1MNLO2ewyob7CgnQQ2xTXy2Loj3y8xAJx0RVl2N9VWl8NRCLUs5aqNbAfpej9Fxa6fxQiEqEqfdnUapNgBw%3D%3D--QmVQAk%2FWSv94YcYh--kgzS6tbQuP0MzmcikEUxwA%3D%3D
+cookie: logged_in=no
+cookie: cpu_bucket=lg
+cookie: preferred_color_mode=light
+cookie: tz=Asia%2FShanghai
+priority: u=1, i
+

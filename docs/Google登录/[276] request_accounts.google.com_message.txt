@@ -1,0 +1,38 @@
+POST /v3/signin/_/AccountsSignInUi/data/batchexecute?rpcids=ihzRS&source-path=%2Fv3%2Fsignin%2Fidentifier&TL=ANzgctQy1wofaWoy2PcqM2ljL_xSbEXBoGT5bQqLHMWXIeggpzs8nE3EA59St8iC&f.sid=-2699898829455604980&bl=boq_identityfrontendauthuiserver_20251118.06_p0&hl=zh-CN&_reqid=201834&rt=c h2
+host: accounts.google.com
+content-length: 2756
+sec-ch-ua-full-version-list: "Chromium";v="142.0.7444.176", "Not_A Brand";v="99.0.0.0", "Google Chrome";v="142.0.7444.176"
+sec-ch-ua-platform: "Windows"
+sec-ch-ua: "Chromium";v="142", "Not_A Brand";v="99", "Google Chrome";v="142"
+sec-ch-ua-bitness: "64"
+sec-ch-ua-model: ""
+sec-ch-ua-mobile: ?0
+x-same-domain: 1
+sec-ch-ua-wow64: ?0
+x-goog-ext-278367001-jspb: ["GeneralOAuthFlow"]
+sec-ch-ua-form-factors: "Desktop"
+sec-ch-ua-arch: "x86"
+sec-ch-ua-full-version: "142.0.7444.176"
+content-type: application/x-www-form-urlencoded;charset=UTF-8
+x-goog-ext-391502476-jspb: ["S-83859447:1764520417951065","lso"]
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36
+dnt: 1
+sec-ch-ua-platform-version: "19.0.0"
+accept: */*
+origin: https://accounts.google.com
+x-browser-channel: stable
+x-browser-year: 1969
+x-browser-validation: Aj9fzfu+SaGLBY9Oqr3S7RokOtM=
+x-browser-copyright: Copyright 2025 Google LLC. All rights reserved.
+sec-fetch-site: same-origin
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://accounts.google.com/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: __Host-GAPS=1:_D-VL3P8uEj4m-BuWc6RCLRoQGt_2A:EJoACzqIs459V_vf
+cookie: OTZ=8370270_24_24__24_
+cookie: NID=526=QOQ147ofMZV0sQvEDdVlz_7qKfDg6EUfl3i3YenAiN4Xd-xNkE_4ChK09O5evcIffaRy8dzq0x29_w4RYLNUd_ezj1gvVJwFd2D-VboX7WlFz6IzmcJXik46EzhrouZiGnHj4WLieR-tHJsgy0M7vffe-hUAuoPMoRc4p0hJHPQWl_8Gm_uZQroyitBaROE-L-V75mAstKtrew
+priority: u=1, i
+
+f.req=%5B%5B%5B%22ihzRS%22%2C%22%5B%5B%5B%5B%5C%22opparams%5C%22%2C%5C%22%253F%5C%22%5D%2C%5B%5C%22dsh%5C%22%2C%5C%22S-83859447%3A1764520417951065%5C%22%5D%2C%5B%5C%22access_type%5C%22%2C%5C%22offline%5C%22%5D%2C%5B%5C%22client_id%5C%22%2C%5C%22183617306620-gqedod9q1su19ghqs84m1tje4lp761ks.apps.googleusercontent.com%5C%22%5D%2C%5B%5C%22o2v%5C%22%2C%5C%222%5C%22%5D%2C%5B%5C%22redirect_uri%5C%22%2C%5C%22https%3A%2F%2Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%2Foauth2%2Fidpresponse%5C%22%5D%2C%5B%5C%22response_type%5C%22%2C%5C%22code%5C%22%5D%2C%5B%5C%22scope%5C%22%2C%5C%22email%20openid%5C%22%5D%2C%5B%5C%22service%5C%22%2C%5C%22lso%5C%22%5D%2C%5B%5C%22state%5C%22%2C%5C%22H4sIAAAAAAAAAE2RS2_qMBSE_4vXGJzEzoMdiPAIFEpTArSqIsd2XoQ4JQ60VPe_X7OpujsjfzM-OvMDKBiCroWCtgoacbAj5aRlmz3ogUS_zKTMKqEF04J4CTeIyDESwmmYiXKUnFjnFFwDXAO5Uk07HAxo0_RPxUX2ubgO2iKri3ogaadyzQnNMckfmenfDzIwfAfiTItKC9mIWqd-9ECuGQ8RwhEn0E0QgZgIBl3HJZCaArkJtqjBTG0qNHpVxxN69go_StdZ6RTFysCFbVdXP1_afq0W-9ctxuY0frppR6kdoUlsPZ70-Lk7zl-WPkvZ5TvIKYQqKtUimIeHmM-yt7X5VI1uMry_lONdWd7vSnylhrisa_XMoshcL-7J55aszsEyDv2U09tkjuajEPIo2bx1KLdm1SFWPBDGvGq-IenMcPvqLKMNOsD6Nm3sybYyLZsGMltN6SpRON0fu9EEwhg2h4M_nu43UznGXxXWG1d648eRYXORHP5W2H_cuf9Hnuld1kzqEpTsM3nW1jMYGo6NiYmw4fRAA4YprVrRAxediVM38SyCoU2pgNi2KPRsD0OBE5MkrpWmjqMzrrqvj3__AeYSEs1AAgAA.H4sIAAAAAAAAAOPg2f7K-kz2Bo3F6Z_48_bHVwVaXl5tynl5h_Ge8z1R0QsAVgmqYyAAAAA.4%5C%22%5D%2C%5B%5C%22flowName%5C%22%2C%5C%22GeneralOAuthFlow%5C%22%5D%2C%5B%5C%22continue%5C%22%2C%5C%22https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAOQ0r-zICDyxCMXN1rlUf8UGbG0rTAkC0APlzzdNqYO5NU3NJ-0bQwlGGI8iSMg5fQHIQh2tU_b7jIcc_HP5qiljdXajyzntjqDg7F2kMIpJiFAI4qUL282k-DnryfkMaENNljPAO0G6Ht9DuMol24Mh5-f2k4mL_CKh_5qSuSVfum-ZlIh4qAmC4Fo4iw16VzK1x1BtxAfJhNqoRoz8i_fGlLPh59cXYdGw6QyQ_N98saDBPMVu0C5O-5--x5ot02LZh0KRfGO-awCN-4ah9UgtgVm4UlQIQHoOYTCVPXkMY6Y2FCqc1jUW2r8AGouZJVGqE20zAKi5xaQ7RPSZ_WWTuzZaJL1KnhpX99Q_zP73AreuwJdVV6S-vxyufPCeiHnTWtrfYU5m7K2aekVZfbGzIVa18Gq_7log4kYD_bTYc8CTGBf_sjjqBO-OeZ6Jcjv0KisG-KdPxqYAoIox89elxxx9tkqu3oqKHBOy6iTA3CcEMEQTY_aAuLl6B3m2KqDvRkC%26flowName%3DGeneralOAuthFlow%26as%3DS-83859447%253A1764520417951065%26client_id%3D183617306620-gqedod9q1su19ghqs84m1tje4lp761ks.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23%5C%22%5D%2C%5B%5C%22app_domain%5C%22%2C%5C%22https%3A%2F%2Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%5C%22%5D%2C%5B%5C%22rart%5C%22%2C%5C%22ANgoxccpOPdXxI9oW-Wns3wKhbkJCjPGWGmyOcty7jNKAY5ij11Z7L_HcbVhBkES7itJGMGZCBBcJ95-bM3j2_bf-ffBeB-FifQYFQa41zcH0kE4lxLw_-k%5C%22%5D%5D%2C%5C%22accounts.google.com%5C%22%2C%5C%22%2Fv3%2Fsignin%2Fidentifier%5C%22%5D%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&at=ACnRkCgkU4x2JSrHJ-mIYDG_klBC%3A1764520418201&

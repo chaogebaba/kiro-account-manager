@@ -24,6 +24,8 @@ pub struct Token {
     pub expires_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subscription_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub csrf_token: Option<String>,
 }
 
 impl Token {
@@ -43,6 +45,7 @@ impl Token {
             user_id: None,
             expires_at: None,
             subscription_type: None,
+            csrf_token: None,
         }
     }
 
@@ -71,6 +74,7 @@ impl Token {
             user_id,
             expires_at: None,
             subscription_type,
+            csrf_token: None,
         }
     }
 }
