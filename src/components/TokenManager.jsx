@@ -48,19 +48,36 @@ function TokenManager() {
   }
 
   const [refreshingId, setRefreshingId] = useState(null)
+  const [refreshResult, setRefreshResult] = useState(null)
 
   const handleRefreshStatus = async (id) => {
     setRefreshingId(id)
+    setRefreshResult(null)
     try {
-      // 尝试调用真正的 API 刷新
-      await invoke('refresh_token_from_api', { id })
+      // 调用真正的 API 刷新
+      const updatedToken = await invoke('refresh_token_from_api', { id })
+      // 显示刷新结果
+      setRefreshResult({
+        id,
+        success: true,
+        message: `配额: ${updatedToken.used} / ${updatedToken.quota}，状态: ${updatedToken.status}`
+      })
+      // 更新本地列表
+      setTokens(prev => prev.map(t => t.id === id ? updatedToken : t))
     } catch (e) {
-      console.warn('API refresh failed, using local refresh:', e)
-      // 如果 API 调用失败，使用本地刷新
+      console.warn('API refresh failed:', e)
+      setRefreshResult({
+        id,
+        success: false,
+        message: `刷新失败: ${e}`
+      })
+      // 回退到本地刷新
       await invoke('refresh_token_status', { id })
+      loadTokens()
     }
     setRefreshingId(null)
-    loadTokens()
+    // 3秒后清除提示
+    setTimeout(() => setRefreshResult(null), 3000)
   }
 
   const handleExport = async () => {
@@ -265,9 +282,16 @@ function TokenManager() {
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusStyle(token.status)}`}>
-                    {token.status}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span className={`px-2 py-1 rounded text-xs font-medium inline-block w-fit ${getStatusStyle(token.status)}`}>
+                      {token.status}
+                    </span>
+                    {refreshResult?.id === token.id && (
+                      <span className={`text-xs ${refreshResult.success ? 'text-green-600' : 'text-red-500'}`}>
+                        {refreshResult.message}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-4 text-sm text-gray-500">{token.created_at}</td>
                 <td className="px-4 py-4">
