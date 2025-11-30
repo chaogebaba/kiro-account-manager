@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
 import Sidebar from './components/Sidebar'
+import Home from './components/Home'
 import TokenManager from './components/TokenManager'
 import Settings from './components/Settings'
 import About from './components/About'
@@ -10,7 +11,7 @@ import Login from './components/Login'
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activeMenu, setActiveMenu] = useState('token')
+  const [activeMenu, setActiveMenu] = useState('home')
   const [showLogin, setShowLogin] = useState(false)
 
   useEffect(() => {
@@ -53,10 +54,11 @@ function App() {
 
   const renderContent = () => {
     switch (activeMenu) {
+      case 'home': return <Home />
       case 'token': return <TokenManager />
       case 'settings': return <Settings />
       case 'about': return <About />
-      default: return <TokenManager />
+      default: return <Home />
     }
   }
 

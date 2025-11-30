@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
-import { Key, Settings, Info, LogOut, Plus, User } from 'lucide-react'
+import { Home, Key, Settings, Info, LogOut, Plus, User } from 'lucide-react'
 
 const menuItems = [
+  { id: 'home', label: '首页', icon: Home },
   { id: 'token', label: '账号管理', icon: Key },
   { id: 'settings', label: '设置', icon: Settings },
   { id: 'about', label: '关于', icon: Info },
