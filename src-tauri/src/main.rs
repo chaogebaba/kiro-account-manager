@@ -168,7 +168,7 @@ async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> Resul
         store.tokens[idx].quota = usage.usage_limit.unwrap_or(store.tokens[idx].quota);
         store.tokens[idx].used = usage.current_usage.unwrap_or(store.tokens[idx].used);
         store.tokens[idx].access_token = Some(new_access_token);
-        store.tokens[idx].refresh_token = Some(csrf_token);
+        // 保留原来的 refresh_token，不要覆盖
         
         // 更新状态
         if store.tokens[idx].used >= store.tokens[idx].quota {
