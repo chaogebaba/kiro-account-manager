@@ -19,27 +19,44 @@ function TokenManager() {
   const [autoRefreshing, setAutoRefreshing] = useState(false)
   const [lastRefreshTime, setLastRefreshTime] = useState(null)
 
-  // 自动刷新所有账号的配额
-  const autoRefreshAll = async (tokenList) => {
+  // 检查 Token 是否即将过期（5分钟内）
+  const isExpiringSoon = (token) => {
+    if (!token.expires_at) return true // 没有过期时间，需要刷新
+    const expiresAt = new Date(token.expires_at.replace(/\//g, '-'))
+    const now = new Date()
+    const fiveMinutes = 5 * 60 * 1000
+    return expiresAt.getTime() - now.getTime() < fiveMinutes
+  }
+
+  // 自动刷新即将过期的账号
+  const autoRefreshAll = async (tokenList, forceAll = false) => {
     if (autoRefreshing || tokenList.length === 0) return
-    setAutoRefreshing(true)
-    console.log('开始自动刷新所有账号...')
     
-    const updatedTokens = []
-    for (const token of tokenList) {
+    // 筛选需要刷新的 Token
+    const tokensToRefresh = forceAll ? tokenList : tokenList.filter(isExpiringSoon)
+    if (tokensToRefresh.length === 0) {
+      console.log('没有需要刷新的账号')
+      return
+    }
+    
+    setAutoRefreshing(true)
+    console.log(`开始刷新 ${tokensToRefresh.length} 个账号...`)
+    
+    const updatedTokens = [...tokenList]
+    for (const token of tokensToRefresh) {
       try {
         const updated = await invoke('refresh_token_from_api', { id: token.id })
-        updatedTokens.push(updated)
+        const idx = updatedTokens.findIndex(t => t.id === token.id)
+        if (idx !== -1) updatedTokens[idx] = updated
       } catch (e) {
         console.warn(`刷新账号 ${token.email} 失败:`, e)
-        updatedTokens.push(token) // 保持原数据
       }
     }
     
     setTokens(updatedTokens)
     setLastRefreshTime(new Date().toLocaleTimeString())
     setAutoRefreshing(false)
-    console.log('自动刷新完成')
+    console.log('刷新完成')
   }
 
   useEffect(() => {
@@ -47,9 +64,9 @@ function TokenManager() {
     const init = async () => {
       const data = await invoke('get_tokens')
       setTokens(data)
-      // 启动时自动刷新一次
+      // 启动时强制刷新所有账号
       if (data.length > 0) {
-        setTimeout(() => autoRefreshAll(data), 1000)
+        setTimeout(() => autoRefreshAll(data, true), 1000)
       }
     }
     init()
@@ -59,13 +76,13 @@ function TokenManager() {
       loadTokens()
     })
 
-    // 定时刷新（每5分钟）
+    // 定时检查（每分钟检查一次，只刷新即将过期的Token）
     const interval = setInterval(async () => {
       const data = await invoke('get_tokens')
       if (data.length > 0) {
-        autoRefreshAll(data)
+        autoRefreshAll(data) // 只刷新即将过期的
       }
-    }, 5 * 60 * 1000)
+    }, 60 * 1000)
 
     return () => {
       unlisten.then(fn => fn())

@@ -168,7 +168,11 @@ async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> Resul
         (50, 0)
     };
 
-    // 3. 更新 token 信息
+    // 3. 计算过期时间
+    let expires_at = chrono::Local::now() + chrono::Duration::seconds(refresh_result.expires_in);
+    let expires_at_str = expires_at.format("%Y/%m/%d %H:%M:%S").to_string();
+
+    // 4. 更新 token 信息
     let mut store = state.store.lock().unwrap();
     let token_idx = store.tokens.iter().position(|t| t.id == id);
     
@@ -176,6 +180,7 @@ async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> Resul
         store.tokens[idx].quota = quota;
         store.tokens[idx].used = used;
         store.tokens[idx].access_token = Some(new_access_token);
+        store.tokens[idx].expires_at = Some(expires_at_str);
         
         // 更新状态
         if store.tokens[idx].used >= store.tokens[idx].quota {
