@@ -79,23 +79,39 @@ function TokenManager() {
     setTimeout(() => setCopiedId(null), 1500)
   }
 
+  const [switchingId, setSwitchingId] = useState(null)
+
   const handleSwitchAccount = async (token) => {
     if (!token.access_token || !token.refresh_token) {
       alert('此账号缺少认证信息，无法切换')
       return
     }
-    if (confirm(`确定要切换到账号 ${token.email} 吗？\n\n切换后需要重启 Kiro IDE 才能生效。`)) {
-      try {
-        await invoke('switch_kiro_account', {
-          accessToken: token.access_token,
-          refreshToken: token.refresh_token,
-          provider: token.provider || 'Github'
-        })
-        alert('账号切换成功！请重启 Kiro IDE 生效。')
-      } catch (e) {
-        console.error('Switch account failed:', e)
-        alert('切换失败: ' + e)
-      }
+    if (!confirm(`确定要切换到账号 ${token.email} 吗？\n\n切换后需要重启 Kiro IDE 才能生效。`)) {
+      return
+    }
+    
+    setSwitchingId(token.id)
+    try {
+      // 先验证 token 是否有效
+      const usage = await invoke('verify_token', {
+        accessToken: token.access_token,
+        refreshToken: token.refresh_token,
+        provider: token.provider || 'Google'
+      })
+      console.log('Token verified, usage:', usage)
+      
+      // 验证通过，执行切换
+      await invoke('switch_kiro_account', {
+        accessToken: token.access_token,
+        refreshToken: token.refresh_token,
+        provider: token.provider || 'Google'
+      })
+      alert(`账号切换成功！\n\n当前配额: ${usage.current_usage || 0} / ${usage.usage_limit || 50}\n\n请重启 Kiro IDE 生效。`)
+    } catch (e) {
+      console.error('Switch account failed:', e)
+      alert('切换失败: ' + e + '\n\n该 Token 可能已过期，请重新登录获取。')
+    } finally {
+      setSwitchingId(null)
     }
   }
 
@@ -258,10 +274,11 @@ function TokenManager() {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleSwitchAccount(token)}
-                      className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
-                      title="切换到此账号"
+                      disabled={switchingId === token.id}
+                      className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors disabled:opacity-50"
+                      title="切换到此账号（会先验证Token有效性）"
                     >
-                      切号
+                      {switchingId === token.id ? '验证中...' : '切号'}
                     </button>
                     <button
                       onClick={() => handleRefreshStatus(token.id)}

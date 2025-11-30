@@ -5,7 +5,7 @@ mod token;
 
 use auth::{
     AuthState, User, initiate_kiro_login, initiate_direct_login, exchange_kiro_token,
-    refresh_kiro_token_with_cookie, get_user_info_with_token, get_user_usage_and_limits,
+    refresh_kiro_token_with_cookie, get_user_usage_and_limits,
     UsageAndLimitsResponse,
 };
 use std::sync::Mutex;
@@ -321,9 +321,17 @@ async fn start_oauth_flow(
                     console.log('quota:', quota, 'used:', used);
                 }
                 
-                // 4. 添加到 token 列表
+                // 4. 从 Cookie 中获取 RefreshToken
+                const getCookie = (name) => {
+                    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+                    return match ? match[2] : '';
+                };
+                const refreshToken = getCookie('RefreshToken') || '';
+                console.log('refreshToken:', refreshToken.substring(0,30) + '...');
+                
+                // 5. 添加到 token 列表
                 if (window.__TAURI__) {
-                    const result = await window.__TAURI__.invoke('add_kiro_token', { email, accessToken, csrfToken, idp, quota, used });
+                    const result = await window.__TAURI__.invoke('add_kiro_token', { email, accessToken, refreshToken, csrfToken, idp, quota, used });
                     console.log('Token added:', result);
                     window.__TAURI__.event.emit('login-success', result);
                     window.__TAURI__.invoke('close_auth_window');
@@ -397,8 +405,15 @@ async fn start_oauth_flow(
                         if (usedMatch) used = parseInt(usedMatch[1]) || 0;
                     }
                     
+                    // 从 Cookie 获取 RefreshToken
+                    const getCookie = (name) => {
+                        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+                        return match ? match[2] : '';
+                    };
+                    const refreshToken = getCookie('RefreshToken') || '';
+                    
                     if (window.__TAURI__) {
-                        const result = await window.__TAURI__.invoke('add_kiro_token', { email, accessToken, csrfToken, idp, quota, used });
+                        const result = await window.__TAURI__.invoke('add_kiro_token', { email, accessToken, refreshToken, csrfToken, idp, quota, used });
                         window.__TAURI__.event.emit('login-success', result);
                         window.__TAURI__.invoke('close_auth_window');
                     }
@@ -560,15 +575,19 @@ fn add_kiro_token(
     state: State<AppState>,
     email: String,
     access_token: String,
+    refresh_token: String,  // 真正的 RefreshToken (aor开头)
     csrf_token: String,
     idp: String,
     quota: Option<i32>,
     used: Option<i32>,
 ) -> Result<Token, String> {
     println!("Adding Kiro token: email={}, idp={}, quota={:?}, used={:?}", email, idp, quota, used);
+    println!("  accessToken: {}...", &access_token[..30.min(access_token.len())]);
+    println!("  refreshToken: {}...", &refresh_token[..30.min(refresh_token.len())]);
     
     // 保存认证信息
     *state.auth.access_token.lock().unwrap() = Some(access_token.clone());
+    *state.auth.refresh_token.lock().unwrap() = Some(refresh_token.clone());
     *state.auth.csrf_token.lock().unwrap() = Some(csrf_token.clone());
     
     // 创建用户
@@ -588,7 +607,7 @@ fn add_kiro_token(
         format!("Kiro {} 账号", idp),
         quota.unwrap_or(50),
         access_token,
-        csrf_token, // 用 csrf_token 作为 refresh_token
+        refresh_token,  // 使用真正的 RefreshToken
         idp
     );
     
