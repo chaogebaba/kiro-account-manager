@@ -5,7 +5,7 @@ mod token;
 
 use auth::{
     AuthState, User, initiate_kiro_login, initiate_direct_login, exchange_kiro_token,
-    refresh_kiro_token_with_cookie, get_user_usage_and_limits,
+    refresh_kiro_token_with_cookie, get_user_info_with_token, get_user_usage_and_limits,
     UsageAndLimitsResponse,
 };
 use std::sync::Mutex;
@@ -200,6 +200,72 @@ async fn verify_token(
 
     // 获取配额
     get_user_usage_and_limits(&new_access_token, &csrf_token).await
+}
+
+// 通过 RefreshToken 添加账号（获取真实邮箱和配额）
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AddTokenResult {
+    pub token: Token,
+    pub email: String,
+    pub quota: i32,
+    pub used: i32,
+}
+
+#[tauri::command]
+async fn add_token_by_refresh(
+    state: State<'_, AppState>,
+    access_token: String,
+    refresh_token: String,
+    provider: String,
+) -> Result<Token, String> {
+    println!("Adding token by refresh: provider={}", provider);
+    
+    // 1. 刷新获取 csrfToken
+    let refresh_result = refresh_kiro_token_with_cookie(&access_token, &refresh_token, &provider).await?;
+    let new_access_token = refresh_result.access_token.unwrap_or_else(|| access_token.clone());
+    let csrf_token = refresh_result.csrf_token.unwrap_or_default();
+    
+    // 2. 获取用户信息（邮箱）
+    let user_info = get_user_info_with_token(&new_access_token, &csrf_token).await?;
+    let email = user_info.email.unwrap_or_else(|| format!("{}@kiro.dev", provider.to_lowercase()));
+    println!("Got email: {}", email);
+    
+    // 3. 获取配额信息
+    let usage = get_user_usage_and_limits(&new_access_token, &csrf_token).await?;
+    let quota = usage.usage_limit.unwrap_or(50);
+    let used = usage.current_usage.unwrap_or(0);
+    println!("Got usage: {}/{}", used, quota);
+    
+    // 4. 添加到 token 列表
+    let token = state.store.lock().unwrap().add_with_tokens(
+        email.clone(),
+        format!("Kiro {} 账号", provider),
+        quota,
+        new_access_token,
+        refresh_token,
+        provider.clone(),
+    );
+    
+    // 更新 used
+    {
+        let mut store = state.store.lock().unwrap();
+        if let Some(t) = store.tokens.iter_mut().find(|t| t.id == token.id) {
+            t.used = used;
+        }
+        store.save_to_file();
+    }
+    
+    // 更新当前用户
+    let user = User {
+        id: uuid::Uuid::new_v4().to_string(),
+        email: email.clone(),
+        name: email.split('@').next().unwrap_or("User").to_string(),
+        avatar: None,
+        provider,
+    };
+    *state.auth.user.lock().unwrap() = Some(user);
+    
+    Ok(token)
 }
 
 #[tauri::command]
@@ -668,6 +734,7 @@ fn main() {
             refresh_token_status,
             refresh_token_from_api,
             verify_token,
+            add_token_by_refresh,
             import_tokens,
             export_tokens,
             get_current_user,

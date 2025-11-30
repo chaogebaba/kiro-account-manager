@@ -218,7 +218,7 @@ function TokenManager() {
                 />
               </th>
               <th className="px-4 py-3 font-medium">邮箱</th>
-              <th className="px-4 py-3 font-medium w-40">标签</th>
+              <th className="px-4 py-3 font-medium w-24">Provider</th>
               <th className="px-4 py-3 font-medium w-48">额度使用</th>
               <th className="px-4 py-3 font-medium w-24">状态</th>
               <th className="px-4 py-3 font-medium w-40">添加时间</th>
@@ -262,7 +262,12 @@ function TokenManager() {
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <span className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded">{token.label}</span>
+                  <span className={`text-xs px-2 py-1 rounded ${
+                    token.provider === 'Google' ? 'bg-red-50 text-red-600' : 
+                    token.provider === 'Github' ? 'bg-gray-100 text-gray-700' : 'bg-blue-50 text-blue-600'
+                  }`}>
+                    {token.provider || '未知'}
+                  </span>
                 </td>
                 <td className="px-4 py-4">
                   <div className="space-y-1">

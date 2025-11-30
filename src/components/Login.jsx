@@ -85,24 +85,12 @@ function Login({ onLogin, onCancel }) {
     setLoading('token')
     setError('')
     try {
-      // 先验证 token 是否有效
-      const usage = await invoke('verify_token', {
+      // 调用后端，自动获取邮箱和配额
+      const result = await invoke('add_token_by_refresh', {
         accessToken: tokenForm.accessToken,
         refreshToken: tokenForm.refreshToken,
         provider: tokenForm.provider
       })
-      
-      // 验证通过，添加到列表
-      const result = await invoke('add_kiro_token', {
-        email: `${tokenForm.provider.toLowerCase()}@kiro.dev`,
-        accessToken: tokenForm.accessToken,
-        refreshToken: tokenForm.refreshToken,
-        csrfToken: '',
-        idp: tokenForm.provider,
-        quota: usage.usage_limit || 50,
-        used: usage.current_usage || 0
-      })
-      
       onLogin?.(result)
     } catch (e) {
       console.error('Token submit failed:', e)
