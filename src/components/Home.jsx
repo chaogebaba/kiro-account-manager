@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
-import { Users, CheckCircle, XCircle, TrendingUp, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 
 function Home() {
   const [tokens, setTokens] = useState([])
@@ -26,14 +26,6 @@ function Home() {
     setLoading(false)
   }
 
-  const stats = {
-    total: tokens.length,
-    active: tokens.filter(t => t.status === '正常' || t.status === '有效').length,
-    expired: tokens.filter(t => t.status === '已失效').length,
-    totalQuota: tokens.reduce((sum, t) => sum + t.quota, 0),
-    totalUsed: tokens.reduce((sum, t) => sum + t.used, 0),
-  }
-
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -46,57 +38,6 @@ function Home() {
     <div className="h-full p-6 overflow-auto bg-gray-50">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">欢迎使用 Kiro Token Manager</h1>
-
-        {/* 统计卡片 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-4 shadow-sm border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Users size={20} className="text-blue-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-gray-800">{stats.total}</div>
-                <div className="text-xs text-gray-500">总账号数</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <CheckCircle size={20} className="text-green-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-gray-800">{stats.active}</div>
-                <div className="text-xs text-gray-500">正常账号</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
-                <XCircle size={20} className="text-red-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-gray-800">{stats.expired}</div>
-                <div className="text-xs text-gray-500">已失效</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                <TrendingUp size={20} className="text-purple-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-gray-800">{stats.totalUsed}/{stats.totalQuota}</div>
-                <div className="text-xs text-gray-500">总配额使用</div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* 当前 Kiro IDE 账号 */}
         <div className="bg-white rounded-xl p-5 shadow-sm border mb-6">
