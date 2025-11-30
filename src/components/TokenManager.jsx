@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
-import { Search, Upload, Download, RefreshCw, Edit2, Trash2, RefreshCcw } from 'lucide-react'
-import AddTokenModal from './AddTokenModal'
+import { listen } from '@tauri-apps/api/event'
+import { Search, Download, RefreshCw, Edit2, Trash2, Plus, Copy, Check } from 'lucide-react'
 import EditTokenModal from './EditTokenModal'
 
 function TokenManager() {
   const [tokens, setTokens] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedTag, setSelectedTag] = useState('所有标签')
   const [selectedIds, setSelectedIds] = useState([])
   const [pageSize, setPageSize] = useState(20)
   const [currentPage, setCurrentPage] = useState(1)
-  const [showAddModal, setShowAddModal] = useState(false)
   const [editingToken, setEditingToken] = useState(null)
+  const [copiedId, setCopiedId] = useState(null)
 
   useEffect(() => {
     loadTokens()
+    // 监听登录成功事件，自动刷新列表
+    const unlisten = listen('login-success', () => {
+      loadTokens()
+    })
+    return () => { unlisten.then(fn => fn()) }
   }, [])
 
   const loadTokens = async () => {
@@ -28,8 +32,17 @@ function TokenManager() {
   }
 
   const handleDelete = async (id) => {
-    if (confirm('确定要删除这个 Token 吗？')) {
+    if (confirm('确定要删除这个账号吗？')) {
       await invoke('delete_token', { id })
+      loadTokens()
+    }
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.length === 0) return
+    if (confirm(`确定要删除选中的 ${selectedIds.length} 个账号吗？`)) {
+      await invoke('delete_tokens', { ids: selectedIds })
+      setSelectedIds([])
       loadTokens()
     }
   }
@@ -45,105 +58,101 @@ function TokenManager() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'tokens.json'
+    a.download = `kiro-tokens-${new Date().toISOString().slice(0,10)}.json`
     a.click()
   }
 
-  const handleImport = () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.json'
-    input.onchange = async (e) => {
-      const file = e.target.files[0]
-      if (file) {
-        const text = await file.text()
-        await invoke('import_tokens', { tokensJson: text })
-        loadTokens()
+  const handleCopyEmail = (email, id) => {
+    navigator.clipboard.writeText(email)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 1500)
+  }
+
+  const handleSwitchAccount = async (token) => {
+    if (!token.access_token || !token.refresh_token) {
+      alert('此账号缺少认证信息，无法切换')
+      return
+    }
+    if (confirm(`确定要切换到账号 ${token.email} 吗？\n\n切换后需要重启 Kiro IDE 才能生效。`)) {
+      try {
+        await invoke('switch_kiro_account', {
+          accessToken: token.access_token,
+          refreshToken: token.refresh_token,
+          provider: token.provider || 'Github'
+        })
+        alert('账号切换成功！请重启 Kiro IDE 生效。')
+      } catch (e) {
+        console.error('Switch account failed:', e)
+        alert('切换失败: ' + e)
       }
     }
-    input.click()
   }
 
   const handleSelectAll = (checked) => {
-    if (checked) {
-      setSelectedIds(filteredTokens.map(t => t.id))
-    } else {
-      setSelectedIds([])
-    }
+    setSelectedIds(checked ? filteredTokens.map(t => t.id) : [])
   }
 
   const handleSelectOne = (id, checked) => {
-    if (checked) {
-      setSelectedIds([...selectedIds, id])
-    } else {
-      setSelectedIds(selectedIds.filter(i => i !== id))
-    }
+    setSelectedIds(checked ? [...selectedIds, id] : selectedIds.filter(i => i !== id))
   }
 
-  const filteredTokens = tokens.filter(token => {
-    const matchSearch = token.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       token.label.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchSearch
-  })
+  const filteredTokens = tokens.filter(token => 
+    token.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    token.label.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
-  const totalPages = Math.ceil(filteredTokens.length / pageSize)
+  const totalPages = Math.ceil(filteredTokens.length / pageSize) || 1
   const paginatedTokens = filteredTokens.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const getStatusStyle = (status) => {
-    switch (status) {
-      case '有效': return 'bg-green-100 text-green-600'
-      case '正常': return 'bg-green-100 text-green-600'
-      case '已失效': return 'bg-red-100 text-red-500'
-      default: return 'bg-gray-100 text-gray-600'
-    }
+    if (status === '有效' || status === '正常') return 'bg-green-100 text-green-700'
+    if (status === '已失效') return 'bg-red-100 text-red-600'
+    return 'bg-gray-100 text-gray-600'
+  }
+
+  const getUsagePercent = (used, quota) => {
+    if (quota === 0) return 0
+    return Math.min(100, (used / quota) * 100)
   }
 
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b">
-        <h1 className="text-xl font-semibold text-gray-800">Token 管理</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-semibold text-gray-800">账号管理</h1>
+          <span className="text-sm text-gray-500">{tokens.length} 个账号</span>
+        </div>
         <div className="flex items-center gap-3">
-          <select
-            value={selectedTag}
-            onChange={(e) => setSelectedTag(e.target.value)}
-            className="px-3 py-2 border rounded-lg text-sm text-gray-600 bg-white"
-          >
-            <option>所有标签</option>
-          </select>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
-              placeholder="搜索邮箱..."
+              placeholder="搜索邮箱或标签..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2 border rounded-lg text-sm w-48"
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
+              className="pl-9 pr-4 py-2 border rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-[#4361ee] text-white rounded-lg text-sm hover:bg-[#3651de]"
-          >
-            导入
-          </button>
-          <button
-            onClick={handleImport}
-            className="p-2 border rounded-lg hover:bg-gray-50"
-            title="导入"
-          >
-            <Upload size={18} className="text-gray-600" />
-          </button>
+          {selectedIds.length > 0 && (
+            <button
+              onClick={handleBatchDelete}
+              className="px-3 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 flex items-center gap-1"
+            >
+              <Trash2 size={14} />
+              删除 ({selectedIds.length})
+            </button>
+          )}
           <button
             onClick={handleExport}
-            className="p-2 border rounded-lg hover:bg-gray-50"
+            className="p-2 border rounded-lg hover:bg-gray-50 transition-colors"
             title="导出"
           >
             <Download size={18} className="text-gray-600" />
           </button>
           <button
             onClick={loadTokens}
-            className="p-2 border rounded-lg hover:bg-gray-50"
+            className="p-2 border rounded-lg hover:bg-gray-50 transition-colors"
             title="刷新"
           >
             <RefreshCw size={18} className="text-gray-600" />
@@ -156,74 +165,113 @@ function TokenManager() {
         <table className="w-full">
           <thead className="bg-gray-50 sticky top-0">
             <tr className="text-left text-sm text-gray-600">
-              <th className="px-6 py-3 font-medium">
+              <th className="px-6 py-3 font-medium w-12">
                 <input
                   type="checkbox"
                   checked={selectedIds.length === filteredTokens.length && filteredTokens.length > 0}
                   onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="rounded"
+                  className="rounded border-gray-300"
                 />
               </th>
-              <th className="px-4 py-3 font-medium">Email</th>
-              <th className="px-4 py-3 font-medium">标签</th>
-              <th className="px-4 py-3 font-medium">可用额度</th>
-              <th className="px-4 py-3 font-medium">Token 状态</th>
-              <th className="px-4 py-3 font-medium">添加时间</th>
-              <th className="px-4 py-3 font-medium">操作</th>
+              <th className="px-4 py-3 font-medium">邮箱</th>
+              <th className="px-4 py-3 font-medium w-40">标签</th>
+              <th className="px-4 py-3 font-medium w-48">额度使用</th>
+              <th className="px-4 py-3 font-medium w-24">状态</th>
+              <th className="px-4 py-3 font-medium w-40">添加时间</th>
+              <th className="px-4 py-3 font-medium w-24">操作</th>
             </tr>
           </thead>
           <tbody>
-            {paginatedTokens.map((token) => (
-              <tr key={token.id} className="border-b hover:bg-gray-50">
+            {paginatedTokens.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-16 text-center text-gray-400">
+                  <div className="flex flex-col items-center gap-2">
+                    <Plus size={40} className="text-gray-300" />
+                    <p>暂无账号，点击登录按钮添加</p>
+                  </div>
+                </td>
+              </tr>
+            ) : paginatedTokens.map((token) => (
+              <tr key={token.id} className="border-b hover:bg-gray-50/50 transition-colors">
                 <td className="px-6 py-4">
                   <input
                     type="checkbox"
                     checked={selectedIds.includes(token.id)}
                     onChange={(e) => handleSelectOne(token.id, e.target.checked)}
-                    className="rounded"
+                    className="rounded border-gray-300"
                   />
-                </td>
-                <td className="px-4 py-4 text-sm text-gray-800">{token.email}</td>
-                <td className="px-4 py-4">
-                  <span className="token-label">{token.label}</span>
-                </td>
-                <td className="px-4 py-4">
-                  <div className="text-sm">
-                    <span className="text-green-600">{token.used}</span>
-                    <span className="text-gray-400"> / </span>
-                    <span className="text-gray-600">{token.quota}</span>
-                  </div>
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded text-xs ${getStatusStyle(token.status)}`}>
-                      {token.status}
-                    </span>
+                    <span className="text-sm text-gray-800 font-medium">{token.email}</span>
                     <button
-                      onClick={() => handleRefreshStatus(token.id)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                      title="刷新状态"
+                      onClick={() => handleCopyEmail(token.email, token.id)}
+                      className="p-1 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="复制邮箱"
                     >
-                      <RefreshCcw size={14} className="text-gray-400" />
+                      {copiedId === token.id ? (
+                        <Check size={14} className="text-green-500" />
+                      ) : (
+                        <Copy size={14} className="text-gray-400" />
+                      )}
                     </button>
                   </div>
                 </td>
-                <td className="px-4 py-4 text-sm text-gray-600">{token.created_at}</td>
+                <td className="px-4 py-4">
+                  <span className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded">{token.label}</span>
+                </td>
+                <td className="px-4 py-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600">{token.used} / {token.quota}</span>
+                      <span className="text-gray-400">{Math.round(getUsagePercent(token.used, token.quota))}%</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all ${
+                          getUsagePercent(token.used, token.quota) > 80 ? 'bg-red-500' : 
+                          getUsagePercent(token.used, token.quota) > 50 ? 'bg-yellow-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${getUsagePercent(token.used, token.quota)}%` }}
+                      />
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-4">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusStyle(token.status)}`}>
+                    {token.status}
+                  </span>
+                </td>
+                <td className="px-4 py-4 text-sm text-gray-500">{token.created_at}</td>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-1">
                     <button
+                      onClick={() => handleSwitchAccount(token)}
+                      className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+                      title="切换到此账号"
+                    >
+                      切号
+                    </button>
+                    <button
+                      onClick={() => handleRefreshStatus(token.id)}
+                      className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                      title="刷新状态"
+                    >
+                      <RefreshCw size={14} className="text-gray-400" />
+                    </button>
+                    <button
                       onClick={() => setEditingToken(token)}
-                      className="p-2 hover:bg-gray-100 rounded"
+                      className="p-1.5 hover:bg-gray-100 rounded transition-colors"
                       title="编辑"
                     >
-                      <Edit2 size={16} className="text-gray-500" />
+                      <Edit2 size={14} className="text-gray-400" />
                     </button>
                     <button
                       onClick={() => handleDelete(token.id)}
-                      className="p-2 hover:bg-red-50 rounded"
+                      className="p-1.5 hover:bg-red-50 rounded transition-colors"
                       title="删除"
                     >
-                      <Trash2 size={16} className="text-red-400" />
+                      <Trash2 size={14} className="text-red-400" />
                     </button>
                   </div>
                 </td>
@@ -234,71 +282,61 @@ function TokenManager() {
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between px-6 py-3 border-t bg-gray-50">
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span>每页显示</span>
-          <select
-            value={pageSize}
-            onChange={(e) => setPageSize(Number(e.target.value))}
-            className="px-2 py-1 border rounded bg-white"
-          >
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-          </select>
-          <span>条</span>
+      {filteredTokens.length > 0 && (
+        <div className="flex items-center justify-between px-6 py-3 border-t bg-gray-50">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>每页</span>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
+              className="px-2 py-1 border rounded bg-white text-sm"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+            <span>条</span>
+          </div>
+          <div className="flex items-center gap-1 text-sm">
+            <span className="text-gray-500 mr-2">{currentPage} / {totalPages}</span>
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-2 py-1 border rounded hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              首页
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border rounded hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ‹
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border rounded hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ›
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-2 py-1 border rounded hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              末页
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span>共 {filteredTokens.length} 条, 第 {currentPage} / {totalPages || 1} 页</span>
-          <button
-            onClick={() => setCurrentPage(1)}
-            disabled={currentPage === 1}
-            className="px-2 py-1 border rounded hover:bg-white disabled:opacity-50"
-          >
-            首页
-          </button>
-          <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="px-2 py-1 border rounded hover:bg-white disabled:opacity-50"
-          >
-            &lt;
-          </button>
-          <button
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages || totalPages === 0}
-            className="px-2 py-1 border rounded hover:bg-white disabled:opacity-50"
-          >
-            &gt;
-          </button>
-          <button
-            onClick={() => setCurrentPage(totalPages)}
-            disabled={currentPage === totalPages || totalPages === 0}
-            className="px-2 py-1 border rounded hover:bg-white disabled:opacity-50"
-          >
-            末页
-          </button>
-        </div>
-      </div>
-
-      {/* Modals */}
-      {showAddModal && (
-        <AddTokenModal
-          onClose={() => setShowAddModal(false)}
-          onSuccess={() => {
-            setShowAddModal(false)
-            loadTokens()
-          }}
-        />
       )}
+
+      {/* Edit Modal */}
       {editingToken && (
         <EditTokenModal
           token={editingToken}
           onClose={() => setEditingToken(null)}
-          onSuccess={() => {
-            setEditingToken(null)
-            loadTokens()
-          }}
+          onSuccess={() => { setEditingToken(null); loadTokens() }}
         />
       )}
     </div>

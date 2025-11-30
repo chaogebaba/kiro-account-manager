@@ -8,12 +8,10 @@ function Settings() {
   const [machineId, setMachineId] = useState('ec088295c978e50c9080aca58282f5ed79db948966213d8da4e86101f2d3a0ff')
 
   const handleApplyProxy = () => {
-    // 应用代理设置
     console.log('Apply proxy:', httpProxy)
   }
 
   const handleResetMachineId = () => {
-    // 重置机器ID
     const newId = Array.from({ length: 64 }, () => 
       Math.floor(Math.random() * 16).toString(16)
     ).join('')
@@ -109,7 +107,8 @@ function Settings() {
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-gray-800 mb-1">Kiro 高级设置</h2>
           <p className="text-sm text-gray-500 mb-4">
-            机器 ID：<button onClick={handleResetMachineId} className="text-[#4361ee] hover:underline">重置机器并启动新功能</button>
+            机器 ID：<code className="text-xs bg-gray-100 px-1 rounded">{machineId.slice(0, 16)}...</code>
+            <button onClick={handleResetMachineId} className="ml-2 text-[#4361ee] hover:underline">重置</button>
           </p>
         </section>
       </div>

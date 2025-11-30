@@ -14,6 +14,9 @@
       "all": false,
       "shell": {
         "open": true
+      },
+      "window": {
+        "all": true
       }
     },
     "bundle": {
@@ -29,7 +32,14 @@
       "targets": "all"
     },
     "security": {
-      "csp": null
+      "csp": null,
+      "dangerousRemoteDomainIpcAccess": [
+        {
+          "domain": "app.kiro.dev",
+          "windows": ["auth"],
+          "enableTauriAPI": true
+        }
+      ]
     },
     "windows": [
       {

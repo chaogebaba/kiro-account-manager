@@ -1,6 +1,7 @@
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Token {
@@ -11,6 +12,12 @@ pub struct Token {
     pub used: i32,
     pub status: String,
     pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub access_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 impl Token {
@@ -24,65 +31,72 @@ impl Token {
             used: 0,
             status: "正常".to_string(),
             created_at: now.format("%Y/%m/%d %H:%M:%S").to_string(),
+            access_token: None,
+            refresh_token: None,
+            provider: None,
+        }
+    }
+
+    pub fn new_with_tokens(
+        email: String,
+        label: String,
+        quota: i32,
+        access_token: String,
+        refresh_token: String,
+        provider: String,
+    ) -> Self {
+        let now: DateTime<Local> = Local::now();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            email,
+            label,
+            quota,
+            used: 0,
+            status: "正常".to_string(),
+            created_at: now.format("%Y/%m/%d %H:%M:%S").to_string(),
+            access_token: Some(access_token),
+            refresh_token: Some(refresh_token),
+            provider: Some(provider),
         }
     }
 }
 
 pub struct TokenStore {
-    tokens: Vec<Token>,
+    pub tokens: Vec<Token>,
+    file_path: PathBuf,
 }
 
 impl TokenStore {
     pub fn new() -> Self {
-        // 初始化一些示例数据
-        let samples = vec![
-            Token {
-                id: "d-9067-98495-01f81446-b011-70ec-42db-1c319e8039af".to_string(),
-                email: "a109ce63@lbatrust.co.uk".to_string(),
-                label: "d-9067-98495-01f81446-b011-70ec-42db-1c319e8039af".to_string(),
-                quota: 2500,
-                used: 2500,
-                status: "有效".to_string(),
-                created_at: "2025/11/30 14:00:09".to_string(),
-            },
-            Token {
-                id: "d-9067-98495-24086408-60c1-702b-48a8-ab655c773b71".to_string(),
-                email: "hj6395759@gmail.com".to_string(),
-                label: "d-9067-98495-24086408-60c1-702b-48a8-ab655c773b71".to_string(),
-                quota: 2500,
-                used: 2500,
-                status: "正常".to_string(),
-                created_at: "2025/11/27 16:29:47".to_string(),
-            },
-            Token {
-                id: "d-9067-98495-54760408-2011-70d1-b492-2a701c924ef3".to_string(),
-                email: "hjj09903@gmail.com".to_string(),
-                label: "d-9067-98495-54760408-2011-70d1-b492-2a701c924ef3".to_string(),
-                quota: 2500,
-                used: 2500,
-                status: "正常".to_string(),
-                created_at: "2025/11/27 16:20:34".to_string(),
-            },
-            Token {
-                id: "d-9067-98495-34d8e448-a001-7081-3603-a29a23866614".to_string(),
-                email: "1292548381@qq.com".to_string(),
-                label: "d-9067-98495-34d8e448-a001-7081-3603-a29a23866614".to_string(),
-                quota: 2500,
-                used: 2138,
-                status: "已失效".to_string(),
-                created_at: "2025/11/27 16:14:36".to_string(),
-            },
-            Token {
-                id: "d-9067-98495-14800448-5021-70d5-3977-511c2af434f6".to_string(),
-                email: "hj01857654@gmail.com".to_string(),
-                label: "d-9067-98495-14800448-5021-70d5-3977-511c2af434f6".to_string(),
-                quota: 2500,
-                used: 2500,
-                status: "已失效".to_string(),
-                created_at: "2025/11/27 15:40:39".to_string(),
-            },
-        ];
-        Self { tokens: samples }
+        let file_path = Self::get_storage_path();
+        let tokens = Self::load_from_file(&file_path);
+        Self { tokens, file_path }
+    }
+
+    fn get_storage_path() -> PathBuf {
+        let home = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_else(|_| ".".to_string());
+        PathBuf::from(home)
+            .join(".kiro-token-manager")
+            .join("tokens.json")
+    }
+
+    fn load_from_file(path: &PathBuf) -> Vec<Token> {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            serde_json::from_str(&content).unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn save_to_file(&self) {
+        if let Some(parent) = self.file_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(&self.tokens) {
+            let _ = std::fs::write(&self.file_path, json);
+        }
     }
 
     pub fn get_all(&self) -> Vec<Token> {
@@ -92,6 +106,22 @@ impl TokenStore {
     pub fn add(&mut self, email: String, label: String, quota: i32) -> Token {
         let token = Token::new(email, label, quota);
         self.tokens.insert(0, token.clone());
+        self.save_to_file();
+        token
+    }
+
+    pub fn add_with_tokens(
+        &mut self,
+        email: String,
+        label: String,
+        quota: i32,
+        access_token: String,
+        refresh_token: String,
+        provider: String,
+    ) -> Token {
+        let token = Token::new_with_tokens(email, label, quota, access_token, refresh_token, provider);
+        self.tokens.insert(0, token.clone());
+        self.save_to_file();
         token
     }
 
@@ -102,6 +132,7 @@ impl TokenStore {
             token.quota = quota;
             token.used = used;
             token.status = status;
+            self.save_to_file();
             return Some(token.clone());
         }
         None
@@ -110,23 +141,31 @@ impl TokenStore {
     pub fn delete(&mut self, id: &str) -> bool {
         let len_before = self.tokens.len();
         self.tokens.retain(|t| t.id != id);
-        self.tokens.len() < len_before
+        let deleted = self.tokens.len() < len_before;
+        if deleted {
+            self.save_to_file();
+        }
+        deleted
     }
 
     pub fn delete_many(&mut self, ids: &[String]) -> usize {
         let len_before = self.tokens.len();
         self.tokens.retain(|t| !ids.contains(&t.id));
-        len_before - self.tokens.len()
+        let deleted = len_before - self.tokens.len();
+        if deleted > 0 {
+            self.save_to_file();
+        }
+        deleted
     }
 
     pub fn refresh_status(&mut self, id: &str) -> Option<Token> {
         if let Some(token) = self.tokens.iter_mut().find(|t| t.id == id) {
-            // 模拟刷新状态逻辑
             if token.used >= token.quota {
                 token.status = "已失效".to_string();
             } else {
                 token.status = "正常".to_string();
             }
+            self.save_to_file();
             return Some(token.clone());
         }
         None
@@ -141,6 +180,7 @@ impl TokenStore {
                         self.tokens.push(token);
                     }
                 }
+                self.save_to_file();
                 Ok(count)
             }
             Err(e) => Err(e.to_string()),

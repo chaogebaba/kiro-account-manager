@@ -1,0 +1,24 @@
+GET /signin/oauth?code=e15e546f-17f4-4cf9-ab0d-f16d58d30c70&state=e6d57969-1568-44fd-a203-86e7f4c9e0b6 h2
+host: app.kiro.dev
+pragma: no-cache
+cache-control: no-cache
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: cross-site
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+referer: https://app.kiro.dev/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiNzMwNGQ0M2ItZjAxNi00M2ZjLTg3YTctMDlhNmFlMjY5OWE5IiwidiI6IjEifQ==
+cookie: AMCVS_7742037254C95E840A4C98A6%40AdobeOrg=1
+cookie: AMCV_7742037254C95E840A4C98A6%40AdobeOrg=1585540135%7CMCIDTS%7C20423%7CMCMID%7C36325079414519041173731457310831596422%7CMCAAMLH-1765098723%7C3%7CMCAAMB-1765098723%7C6G1ynYcLPuiQxYZrsz_pkqfLG9yMXBpb2zX5dvJdYQJzPXImdj0y%7CMCOPTOUT-1764501123s%7CNONE%7CvVersion%7C4.4.0
+cookie: kiro-visitor-id=1764493925041-c5vgq4v5gps
+priority: u=0, i
+

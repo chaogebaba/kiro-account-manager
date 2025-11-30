@@ -1,0 +1,33 @@
+POST /service/KiroWebPortalService/operation/GetUserUsageAndLimits h2
+host: app.kiro.dev
+content-length: 34
+x-amz-user-agent: aws-sdk-js/1.0.0 ua/2.1 os/Windows#NT-10.0 lang/js md/browser#Microsoft-Edge_142.0.0.0 m/M,E
+sec-ch-ua-platform: "Windows"
+authorization: Bearer aoaAAAAAGksHmYJJJcuPyk4A3xGh4T-4FeHtZThgCFsBX65pKpYR0abAhkBcmbmA3hQH4uaFknYd3CMmhMhMrB6SoBkc0:MGQCMBOE0SOeRdOOn8iIi3dbHi/WHul+VdkeIuXR8oh7rtlVN3BdGEOD8HN052Ja0FNbsgIwZuCJnsqCMPZ3RBD444tJM8G7oSlqpQIlJYG8rHXpBrdrN2UjjMKPHRL2Ot+62kUS
+x-csrf-token: iPTgSQ6ptXbD1ndCCLO6GJ/BLBV5gvr9oHu0KfUe32M=
+x-kiro-visitorid: 1764495155763-d3qiyxct58c
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+amz-sdk-request: attempt=1; max=1
+amz-sdk-invocation-id: 34690f55-d8fd-4e70-89db-b6dc7a4e55cc
+sec-ch-ua-mobile: ?0
+smithy-protocol: rpc-v2-cbor
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0
+accept: application/cbor
+dnt: 1
+content-type: application/cbor
+x-kiro-userid: d-9067c98495.24086408-60c1-702b-48a8-ab955c773b71
+origin: https://app.kiro.dev
+sec-fetch-site: same-origin
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://app.kiro.dev/account/usage
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: kiro-visitor-id=1764495155763-d3qiyxct58c
+cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiZGNjNWFiOTMtZDgzOS00ZjNkLWJmOTYtYzg3YmQzZjU1N2NiIiwidiI6IjEifQ==
+cookie: AccessToken=aoaAAAAAGksHmYJJJcuPyk4A3xGh4T-4FeHtZThgCFsBX65pKpYR0abAhkBcmbmA3hQH4uaFknYd3CMmhMhMrB6SoBkc0:MGQCMBOE0SOeRdOOn8iIi3dbHi/WHul+VdkeIuXR8oh7rtlVN3BdGEOD8HN052Ja0FNbsgIwZuCJnsqCMPZ3RBD444tJM8G7oSlqpQIlJYG8rHXpBrdrN2UjjMKPHRL2Ot+62kUS
+cookie: RefreshToken=aorAAAAAGmit1YjvwsbzLRO3yLacAkyKYB2iW6HQWgqo8SG8d-bZ5bm8vdguUIeT-dyQH9HlgecRQ5eZg3ck7dokwBkc0:MGYCMQDA823UB7GkxXVsr4yKBS2JU/MHU/mHTeFfHmx/Hl/KO4vPr2aDu4qaENfOtn/0EhwCMQC2Xvti/F+ve5LDeff9hp2GrAMXGT6K3WP5UF97h/ffviia/OKRGdJoI4ySB6y2XFc
+cookie: Idp=Google
+priority: u=1, i
+
+¢oisEmailRequiredõforiginhKIRO_IDE

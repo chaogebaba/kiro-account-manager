@@ -5,7 +5,7 @@ import { X } from 'lucide-react'
 function AddTokenModal({ onClose, onSuccess }) {
   const [email, setEmail] = useState('')
   const [label, setLabel] = useState('')
-  const [quota, setQuota] = useState(2500)
+  const [quota, setQuota] = useState(50)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -19,7 +19,7 @@ function AddTokenModal({ onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-[450px] shadow-xl">
+      <div className="bg-white rounded-lg w-[400px] shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="text-lg font-semibold">添加 Token</h2>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">

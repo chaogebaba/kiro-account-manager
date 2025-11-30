@@ -1,0 +1,12 @@
+h2 200
+date: Sun, 30 Nov 2025 09:33:04 GMT
+content-type: application/cbor
+content-length: 380
+x-amzn-requestid: b291cd9b-f404-4f97-a8e4-6c78b9477959
+access-control-allow-origin: https://app.kiro.dev
+smithy-protocol: rpc-v2-cbor
+vary: Origin
+access-control-expose-headers: x-amzn-RequestId,x-amzn-ErrorType,x-amzn-ErrorMessage,Date,smithy-protocol
+access-control-allow-credentials: true
+
+¿kredirectUrlykhttps://kiro-prod-us-east-1.auth.us-east-1.amazoncognito.com/oauth2/authorize?client_id=59bd15eh40ee7pc20h0bkcu7id&response_type=code&scope=email+openid&redirect_uri=https%3A%2F%2Fapp.kiro.dev%2Fsignin%2Foauth&state=e6d57969-1568-44fd-a203-86e7f4c9e0b6&code_challenge=CTj1Z2-RWNBcBQ2LE3HamLw0yCCQvXuSQQKmAD2qads&code_challenge_method=S256&identity_provider=Googleÿ
