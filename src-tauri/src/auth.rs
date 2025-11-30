@@ -329,6 +329,10 @@ pub struct UsageAndLimitsResponse {
     pub current_usage: Option<i32>,
     #[serde(rename = "resetDate")]
     pub reset_date: Option<String>,
+    #[serde(rename = "subscriptionType")]
+    pub subscription_type: Option<String>,
+    #[serde(rename = "userId")]
+    pub user_id: Option<String>,
 }
 
 /// 使用 RefreshToken 刷新 AccessToken（通过 Cookie）
@@ -411,11 +415,12 @@ pub async fn get_user_info_with_token(
     let text = String::from_utf8_lossy(&body);
     let email = extract_email(&text);
     let idp = extract_pattern(&text, r"cidp.([A-Za-z]+)");
+    let user_id = extract_pattern(&text, r"userId.{1,5}(d-[a-zA-Z0-9\.\-]+)");
 
     Ok(GetUserInfoResponse {
         email,
         name: idp.clone(),
-        user_id: None,
+        user_id,
         avatar_url: None,
     })
 }
@@ -459,11 +464,17 @@ pub async fn get_user_usage_and_limits(
     let text = String::from_utf8_lossy(&body);
     let limit = extract_number(&text, r"usageLimit[^\d]*(\d+)");
     let used = extract_number(&text, r"currentUsage[^\d]*(\d+)");
+    // 提取订阅类型: subscriptionTitle 后面的值如 "KIRO PRO+"
+    let subscription_type = extract_pattern(&text, r"subscriptionTitle.{1,5}([A-Z][A-Z0-9\s\+]+)");
+    // 提取 userId
+    let user_id = extract_pattern(&text, r"userId.{1,5}(d-[a-zA-Z0-9\.\-]+)");
 
     Ok(UsageAndLimitsResponse {
         usage_limit: limit,
         current_usage: used,
         reset_date: None,
+        subscription_type,
+        user_id,
     })
 }
 

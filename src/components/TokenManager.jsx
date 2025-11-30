@@ -218,17 +218,18 @@ function TokenManager() {
                 />
               </th>
               <th className="px-4 py-3 font-medium">邮箱</th>
-              <th className="px-4 py-3 font-medium w-24">Provider</th>
+              <th className="px-4 py-3 font-medium w-24">来源</th>
+              <th className="px-4 py-3 font-medium w-24">订阅</th>
               <th className="px-4 py-3 font-medium w-48">额度使用</th>
               <th className="px-4 py-3 font-medium w-24">状态</th>
               <th className="px-4 py-3 font-medium w-40">添加时间</th>
-              <th className="px-4 py-3 font-medium w-24">操作</th>
+              <th className="px-4 py-3 font-medium w-32">操作</th>
             </tr>
           </thead>
           <tbody>
             {paginatedTokens.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-16 text-center text-gray-400">
+                <td colSpan={8} className="px-6 py-16 text-center text-gray-400">
                   <div className="flex flex-col items-center gap-2">
                     <Plus size={40} className="text-gray-300" />
                     <p>暂无账号，点击登录按钮添加</p>
@@ -267,6 +268,14 @@ function TokenManager() {
                     token.provider === 'Github' ? 'bg-gray-100 text-gray-700' : 'bg-blue-50 text-blue-600'
                   }`}>
                     {token.provider || '未知'}
+                  </span>
+                </td>
+                <td className="px-4 py-4">
+                  <span className={`text-xs px-2 py-1 rounded ${
+                    token.subscription_type?.includes('PRO+') ? 'bg-purple-100 text-purple-700' :
+                    token.subscription_type?.includes('PRO') ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {token.subscription_type || 'Free'}
                   </span>
                 </td>
                 <td className="px-4 py-4">

@@ -18,6 +18,12 @@ pub struct Token {
     pub refresh_token: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subscription_type: Option<String>,
 }
 
 impl Token {
@@ -34,6 +40,9 @@ impl Token {
             access_token: None,
             refresh_token: None,
             provider: None,
+            user_id: None,
+            expires_at: None,
+            subscription_type: None,
         }
     }
 
@@ -44,6 +53,8 @@ impl Token {
         access_token: String,
         refresh_token: String,
         provider: String,
+        user_id: Option<String>,
+        subscription_type: Option<String>,
     ) -> Self {
         let now: DateTime<Local> = Local::now();
         Self {
@@ -57,6 +68,9 @@ impl Token {
             access_token: Some(access_token),
             refresh_token: Some(refresh_token),
             provider: Some(provider),
+            user_id,
+            expires_at: None,
+            subscription_type,
         }
     }
 }
@@ -118,8 +132,10 @@ impl TokenStore {
         access_token: String,
         refresh_token: String,
         provider: String,
+        user_id: Option<String>,
+        subscription_type: Option<String>,
     ) -> Token {
-        let token = Token::new_with_tokens(email, label, quota, access_token, refresh_token, provider);
+        let token = Token::new_with_tokens(email, label, quota, access_token, refresh_token, provider, user_id, subscription_type);
         self.tokens.insert(0, token.clone());
         self.save_to_file();
         token

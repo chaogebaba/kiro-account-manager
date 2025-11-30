@@ -234,7 +234,9 @@ async fn add_token_by_refresh(
     let usage = get_user_usage_and_limits(&new_access_token, &csrf_token).await?;
     let quota = usage.usage_limit.unwrap_or(50);
     let used = usage.current_usage.unwrap_or(0);
-    println!("Got usage: {}/{}", used, quota);
+    let subscription_type = usage.subscription_type.clone();
+    let user_id = usage.user_id.or(user_info.user_id);
+    println!("Got usage: {}/{}, subscription: {:?}", used, quota, subscription_type);
     
     // 4. 添加到 token 列表
     let token = state.store.lock().unwrap().add_with_tokens(
@@ -244,6 +246,8 @@ async fn add_token_by_refresh(
         new_access_token,
         refresh_token,
         provider.clone(),
+        user_id.clone(),
+        subscription_type.clone(),
     );
     
     // 更新 used
@@ -674,7 +678,9 @@ fn add_kiro_token(
         quota.unwrap_or(50),
         access_token,
         refresh_token,  // 使用真正的 RefreshToken
-        idp
+        idp,
+        None,  // user_id - 登录时暂时没有
+        None,  // subscription_type - 登录时暂时没有
     );
     
     // 更新已使用量
