@@ -90,7 +90,7 @@ impl TokenStore {
         }
     }
 
-    fn save_to_file(&self) {
+    pub fn save_to_file(&self) {
         if let Some(parent) = self.file_path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
@@ -126,16 +126,15 @@ impl TokenStore {
     }
 
     pub fn update(&mut self, id: &str, email: String, label: String, quota: i32, used: i32, status: String) -> Option<Token> {
-        if let Some(token) = self.tokens.iter_mut().find(|t| t.id == id) {
-            token.email = email;
-            token.label = label;
-            token.quota = quota;
-            token.used = used;
-            token.status = status;
-            self.save_to_file();
-            return Some(token.clone());
-        }
-        None
+        let idx = self.tokens.iter().position(|t| t.id == id)?;
+        self.tokens[idx].email = email;
+        self.tokens[idx].label = label;
+        self.tokens[idx].quota = quota;
+        self.tokens[idx].used = used;
+        self.tokens[idx].status = status;
+        let result = self.tokens[idx].clone();
+        self.save_to_file();
+        Some(result)
     }
 
     pub fn delete(&mut self, id: &str) -> bool {
@@ -159,16 +158,15 @@ impl TokenStore {
     }
 
     pub fn refresh_status(&mut self, id: &str) -> Option<Token> {
-        if let Some(token) = self.tokens.iter_mut().find(|t| t.id == id) {
-            if token.used >= token.quota {
-                token.status = "已失效".to_string();
-            } else {
-                token.status = "正常".to_string();
-            }
-            self.save_to_file();
-            return Some(token.clone());
+        let idx = self.tokens.iter().position(|t| t.id == id)?;
+        if self.tokens[idx].used >= self.tokens[idx].quota {
+            self.tokens[idx].status = "已失效".to_string();
+        } else {
+            self.tokens[idx].status = "正常".to_string();
         }
-        None
+        let result = self.tokens[idx].clone();
+        self.save_to_file();
+        Some(result)
     }
 
     pub fn import_from_json(&mut self, json: &str) -> Result<usize, String> {

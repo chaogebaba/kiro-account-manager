@@ -3,7 +3,11 @@
 mod auth;
 mod token;
 
-use auth::{AuthState, User, initiate_kiro_login, initiate_direct_login, exchange_kiro_token};
+use auth::{
+    AuthState, User, initiate_kiro_login, initiate_direct_login, exchange_kiro_token,
+    refresh_kiro_token_with_cookie, get_user_info_with_token, get_user_usage_and_limits,
+    UsageAndLimitsResponse,
+};
 use std::sync::Mutex;
 use tauri::{Manager, State, Window};
 use token::{Token, TokenStore};
@@ -128,9 +132,74 @@ fn delete_tokens(state: State<AppState>, ids: Vec<String>) -> usize {
     state.store.lock().unwrap().delete_many(&ids)
 }
 
+// 刷新 token 状态（本地简单刷新）
 #[tauri::command]
 fn refresh_token_status(state: State<AppState>, id: String) -> Option<Token> {
     state.store.lock().unwrap().refresh_status(&id)
+}
+
+// 真正调用 API 刷新 token 状态和配额
+#[tauri::command]
+async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> Result<Token, String> {
+    // 获取 token
+    let token = {
+        let store = state.store.lock().unwrap();
+        store.tokens.iter().find(|t| t.id == id).cloned()
+    }.ok_or("Token not found")?;
+
+    let access_token = token.access_token.as_ref().ok_or("No access token")?;
+    let refresh_token = token.refresh_token.as_ref().ok_or("No refresh token")?;
+    let provider = token.provider.as_ref().map(|s| s.as_str()).unwrap_or("Google");
+
+    // 1. 先刷新 token 获取新的 accessToken 和 csrfToken
+    let refresh_result = refresh_kiro_token_with_cookie(access_token, refresh_token, provider).await?;
+    
+    let new_access_token = refresh_result.access_token.unwrap_or_else(|| access_token.clone());
+    let csrf_token = refresh_result.csrf_token.unwrap_or_default();
+
+    // 2. 获取配额使用情况
+    let usage = get_user_usage_and_limits(&new_access_token, &csrf_token).await?;
+
+    // 3. 更新 token 信息
+    let mut store = state.store.lock().unwrap();
+    let token_idx = store.tokens.iter().position(|t| t.id == id);
+    
+    if let Some(idx) = token_idx {
+        store.tokens[idx].quota = usage.usage_limit.unwrap_or(store.tokens[idx].quota);
+        store.tokens[idx].used = usage.current_usage.unwrap_or(store.tokens[idx].used);
+        store.tokens[idx].access_token = Some(new_access_token);
+        store.tokens[idx].refresh_token = Some(csrf_token);
+        
+        // 更新状态
+        if store.tokens[idx].used >= store.tokens[idx].quota {
+            store.tokens[idx].status = "已失效".to_string();
+        } else {
+            store.tokens[idx].status = "正常".to_string();
+        }
+        
+        let result = store.tokens[idx].clone();
+        store.save_to_file();
+        return Ok(result);
+    }
+
+    Err("Token not found after update".to_string())
+}
+
+// 验证 token 是否有效
+#[tauri::command]
+async fn verify_token(
+    access_token: String,
+    refresh_token: String,
+    provider: String,
+) -> Result<UsageAndLimitsResponse, String> {
+    // 先刷新获取 csrf_token
+    let refresh_result = refresh_kiro_token_with_cookie(&access_token, &refresh_token, &provider).await?;
+    
+    let new_access_token = refresh_result.access_token.unwrap_or(access_token);
+    let csrf_token = refresh_result.csrf_token.unwrap_or_default();
+
+    // 获取配额
+    get_user_usage_and_limits(&new_access_token, &csrf_token).await
 }
 
 #[tauri::command]
@@ -499,8 +568,8 @@ fn add_kiro_token(
     println!("Adding Kiro token: email={}, idp={}, quota={:?}, used={:?}", email, idp, quota, used);
     
     // 保存认证信息
-    *state.auth.access_token.lock().unwrap() = Some(access_token);
-    *state.auth.csrf_token.lock().unwrap() = Some(csrf_token);
+    *state.auth.access_token.lock().unwrap() = Some(access_token.clone());
+    *state.auth.csrf_token.lock().unwrap() = Some(csrf_token.clone());
     
     // 创建用户
     let user = User {
@@ -578,6 +647,8 @@ fn main() {
             delete_token,
             delete_tokens,
             refresh_token_status,
+            refresh_token_from_api,
+            verify_token,
             import_tokens,
             export_tokens,
             get_current_user,

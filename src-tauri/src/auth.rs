@@ -308,8 +308,7 @@ pub async fn get_kiro_user_info(csrf_token: &str) -> Result<GetUserInfoResponse,
 }
 
 /// RefreshToken 响应
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RefreshTokenResponse {
     #[serde(rename = "accessToken")]
     pub access_token: Option<String>,
@@ -321,17 +320,25 @@ pub struct RefreshTokenResponse {
     pub profile_arn: Option<String>,
 }
 
-/// 使用 RefreshToken 刷新 AccessToken
-#[allow(dead_code)]
-pub async fn refresh_kiro_token(refresh_token: &str, csrf_token: &str) -> Result<RefreshTokenResponse, String> {
-    let request = serde_json::json!({
-        "csrfToken": csrf_token
-    });
+/// GetUserUsageAndLimits 响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsageAndLimitsResponse {
+    #[serde(rename = "usageLimit")]
+    pub usage_limit: Option<i32>,
+    #[serde(rename = "currentUsage")]
+    pub current_usage: Option<i32>,
+    #[serde(rename = "resetDate")]
+    pub reset_date: Option<String>,
+}
 
-    // 序列化为 CBOR
-    let mut cbor_data = Vec::new();
-    ciborium::into_writer(&request, &mut cbor_data)
-        .map_err(|e| format!("CBOR serialize failed: {}", e))?;
+/// 使用 RefreshToken 刷新 AccessToken（通过 Cookie）
+pub async fn refresh_kiro_token_with_cookie(
+    access_token: &str,
+    refresh_token: &str,
+    idp: &str,
+) -> Result<RefreshTokenResponse, String> {
+    // CBOR 编码: {csrfToken: ""}
+    let cbor_body: Vec<u8> = vec![0xa1, 0x69, 0x63, 0x73, 0x72, 0x66, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x60];
 
     let client = reqwest::Client::new();
     
@@ -340,25 +347,146 @@ pub async fn refresh_kiro_token(refresh_token: &str, csrf_token: &str) -> Result
         .header("Content-Type", "application/cbor")
         .header("Accept", "application/cbor")
         .header("smithy-protocol", "rpc-v2-cbor")
-        .header("x-csrf-token", csrf_token)
-        .header("Cookie", format!("RefreshToken={}", refresh_token))
-        .body(cbor_data)
+        .header("Cookie", format!("AccessToken={}; RefreshToken={}; Idp={}", access_token, refresh_token, idp))
+        .body(cbor_body)
         .send()
         .await
         .map_err(|e| format!("RefreshToken request failed: {}", e))?;
 
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.bytes().await.unwrap_or_default();
+    let status = response.status();
+    let body = response.bytes().await.unwrap_or_default();
+
+    if !status.is_success() {
         let text = String::from_utf8_lossy(&body);
         return Err(format!("RefreshToken failed ({}): {}", status, text));
     }
 
-    let body = response.bytes().await.unwrap_or_default();
-    let result: RefreshTokenResponse = ciborium::from_reader(&body[..])
-        .map_err(|e| format!("Parse RefreshToken response failed: {}", e))?;
+    // 从响应文本中提取 token（CBOR 解析可能有问题，用正则提取）
+    let text = String::from_utf8_lossy(&body);
+    let access_token = extract_pattern(&text, r"aoa[A-Za-z0-9_\-:\/+=]+");
+    let csrf_token = extract_pattern(&text, r"csrfToken.{1,5}([A-Za-z0-9+/=]{20,50})");
 
-    Ok(result)
+    Ok(RefreshTokenResponse {
+        access_token,
+        csrf_token,
+        expires_in: Some(3600),
+        profile_arn: None,
+    })
+}
+
+/// 获取用户信息
+pub async fn get_user_info_with_token(
+    access_token: &str,
+    csrf_token: &str,
+) -> Result<GetUserInfoResponse, String> {
+    // CBOR 编码: {origin: "KIRO_IDE"}
+    let cbor_body: Vec<u8> = vec![
+        0xa1, 0x66, 0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 
+        0x68, 0x4b, 0x49, 0x52, 0x4f, 0x5f, 0x49, 0x44, 0x45
+    ];
+
+    let client = reqwest::Client::new();
+    
+    let response = client
+        .post(format!("{}/GetUserInfo", KIRO_API))
+        .header("Content-Type", "application/cbor")
+        .header("Accept", "application/cbor")
+        .header("smithy-protocol", "rpc-v2-cbor")
+        .header("Authorization", format!("Bearer {}", access_token))
+        .header("x-csrf-token", csrf_token)
+        .body(cbor_body)
+        .send()
+        .await
+        .map_err(|e| format!("GetUserInfo request failed: {}", e))?;
+
+    let status = response.status();
+    let body = response.bytes().await.unwrap_or_default();
+
+    if !status.is_success() {
+        let text = String::from_utf8_lossy(&body);
+        return Err(format!("GetUserInfo failed ({}): {}", status, text));
+    }
+
+    // 从响应文本中提取信息
+    let text = String::from_utf8_lossy(&body);
+    let email = extract_email(&text);
+    let idp = extract_pattern(&text, r"cidp.([A-Za-z]+)");
+
+    Ok(GetUserInfoResponse {
+        email,
+        name: idp.clone(),
+        user_id: None,
+        avatar_url: None,
+    })
+}
+
+/// 获取用户配额使用情况
+pub async fn get_user_usage_and_limits(
+    access_token: &str,
+    csrf_token: &str,
+) -> Result<UsageAndLimitsResponse, String> {
+    // CBOR 编码: {isEmailRequired: false, origin: "KIRO_IDE"}
+    let cbor_body: Vec<u8> = vec![
+        0xa2, 0x6f, 0x69, 0x73, 0x45, 0x6d, 0x61, 0x69, 0x6c, 
+        0x52, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0xf4, 
+        0x66, 0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x68, 0x4b, 
+        0x49, 0x52, 0x4f, 0x5f, 0x49, 0x44, 0x45
+    ];
+
+    let client = reqwest::Client::new();
+    
+    let response = client
+        .post(format!("{}/GetUserUsageAndLimits", KIRO_API))
+        .header("Content-Type", "application/cbor")
+        .header("Accept", "application/cbor")
+        .header("smithy-protocol", "rpc-v2-cbor")
+        .header("Authorization", format!("Bearer {}", access_token))
+        .header("x-csrf-token", csrf_token)
+        .body(cbor_body)
+        .send()
+        .await
+        .map_err(|e| format!("GetUserUsageAndLimits request failed: {}", e))?;
+
+    let status = response.status();
+    let body = response.bytes().await.unwrap_or_default();
+
+    if !status.is_success() {
+        let text = String::from_utf8_lossy(&body);
+        return Err(format!("GetUserUsageAndLimits failed ({}): {}", status, text));
+    }
+
+    // 从响应文本中提取配额信息
+    let text = String::from_utf8_lossy(&body);
+    let limit = extract_number(&text, r"usageLimit[^\d]*(\d+)");
+    let used = extract_number(&text, r"currentUsage[^\d]*(\d+)");
+
+    Ok(UsageAndLimitsResponse {
+        usage_limit: limit,
+        current_usage: used,
+        reset_date: None,
+    })
+}
+
+// 辅助函数：提取正则匹配
+fn extract_pattern(text: &str, pattern: &str) -> Option<String> {
+    use regex::Regex;
+    if let Ok(re) = Regex::new(pattern) {
+        if let Some(caps) = re.captures(text) {
+            if caps.len() > 1 {
+                return caps.get(1).map(|m| m.as_str().to_string());
+            }
+            return caps.get(0).map(|m| m.as_str().to_string());
+        }
+    }
+    None
+}
+
+fn extract_email(text: &str) -> Option<String> {
+    extract_pattern(text, r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
+}
+
+fn extract_number(text: &str, pattern: &str) -> Option<i32> {
+    extract_pattern(text, pattern).and_then(|s| s.parse().ok())
 }
 
 

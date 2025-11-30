@@ -47,8 +47,19 @@ function TokenManager() {
     }
   }
 
+  const [refreshingId, setRefreshingId] = useState(null)
+
   const handleRefreshStatus = async (id) => {
-    await invoke('refresh_token_status', { id })
+    setRefreshingId(id)
+    try {
+      // 尝试调用真正的 API 刷新
+      await invoke('refresh_token_from_api', { id })
+    } catch (e) {
+      console.warn('API refresh failed, using local refresh:', e)
+      // 如果 API 调用失败，使用本地刷新
+      await invoke('refresh_token_status', { id })
+    }
+    setRefreshingId(null)
     loadTokens()
   }
 
@@ -254,10 +265,11 @@ function TokenManager() {
                     </button>
                     <button
                       onClick={() => handleRefreshStatus(token.id)}
-                      className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                      title="刷新状态"
+                      disabled={refreshingId === token.id}
+                      className="p-1.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+                      title="刷新状态（从API获取最新配额）"
                     >
-                      <RefreshCw size={14} className="text-gray-400" />
+                      <RefreshCw size={14} className={`text-gray-400 ${refreshingId === token.id ? 'animate-spin' : ''}`} />
                     </button>
                     <button
                       onClick={() => setEditingToken(token)}
