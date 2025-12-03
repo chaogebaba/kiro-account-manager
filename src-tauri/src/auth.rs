@@ -31,7 +31,7 @@ impl AuthState {
 const KIRO_API: &str = "https://app.kiro.dev/service/KiroWebPortalService/operation";
 
 // 桌面端 API
-const DESKTOP_AUTH_API: &str = "https://prod.us-east-1.auth.desktop.kiro.dev";
+pub const DESKTOP_AUTH_API: &str = "https://prod.us-east-1.auth.desktop.kiro.dev";
 const DESKTOP_USAGE_API: &str = "https://codewhisperer.us-east-1.amazonaws.com";
 const PROFILE_ARN: &str = "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK";
 
@@ -380,38 +380,60 @@ pub struct DesktopUsageBreakdown {
 
 /// 使用桌面端 API 刷新 Token（只需要 RefreshToken）
 pub async fn refresh_token_desktop(refresh_token: &str) -> Result<DesktopRefreshResponse, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create client: {}", e))?;
     
     let body = serde_json::json!({
         "refreshToken": refresh_token
     });
     
-    let response = client
-        .post(format!("{}/refreshToken", DESKTOP_AUTH_API))
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-    
-    let status = response.status();
-    let text = response.text().await.unwrap_or_default();
-    
-    if !status.is_success() {
-        if status.as_u16() == 401 {
-            return Err("RefreshToken 已过期或无效，请重新获取".to_string());
+    // 重试机制
+    let mut last_error = String::new();
+    for attempt in 0..3 {
+        if attempt > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         }
-        return Err(format!("RefreshToken failed ({}): {}", status, text));
+        
+        match client
+            .post(format!("{}/refreshToken", DESKTOP_AUTH_API))
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .json(&body)
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let status = response.status();
+                let text = response.text().await.unwrap_or_default();
+                
+                if !status.is_success() {
+                    if status.as_u16() == 401 {
+                        return Err("RefreshToken 已过期或无效".to_string());
+                    }
+                    return Err(format!("RefreshToken failed ({})", status));
+                }
+                
+                return serde_json::from_str(&text)
+                    .map_err(|e| format!("Parse failed: {}", e));
+            }
+            Err(e) => {
+                last_error = format!("网络错误: {}", e);
+                continue;
+            }
+        }
     }
     
-    serde_json::from_str(&text)
-        .map_err(|e| format!("Parse response failed: {} - {}", e, text))
+    Err(last_error)
 }
 
 /// 使用桌面端 API 获取配额和用户信息
 pub async fn get_usage_limits_desktop(access_token: &str) -> Result<DesktopUsageResponse, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create client: {}", e))?;
     
     let url = format!(
         "{}/getUsageLimits?isEmailRequired=true&origin=AI_EDITOR&profileArn={}",
@@ -419,21 +441,37 @@ pub async fn get_usage_limits_desktop(access_token: &str) -> Result<DesktopUsage
         urlencoding::encode(PROFILE_ARN)
     );
     
-    let response = client
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", access_token))
-        .header("Accept", "application/json")
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-    
-    let status = response.status();
-    let text = response.text().await.unwrap_or_default();
-    
-    if !status.is_success() {
-        return Err(format!("GetUsageLimits failed ({}): {}", status, text));
+    // 重试机制
+    let mut last_error = String::new();
+    for attempt in 0..3 {
+        if attempt > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+        }
+        
+        match client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", access_token))
+            .header("Accept", "application/json")
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let status = response.status();
+                let text = response.text().await.unwrap_or_default();
+                
+                if !status.is_success() {
+                    return Err(format!("GetUsageLimits failed ({})", status));
+                }
+                
+                return serde_json::from_str(&text)
+                    .map_err(|e| format!("Parse failed: {}", e));
+            }
+            Err(e) => {
+                last_error = format!("网络错误: {}", e);
+                continue;
+            }
+        }
     }
     
-    serde_json::from_str(&text)
-        .map_err(|e| format!("Parse response failed: {} - {}", e, text))
+    Err(last_error)
 }

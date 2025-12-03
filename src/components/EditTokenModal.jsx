@@ -9,6 +9,8 @@ function EditTokenModal({ token, onClose, onSuccess }) {
     quota: token.quota,
     used: token.used,
     status: token.status,
+    access_token: token.access_token || '',
+    refresh_token: token.refresh_token || '',
   })
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -25,7 +27,9 @@ function EditTokenModal({ token, onClose, onSuccess }) {
         label: form.label, 
         quota: form.quota, 
         used: form.used, 
-        status: form.status 
+        status: form.status,
+        accessToken: form.access_token || null,
+        refreshToken: form.refresh_token || null,
       })
       onSuccess()
     } catch (err) {
@@ -56,12 +60,6 @@ function EditTokenModal({ token, onClose, onSuccess }) {
     navigator.clipboard.writeText(text)
     setCopied(field)
     setTimeout(() => setCopied(null), 1500)
-  }
-
-  const maskToken = (str) => {
-    if (!str) return '-'
-    if (str.length <= 20) return str
-    return str.slice(0, 12) + '••••••••' + str.slice(-8)
   }
 
   const usagePercent = form.quota > 0 ? Math.min(100, (form.used / form.quota) * 100) : 0
@@ -233,42 +231,44 @@ function EditTokenModal({ token, onClose, onSuccess }) {
                     <span className="text-gray-700 font-medium">{token.created_at}</span>
                   </div>
                   
-                  <div className="pt-2 space-y-2">
-                    <div className="group">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-400">AccessToken</span>
+                  <div className="pt-2 space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-gray-500">AccessToken</span>
                         <button
                           type="button"
-                          onClick={() => handleCopy(token.access_token || '', 'access')}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleCopy(form.access_token, 'access')}
+                          className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
                         >
-                          {copied === 'access' ? 
-                            <Check size={14} className="text-green-500" /> : 
-                            <Copy size={14} className="text-gray-400 hover:text-gray-600" />
-                          }
+                          {copied === 'access' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                          复制
                         </button>
                       </div>
-                      <div className="text-xs font-mono bg-gray-50 px-3 py-2 rounded-lg text-gray-500 break-all select-all">
-                        {maskToken(token.access_token)}
-                      </div>
+                      <textarea
+                        value={form.access_token}
+                        onChange={(e) => setForm({ ...form, access_token: e.target.value })}
+                        placeholder="aoa 开头的 AccessToken"
+                        className="w-full px-3 py-2 text-xs font-mono bg-white border border-gray-200 rounded-lg resize-none h-16 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                      />
                     </div>
-                    <div className="group">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-400">RefreshToken</span>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-gray-500">RefreshToken</span>
                         <button
                           type="button"
-                          onClick={() => handleCopy(token.refresh_token || '', 'refresh')}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleCopy(form.refresh_token, 'refresh')}
+                          className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
                         >
-                          {copied === 'refresh' ? 
-                            <Check size={14} className="text-green-500" /> : 
-                            <Copy size={14} className="text-gray-400 hover:text-gray-600" />
-                          }
+                          {copied === 'refresh' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                          复制
                         </button>
                       </div>
-                      <div className="text-xs font-mono bg-gray-50 px-3 py-2 rounded-lg text-gray-500 break-all select-all">
-                        {maskToken(token.refresh_token)}
-                      </div>
+                      <textarea
+                        value={form.refresh_token}
+                        onChange={(e) => setForm({ ...form, refresh_token: e.target.value })}
+                        placeholder="aor 开头的 RefreshToken"
+                        className="w-full px-3 py-2 text-xs font-mono bg-white border border-gray-200 rounded-lg resize-none h-16 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                      />
                     </div>
                   </div>
                 </div>

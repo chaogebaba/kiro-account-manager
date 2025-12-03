@@ -17,6 +17,7 @@ function TokenManager() {
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState('')
   const [autoRefreshing, setAutoRefreshing] = useState(false)
+  const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0, currentEmail: '', results: [] })
   const [lastRefreshTime, setLastRefreshTime] = useState(null)
 
   // 检查 Token 是否即将过期（5分钟内）
@@ -40,22 +41,45 @@ function TokenManager() {
     }
     
     setAutoRefreshing(true)
+    setRefreshProgress({ current: 0, total: tokensToRefresh.length, currentEmail: '', results: [] })
     console.log(`开始刷新 ${tokensToRefresh.length} 个账号...`)
     
     const updatedTokens = [...tokenList]
+    const results = []
+    let current = 0
+    
     for (const token of tokensToRefresh) {
+      setRefreshProgress(prev => ({ ...prev, currentEmail: token.email }))
+      let success = false
+      let message = ''
       try {
         const updated = await invoke('refresh_token_from_api', { id: token.id })
         const idx = updatedTokens.findIndex(t => t.id === token.id)
         if (idx !== -1) updatedTokens[idx] = updated
+        success = true
+        message = `${updated.used}/${updated.quota}`
       } catch (e) {
         console.warn(`刷新账号 ${token.email} 失败:`, e)
+        message = String(e).slice(0, 30)
+      }
+      current++
+      results.push({ email: token.email, success, message })
+      setRefreshProgress({ current, total: tokensToRefresh.length, currentEmail: '', results: [...results] })
+      
+      // 请求间隔，避免太快
+      if (current < tokensToRefresh.length) {
+        await new Promise(r => setTimeout(r, 500))
       }
     }
     
     setTokens(updatedTokens)
     setLastRefreshTime(new Date().toLocaleTimeString())
-    setAutoRefreshing(false)
+    
+    // 延迟关闭对话框，让用户看到结果
+    setTimeout(() => {
+      setAutoRefreshing(false)
+      setRefreshProgress({ current: 0, total: 0, currentEmail: '', results: [] })
+    }, 1500)
     console.log('刷新完成')
   }
 
@@ -72,8 +96,36 @@ function TokenManager() {
     init()
 
     // 监听登录成功事件
-    const unlisten = listen('login-success', () => {
+    const unlistenLoginSuccess = listen('login-success', () => {
       loadTokens()
+    })
+
+    // 监听 Kiro OAuth 登录数据事件，自动添加账号
+    const unlistenKiroLoginData = listen('kiro-login-data', async (event) => {
+      try {
+        const payload = event.payload
+        const data = typeof payload === 'string' ? JSON.parse(payload) : payload
+
+        if (!data || !data.accessToken || !data.refreshToken) {
+          console.warn('Invalid kiro-login-data payload:', data)
+          return
+        }
+
+        await invoke('add_kiro_token', {
+          email: data.email || 'unknown@kiro.dev',
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          csrfToken: data.csrfToken || '',
+          idp: data.idp || 'Google',
+          quota: data.quota ?? null,
+          used: data.used ?? null
+        })
+
+        // 添加成功后刷新列表
+        loadTokens()
+      } catch (e) {
+        console.error('Failed to handle kiro-login-data:', e)
+      }
     })
 
     // 定时检查（每分钟检查一次，只刷新即将过期的Token）
@@ -85,7 +137,8 @@ function TokenManager() {
     }, 60 * 1000)
 
     return () => {
-      unlisten.then(fn => fn())
+      unlistenLoginSuccess.then(fn => fn())
+      unlistenKiroLoginData.then(fn => fn())
       clearInterval(interval)
     }
   }, [])
@@ -254,11 +307,19 @@ function TokenManager() {
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-semibold text-gray-800">账号管理</h1>
           <span className="text-sm text-gray-500">{tokens.length} 个账号</span>
-          {autoRefreshing && (
-            <span className="text-xs text-blue-500 flex items-center gap-1">
-              <RefreshCw size={12} className="animate-spin" />
-              自动刷新中...
-            </span>
+          {autoRefreshing && refreshProgress.total > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 text-xs text-blue-600">
+                <RefreshCw size={12} className="animate-spin" />
+                <span>{refreshProgress.current}/{refreshProgress.total}</span>
+              </div>
+              <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                  style={{ width: `${(refreshProgress.current / refreshProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
           )}
           {lastRefreshTime && !autoRefreshing && (
             <span className="text-xs text-gray-400">上次刷新: {lastRefreshTime}</span>
@@ -326,14 +387,14 @@ function TokenManager() {
               <th className="px-4 py-3 font-medium w-24">订阅</th>
               <th className="px-4 py-3 font-medium w-48">额度使用</th>
               <th className="px-4 py-3 font-medium w-24">状态</th>
-              <th className="px-4 py-3 font-medium w-40">添加时间</th>
+              <th className="px-4 py-3 font-medium w-36">Token过期</th>
               <th className="px-4 py-3 font-medium w-32">操作</th>
             </tr>
           </thead>
           <tbody>
             {paginatedTokens.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-16 text-center text-gray-400">
+                <td colSpan={9} className="px-6 py-16 text-center text-gray-400">
                   <div className="flex flex-col items-center gap-2">
                     <Plus size={40} className="text-gray-300" />
                     <p>暂无账号，点击登录按钮添加</p>
@@ -411,7 +472,21 @@ function TokenManager() {
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-4 text-sm text-gray-500">{token.created_at}</td>
+                <td className="px-4 py-4">
+                  {token.expires_at ? (
+                    <div className="text-xs">
+                      <div className={`${
+                        new Date(token.expires_at.replace(/\//g, '-')) < new Date() ? 'text-red-500' :
+                        new Date(token.expires_at.replace(/\//g, '-')) - new Date() < 10 * 60 * 1000 ? 'text-yellow-600' : 'text-gray-500'
+                      }`}>
+                        {token.expires_at.split(' ')[1]}
+                      </div>
+                      <div className="text-gray-400">{token.expires_at.split(' ')[0]}</div>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">-</span>
+                  )}
+                </td>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-1">
                     <button
@@ -553,6 +628,65 @@ function TokenManager() {
                   {addLoading ? '添加中...' : '添加'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Refresh Progress Dialog */}
+      {autoRefreshing && refreshProgress.total > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl w-[400px] shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b bg-blue-50">
+              <div className="flex items-center gap-2">
+                <RefreshCw size={18} className="text-blue-600 animate-spin" />
+                <h2 className="text-lg font-semibold text-gray-800">刷新账号</h2>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* 进度条 */}
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600">进度</span>
+                  <span className="text-blue-600 font-medium">{refreshProgress.current} / {refreshProgress.total}</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                    style={{ width: `${(refreshProgress.current / refreshProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+              
+              {/* 当前刷新 */}
+              {refreshProgress.currentEmail && (
+                <div className="text-sm text-gray-500">
+                  正在刷新: <span className="text-gray-700">{refreshProgress.currentEmail}</span>
+                </div>
+              )}
+              
+              {/* 结果列表 */}
+              {refreshProgress.results.length > 0 && (
+                <div className="max-h-48 overflow-y-auto space-y-1">
+                  {refreshProgress.results.map((r, i) => (
+                    <div key={i} className={`text-xs px-3 py-2 rounded flex items-center justify-between ${
+                      r.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
+                    }`}>
+                      <span className="truncate flex-1">{r.email}</span>
+                      <span className={`ml-2 ${r.success ? 'text-green-600' : 'text-red-500'}`}>
+                        {r.success ? `✓ ${r.message}` : `✗ ${r.message}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* 完成提示 */}
+              {refreshProgress.current === refreshProgress.total && (
+                <div className="text-center text-sm text-green-600 font-medium">
+                  刷新完成！
+                </div>
+              )}
             </div>
           </div>
         </div>

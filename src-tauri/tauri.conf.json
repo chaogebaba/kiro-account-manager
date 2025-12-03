@@ -41,6 +41,21 @@
         }
       ]
     },
+    "systemTray": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    },
+    "cli": {
+      "description": "Kiro Token Manager CLI",
+      "args": [
+        {
+          "short": "c",
+          "name": "config",
+          "description": "Path to config file",
+          "takesValue": true
+        }
+      ]
+    },
     "windows": [
       {
         "fullscreen": false,
@@ -50,6 +65,16 @@
         "width": 1100,
         "minWidth": 900,
         "minHeight": 600
+      },
+      {
+        "label": "callback",
+        "url": "/callback",
+        "title": "登录回调",
+        "width": 500,
+        "height": 600,
+        "resizable": false,
+        "center": true,
+        "visible": false
       }
     ]
   }

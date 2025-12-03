@@ -1,7 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod auth;
+mod auth_social;
 mod token;
+mod callback_server;
+mod kiro_auth_client;
+mod oauth_callback_server;
+mod provider_factory;
 
 use auth::{
     AuthState, User, initiate_cognito_login, exchange_kiro_token,
@@ -10,6 +15,10 @@ use auth::{
 use base64::engine::Engine;
 use std::sync::Mutex;
 use tauri::{Manager, State, Window};
+use callback_server::start_kiro_callback_server;
+use kiro_auth_client::KiroAuthServiceClient;
+use oauth_callback_server::OAuthCallbackServer;
+use provider_factory::{get_provider_config, AuthMethod};
 use token::{Token, TokenStore};
 
 struct AppState {
@@ -25,6 +34,7 @@ struct PendingLogin {
     provider: String,
     code_verifier: String,
     state: String,
+    machineid: String,
 }
 
 // ===== Kiro IDE 本地 Token =====
@@ -119,8 +129,28 @@ fn update_token(
     quota: i32,
     used: i32,
     status: String,
+    access_token: Option<String>,
+    refresh_token: Option<String>,
 ) -> Option<Token> {
-    state.store.lock().unwrap().update(&id, email, label, quota, used, status)
+    let mut store = state.store.lock().unwrap();
+    let result = store.update(&id, email, label, quota, used, status);
+    
+    // 更新 token 信息
+    if let Some(idx) = store.tokens.iter().position(|t| t.id == id) {
+        if let Some(at) = access_token {
+            if !at.is_empty() {
+                store.tokens[idx].access_token = Some(at);
+            }
+        }
+        if let Some(rt) = refresh_token {
+            if !rt.is_empty() {
+                store.tokens[idx].refresh_token = Some(rt);
+            }
+        }
+        store.save_to_file();
+        return Some(store.tokens[idx].clone());
+    }
+    result
 }
 
 #[tauri::command]
@@ -323,6 +353,253 @@ fn import_tokens(state: State<AppState>, tokens_json: String) -> Result<usize, S
 #[tauri::command]
 fn export_tokens(state: State<AppState>) -> String {
     state.store.lock().unwrap().export_to_json()
+}
+
+// ===== Social 登录命令 =====
+
+#[tauri::command]
+async fn kiro_social_login(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+    provider: String,
+) -> Result<String, String> {
+    // 验证 provider 是否受支持
+    let config = get_provider_config(&provider)
+        .ok_or_else(|| format!("Unsupported provider: {}", provider))?;
+
+    if config.auth_method != AuthMethod::Social {
+        return Err("provider 必须是 Social 类型 (Google / Github)".to_string());
+    }
+
+    // 使用预定义端口策略启动本地 OAuth 回调服务器（与 JS 版本保持一致）
+    let social_auth_ports: Vec<u16> = vec![
+        49153, 50153, 51153, 52153, 53153, 4649, 6588, 9091, 8008, 3128,
+    ];
+
+    let mut server = OAuthCallbackServer::new_predefined("localhost", social_auth_ports);
+
+    // 启动服务器并获取 redirect_uri
+    let redirect_uri = server
+        .start()
+        .map_err(|e| format!("Failed to start OAuth callback server: {}", e))?;
+
+    // 生成 state（CSRF 防护）
+    let state_str = uuid::Uuid::new_v4().to_string();
+
+    // 生成 PKCE 参数（沿用现有的 social PKCE 实现）
+    let code_verifier = auth_social::generate_code_verifier_social();
+    let code_challenge = auth_social::generate_code_challenge_social(&code_verifier);
+
+    // 打开浏览器到 Kiro Auth Service 登录页面
+    let client = KiroAuthServiceClient::new();
+    client
+        .login(&provider, &redirect_uri, &code_challenge, &state_str)
+        .await?;
+
+    println!(
+        "Social login URL opened via Kiro Auth Service: provider={}, redirect_uri={}",
+        provider, redirect_uri
+    );
+
+    // 在阻塞线程中等待回调，避免阻塞异步运行时
+    let wait_result = tokio::task::spawn_blocking(move || server.wait_for_callback())
+        .await
+        .map_err(|e| format!("Failed to join callback waiter: {}", e))?;
+
+    let callback = wait_result.map_err(|e| format!("OAuth callback failed: {}", e))?;
+
+    // 验证 state
+    if callback.state != state_str {
+        return Err("State mismatch - possible CSRF attack".to_string());
+    }
+
+    // 用授权码交换 token，这里暂时只完成协议调用并记录日志
+    #[derive(serde::Deserialize)]
+    struct SocialTokenResponse {
+        #[serde(rename = "accessToken")]
+        access_token: String,
+        #[serde(rename = "refreshToken")]
+        refresh_token: String,
+        #[serde(rename = "profileArn")]
+        profile_arn: Option<String>,
+        #[serde(rename = "expiresIn")]
+        expires_in: i64,
+        #[serde(rename = "idToken")]
+        id_token: Option<String>,
+        #[serde(rename = "tokenType")]
+        token_type: Option<String>,
+    }
+
+    let token_response: SocialTokenResponse = client
+        .create_token(
+            &callback.code,
+            &code_verifier,
+            &redirect_uri,
+            None,
+        )
+        .await?;
+
+    println!(
+        "Social token exchange success via Kiro Auth Service: provider={}, profileArn={:?}",
+        provider, token_response.profile_arn
+    );
+
+    // 用 access_token 获取用户信息和配额（沿用 handle_kiro_social_callback 的逻辑）
+    let usage = get_usage_limits_desktop(&token_response.access_token).await.ok();
+
+    let email = usage.as_ref()
+        .and_then(|u| u.user_info.as_ref())
+        .and_then(|ui| ui.email.clone())
+        .unwrap_or_else(|| format!("user@{}.com", provider.to_lowercase()));
+    let user_id = usage.as_ref()
+        .and_then(|u| u.user_info.as_ref())
+        .and_then(|ui| ui.user_id.clone());
+    let subscription_type = usage.as_ref()
+        .and_then(|u| u.subscription_info.as_ref())
+        .and_then(|si| si.subscription_type.clone());
+
+    let (quota, used) = usage.as_ref()
+        .and_then(|u| u.usage_breakdown_list.as_ref())
+        .and_then(|list| list.first())
+        .map(|b| (b.usage_limit.unwrap_or(50), b.current_usage.unwrap_or(0)))
+        .unwrap_or((50, 0));
+
+    // 添加到 token 列表
+    let mut token = state.store.lock().unwrap().add_with_tokens(
+        email.clone(),
+        format!("Kiro {} 账号", provider),
+        quota,
+        token_response.access_token.clone(),
+        token_response.refresh_token.clone(),
+        provider.clone(),
+        user_id,
+        subscription_type,
+    );
+
+    token.used = used;
+
+    // 保存 used 等信息
+    {
+        let mut store = state.store.lock().unwrap();
+        if let Some(t) = store.tokens.iter_mut().find(|t| t.id == token.id) {
+            t.used = used;
+        }
+        store.save_to_file();
+    }
+
+    // 更新当前登录用户
+    let user = User {
+        id: uuid::Uuid::new_v4().to_string(),
+        email: email.clone(),
+        name: email.split('@').next().unwrap_or("User").to_string(),
+        avatar: None,
+        provider: provider.clone(),
+    };
+    *state.auth.user.lock().unwrap() = Some(user);
+    *state.auth.access_token.lock().unwrap() = Some(token_response.access_token);
+    *state.auth.refresh_token.lock().unwrap() = Some(token_response.refresh_token);
+    *state.pending_login.lock().unwrap() = None;
+
+    // 通知前端登录成功
+    let _ = app_handle.emit_all("login-success", token.id.clone());
+
+    Ok(format!("Social login completed for {}", provider))
+}
+
+#[tauri::command]
+async fn handle_kiro_social_callback(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+    code: String,
+    callback_state: String,
+) -> Result<(), String> {
+    use auth_social::exchange_social_code_for_token;
+    
+    // 获取保存的登录状态
+    let pending = {
+        let lock = state.pending_login.lock().unwrap();
+        lock.clone().ok_or("No pending login found")?
+    };
+    
+    // 验证 state
+    if pending.state != callback_state {
+        return Err("State mismatch".to_string());
+    }
+    
+    let redirect_uri = "kiro://app/callback";
+    
+    // 用 code 交换 token
+    let token_response = exchange_social_code_for_token(
+        &code,
+        &pending.code_verifier,
+        redirect_uri,
+        &pending.machineid,
+    ).await?;
+    
+    println!("Social token exchange success for {}", pending.provider);
+    
+    // 用 access_token 获取用户信息和配额
+    let usage = get_usage_limits_desktop(&token_response.access_token).await.ok();
+    
+    let email = usage.as_ref()
+        .and_then(|u| u.user_info.as_ref())
+        .and_then(|ui| ui.email.clone())
+        .unwrap_or_else(|| format!("user@{}.com", pending.provider.to_lowercase()));
+    let user_id = usage.as_ref()
+        .and_then(|u| u.user_info.as_ref())
+        .and_then(|ui| ui.user_id.clone());
+    let subscription_type = usage.as_ref()
+        .and_then(|u| u.subscription_info.as_ref())
+        .and_then(|si| si.subscription_type.clone());
+    
+    let (quota, used) = usage.as_ref()
+        .and_then(|u| u.usage_breakdown_list.as_ref())
+        .and_then(|list| list.first())
+        .map(|b| (b.usage_limit.unwrap_or(50), b.current_usage.unwrap_or(0)))
+        .unwrap_or((50, 0));
+    
+    // 添加到 token 列表
+    let mut token = state.store.lock().unwrap().add_with_tokens(
+        email.clone(),
+        format!("Kiro {} 账号", pending.provider),
+        quota,
+        token_response.access_token.clone(),
+        token_response.refresh_token.clone(),
+        pending.provider.clone(),
+        user_id,
+        subscription_type,
+    );
+    
+    token.used = used;
+    
+    // 保存
+    {
+        let mut store = state.store.lock().unwrap();
+        if let Some(t) = store.tokens.iter_mut().find(|t| t.id == token.id) {
+            t.used = used;
+        }
+        store.save_to_file();
+    }
+    
+    // 更新当前登录用户
+    let user = User {
+        id: uuid::Uuid::new_v4().to_string(),
+        email: email.clone(),
+        name: email.split('@').next().unwrap_or("User").to_string(),
+        avatar: None,
+        provider: pending.provider.clone(),
+    };
+    *state.auth.user.lock().unwrap() = Some(user);
+    *state.auth.access_token.lock().unwrap() = Some(token_response.access_token);
+    *state.auth.refresh_token.lock().unwrap() = Some(token_response.refresh_token);
+    *state.pending_login.lock().unwrap() = None;
+    
+    // 通知前端登录成功
+    let _ = app_handle.emit_all("login-success", token.id);
+    
+    println!("Social login completed and account added: {}", email);
+    
+    Ok(())
 }
 
 // ===== Auth 相关命令 =====
@@ -590,6 +867,7 @@ async fn start_direct_oauth_flow(
         provider: provider.to_string(),
         code_verifier,
         state: login_state,
+        machineid: String::new(), // Social 登录时单独设置
     });
 
     // 创建内置浏览器窗口
@@ -826,6 +1104,16 @@ fn complete_oauth_login(
 
 fn main() {
     tauri::Builder::default()
+        .setup(|app| {
+            let app_handle = app.handle().clone();
+
+            // 在后台线程启动 HTTP 服务器
+            std::thread::spawn(move || {
+                start_kiro_callback_server(app_handle);
+            });
+            
+            Ok(())
+        })
         .manage(AppState {
             store: Mutex::new(TokenStore::new()),
             auth: AuthState::new(),
@@ -858,7 +1146,9 @@ fn main() {
             get_pending_login,
             complete_oauth_login,
             get_kiro_local_token,
-            switch_kiro_account
+            switch_kiro_account,
+            kiro_social_login,
+            handle_kiro_social_callback
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

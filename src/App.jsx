@@ -7,6 +7,7 @@ import TokenManager from './components/TokenManager'
 import Settings from './components/Settings'
 import About from './components/About'
 import Login from './components/Login'
+import AuthCallback from './components/AuthCallback'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -16,6 +17,14 @@ function App() {
 
   useEffect(() => {
     checkAuth()
+    
+    // 检查是否是回调页面
+    const url = new URL(window.location.href)
+    if (url.pathname === '/callback' && (url.searchParams.has('code') || url.searchParams.has('state'))) {
+      // 显示回调页面
+      setActiveMenu('callback')
+      return
+    }
     
     // 监听登录成功事件
     const unlisten = listen('login-success', (event) => {
@@ -57,6 +66,7 @@ function App() {
       case 'home': return <Home />
       case 'token': return <TokenManager />
       case 'login': return <Login onLogin={(user) => { handleLogin(user); setActiveMenu('token'); }} />
+      case 'callback': return <AuthCallback />
       case 'settings': return <Settings />
       case 'about': return <About />
       default: return <Home />
