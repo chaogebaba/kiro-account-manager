@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/tauri'
 
 const ThemeContext = createContext()
 
@@ -78,14 +79,30 @@ export const themes = {
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('kiro-theme')
-    return saved && themes[saved] ? saved : 'light'
-  })
+  const [theme, setThemeState] = useState('light')
+  const [loaded, setLoaded] = useState(false)
+
+  // 从文件加载设置
+  useEffect(() => {
+    invoke('get_app_settings').then(settings => {
+      if (settings?.theme && themes[settings.theme]) {
+        setThemeState(settings.theme)
+      }
+      setLoaded(true)
+    }).catch(() => setLoaded(true))
+  }, [])
+
+  // 保存设置到文件
+  const setTheme = (newTheme) => {
+    setThemeState(newTheme)
+    invoke('get_app_settings').then(settings => {
+      invoke('save_app_settings', { settings: { ...settings, theme: newTheme } })
+    }).catch(() => {
+      invoke('save_app_settings', { settings: { theme: newTheme } })
+    })
+  }
 
   useEffect(() => {
-    localStorage.setItem('kiro-theme', theme)
-    // 更新 body 类名用于全局样式
     document.body.className = theme === 'dark' ? 'dark' : ''
   }, [theme])
 

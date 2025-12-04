@@ -1,22 +1,62 @@
-// Kiro IDE 设置相关命令
+// 设置相关命令
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+// ============================================================
+// Kiro IDE 设置 (读写 Kiro IDE 的 settings.json)
+// ============================================================
+
+// 简化的 Kiro 设置，只返回需要的字段
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct KiroSettings {
-    #[serde(rename = "http.proxy", skip_serializing_if = "Option::is_none")]
     pub http_proxy: Option<String>,
-    #[serde(rename = "http.proxyStrictSSL", skip_serializing_if = "Option::is_none")]
-    pub http_proxy_strict_ssl: Option<bool>,
-    #[serde(rename = "http.proxySupport", skip_serializing_if = "Option::is_none")]
-    pub http_proxy_support: Option<String>,
-    #[serde(rename = "kiroAgent.modelSelection", skip_serializing_if = "Option::is_none")]
     pub model_selection: Option<String>,
-    #[serde(rename = "kiroAgent.agentAutonomy", skip_serializing_if = "Option::is_none")]
-    pub agent_autonomy: Option<String>,
-    #[serde(flatten)]
-    pub other: serde_json::Map<String, serde_json::Value>,
+}
+
+// ============================================================
+// 应用自身设置 (存到 ~/.kiro-token-manager/app-settings.json)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AppSettings {
+    pub theme: Option<String>,
+    pub lock_model: Option<bool>,
+    pub locked_model: Option<String>,
+}
+
+fn get_app_settings_path() -> PathBuf {
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home)
+        .join(".kiro-token-manager")
+        .join("app-settings.json")
+}
+
+#[tauri::command]
+pub fn get_app_settings() -> Result<AppSettings, String> {
+    let path = get_app_settings_path();
+    if !path.exists() {
+        return Ok(AppSettings::default());
+    }
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| format!("读取设置失败: {}", e))?;
+    serde_json::from_str(&content)
+        .map_err(|e| format!("解析设置失败: {}", e))
+}
+
+#[tauri::command]
+pub fn save_app_settings(settings: AppSettings) -> Result<(), String> {
+    let path = get_app_settings_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let content = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("序列化失败: {}", e))?;
+    std::fs::write(&path, content)
+        .map_err(|e| format!("写入失败: {}", e))?;
+    Ok(())
 }
 
 fn get_kiro_settings_path() -> Option<PathBuf> {
@@ -37,8 +77,13 @@ pub fn get_kiro_settings() -> Result<KiroSettings, String> {
     let content = std::fs::read_to_string(&path)
         .map_err(|e| format!("读取设置文件失败: {}", e))?;
     
-    serde_json::from_str(&content)
-        .map_err(|e| format!("解析设置文件失败: {}", e))
+    let json: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("解析设置文件失败: {}", e))?;
+    
+    Ok(KiroSettings {
+        http_proxy: json.get("http.proxy").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        model_selection: json.get("kiroAgent.modelSelection").and_then(|v| v.as_str()).map(|s| s.to_string()),
+    })
 }
 
 #[tauri::command]

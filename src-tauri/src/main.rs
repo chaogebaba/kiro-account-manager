@@ -65,7 +65,10 @@ fn main() {
             // Kiro IDE 设置命令
             get_kiro_settings,
             set_kiro_proxy,
-            set_kiro_model
+            set_kiro_model,
+            // 应用设置命令
+            get_app_settings,
+            save_app_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

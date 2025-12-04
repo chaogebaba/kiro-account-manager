@@ -17,29 +17,45 @@ function Settings() {
   const [telemetryInfo, setTelemetryInfo] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  // 加载 Kiro IDE 设置和信息
-  const loadKiroInfo = async () => {
+  // 加载设置
+  const loadSettings = async () => {
     setLoading(true)
     try {
-      const [telemetry, settings] = await Promise.all([
+      const [telemetry, kiroSettings, appSettings] = await Promise.all([
         invoke('get_kiro_telemetry_info').catch(() => null),
-        invoke('get_kiro_settings').catch(() => null)
+        invoke('get_kiro_settings').catch(() => null),
+        invoke('get_app_settings').catch(() => null)
       ])
       setTelemetryInfo(telemetry)
-      if (settings) {
-        setHttpProxy(settings.http_proxy || '')
-        setAiModel(settings.model_selection || 'claude-sonnet-4.5')
+      // 从 Kiro IDE 设置读取
+      if (kiroSettings) {
+        setHttpProxy(kiroSettings.http_proxy || '')
+        setAiModel(kiroSettings.model_selection || 'claude-sonnet-4.5')
+      }
+      // 从应用设置读取锁定模型
+      if (appSettings) {
+        setLockModel(appSettings.lock_model ?? true)
       }
     } catch (err) {
-      console.error('Failed to load Kiro info:', err)
+      console.error('Failed to load settings:', err)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadKiroInfo()
+    loadSettings()
   }, [])
+
+  // 保存应用设置
+  const saveAppSettings = async (updates) => {
+    try {
+      const current = await invoke('get_app_settings').catch(() => ({}))
+      await invoke('save_app_settings', { settings: { ...current, ...updates } })
+    } catch (err) {
+      console.error('Failed to save app settings:', err)
+    }
+  }
 
   const handleApplyProxy = async () => {
     setSavingProxy(true)
@@ -57,11 +73,20 @@ function Settings() {
     setSavingModel(true)
     try {
       await invoke('set_kiro_model', { model })
+      // 如果锁定模型，保存到应用设置
+      if (lockModel) {
+        await saveAppSettings({ locked_model: model })
+      }
     } catch (err) {
       alert('保存模型设置失败: ' + err)
     } finally {
       setSavingModel(false)
     }
+  }
+
+  const handleLockModelChange = async (checked) => {
+    setLockModel(checked)
+    await saveAppSettings({ lock_model: checked, locked_model: checked ? aiModel : null })
   }
 
   const [resetting, setResetting] = useState(false)
@@ -251,7 +276,7 @@ function Settings() {
             <input
               type="checkbox"
               checked={lockModel}
-              onChange={(e) => setLockModel(e.target.checked)}
+              onChange={(e) => handleLockModelChange(e.target.checked)}
               className="mt-0.5 w-4 h-4 rounded-lg border-gray-300 text-blue-500 focus:ring-blue-500"
             />
             <div className="flex items-center gap-2">
@@ -290,7 +315,7 @@ function Settings() {
                 {savingProxy ? '保存中...' : '应用'}
               </button>
               <button 
-                onClick={loadKiroInfo}
+                onClick={loadSettings}
                 className={`px-4 py-3 border rounded-xl ${isDark ? 'border-gray-700 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'} ${colors.textMuted}`}
               >
                 ↻
@@ -310,7 +335,7 @@ function Settings() {
               <p className={`text-sm ${colors.textMuted}`}>从本地 Kiro IDE 读取的设备和会话信息</p>
             </div>
             <button
-              onClick={loadKiroInfo}
+              onClick={loadSettings}
               disabled={loading}
               className={`p-2 rounded-xl ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} transition-colors ${loading ? 'animate-spin' : ''}`}
             >
