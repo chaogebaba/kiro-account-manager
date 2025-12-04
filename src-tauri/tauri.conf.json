@@ -66,16 +66,6 @@
         "minWidth": 1100,
         "minHeight": 650,
         "visible": false
-      },
-      {
-        "label": "callback",
-        "url": "/callback",
-        "title": "登录回调",
-        "width": 500,
-        "height": 600,
-        "resizable": false,
-        "center": true,
-        "visible": false
       }
     ]
   }
