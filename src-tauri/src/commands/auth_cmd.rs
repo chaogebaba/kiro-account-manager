@@ -122,7 +122,7 @@ pub async fn kiro_social_login(
         .map(|b| (b.usage_limit.unwrap_or(50), b.current_usage.unwrap_or(0)))
         .unwrap_or((50, 0));
 
-    let mut token = state.store.lock().unwrap().add_with_tokens(
+    let (mut token, _is_new) = state.store.lock().unwrap().add_with_tokens(
         email.clone(),
         format!("Kiro {} 账号", provider),
         quota,
@@ -265,7 +265,7 @@ pub async fn handle_kiro_social_callback(
         .map(|b| (b.usage_limit.unwrap_or(50), b.current_usage.unwrap_or(0)))
         .unwrap_or((50, 0));
     
-    let mut token = state.store.lock().unwrap().add_with_tokens(
+    let (mut token, _is_new) = state.store.lock().unwrap().add_with_tokens(
         email.clone(),
         format!("Kiro {} 账号", pending.provider),
         quota,
@@ -358,7 +358,7 @@ pub async fn add_kiro_token(
     *state.auth.user.lock().unwrap() = Some(user);
     *state.pending_login.lock().unwrap() = None;
     
-    let mut token = state.store.lock().unwrap().add_with_tokens(
+    let (mut token, _is_new) = state.store.lock().unwrap().add_with_tokens(
         final_email,
         format!("Kiro {} 账号", idp),
         quota,

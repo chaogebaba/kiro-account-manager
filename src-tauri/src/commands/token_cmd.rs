@@ -260,7 +260,7 @@ pub async fn add_token_by_refresh(
     
     println!("Got: email={}, quota={}, used={}, subscription={:?}", email, quota, used, subscription_type);
     
-    let token = state.store.lock().unwrap().add_with_tokens(
+    let (token, is_new) = state.store.lock().unwrap().add_with_tokens(
         email.clone(),
         format!("Kiro {} 账号", idp),
         quota,
@@ -270,6 +270,7 @@ pub async fn add_token_by_refresh(
         user_id,
         subscription_type,
     );
+    println!("Token {}: {}", if is_new { "added" } else { "updated" }, email);
     
     {
         let mut store = state.store.lock().unwrap();

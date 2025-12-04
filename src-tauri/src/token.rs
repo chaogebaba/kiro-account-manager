@@ -201,6 +201,7 @@ impl TokenStore {
         token
     }
 
+    /// 返回 (Token, is_new) - is_new 为 true 表示新增，false 表示更新
     pub fn add_with_tokens(
         &mut self,
         email: String,
@@ -211,11 +212,26 @@ impl TokenStore {
         provider: String,
         user_id: Option<String>,
         subscription_type: Option<String>,
-    ) -> Token {
+    ) -> (Token, bool) {
+        // 检查是否已存在相同邮箱的账号，如果存在则更新
+        if let Some(idx) = self.tokens.iter().position(|t| t.email == email) {
+            self.tokens[idx].access_token = Some(access_token);
+            self.tokens[idx].refresh_token = Some(refresh_token);
+            self.tokens[idx].quota = quota;
+            self.tokens[idx].provider = provider;
+            self.tokens[idx].user_id = user_id;
+            self.tokens[idx].subscription_type = subscription_type;
+            self.tokens[idx].status = "正常".to_string();
+            self.tokens[idx].expires_at = Some(chrono::Local::now().format("%Y/%m/%d %H:%M:%S").to_string());
+            let token = self.tokens[idx].clone();
+            self.save_to_file();
+            return (token, false);
+        }
+        
         let token = Token::new_with_tokens(email, label, quota, access_token, refresh_token, provider, user_id, subscription_type);
         self.tokens.insert(0, token.clone());
         self.save_to_file();
-        token
+        (token, true)
     }
 
     pub fn update(&mut self, id: &str, email: String, label: String, quota: i32, used: i32, status: String) -> Option<Token> {
