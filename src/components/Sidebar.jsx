@@ -83,9 +83,9 @@ function Sidebar({ activeMenu, onMenuChange, user, onLogout }) {
         </div>
       )}
 
-      {/* User & Theme */}
-      <div className={`p-3 border-t ${colors.sidebarBorder}`}>
-        {user ? (
+      {/* User Info - 只在登录时显示 */}
+      {user && (
+        <div className={`p-3 border-t ${colors.sidebarBorder}`}>
           <div className="space-y-2">
             <div className={`flex items-center gap-2 ${colors.sidebarCard} rounded-xl px-3 py-2.5`}>
               <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm font-medium">
@@ -104,12 +104,8 @@ function Sidebar({ activeMenu, onMenuChange, user, onLogout }) {
               <span>退出登录</span>
             </button>
           </div>
-        ) : (
-          <div className={`${colors.sidebarCard} rounded-xl px-3 py-3 text-center`}>
-            <p className={`text-xs ${colors.sidebarMuted}`}>未登录</p>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Theme & Version */}
       <div className={`px-3 pb-3 flex items-center justify-between`}>
