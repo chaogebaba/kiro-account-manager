@@ -198,13 +198,13 @@ function TokenManager() {
           <table className="w-full">
             <thead>
               <tr className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} border-b ${colors.cardBorder} text-left text-xs font-medium ${colors.textMuted} uppercase tracking-wider`}>
-                <th className="px-4 py-3 w-10"><input type="checkbox" checked={selectedIds.length === filteredTokens.length && filteredTokens.length > 0} onChange={(e) => setSelectedIds(e.target.checked ? filteredTokens.map(t => t.id) : [])} className="rounded" /></th>
-                <th className="px-4 py-3">账号</th>
-                <th className="px-4 py-3 w-28">订阅</th>
-                <th className="px-4 py-3 w-52">配额</th>
-                <th className="px-4 py-3 w-24">状态</th>
-                <th className="px-4 py-3 w-28">Token</th>
-                <th className="px-4 py-3 w-36 text-right">操作</th>
+                <th className="px-3 py-3 w-10"><input type="checkbox" checked={selectedIds.length === filteredTokens.length && filteredTokens.length > 0} onChange={(e) => setSelectedIds(e.target.checked ? filteredTokens.map(t => t.id) : [])} className="rounded" /></th>
+                <th className="px-3 py-3 min-w-[180px] max-w-[280px]">账号</th>
+                <th className="px-3 py-3 w-20">订阅</th>
+                <th className="px-3 py-3 w-48">配额</th>
+                <th className="px-3 py-3 w-16">状态</th>
+                <th className="px-3 py-3 w-20">Token</th>
+                <th className="px-3 py-3 w-28 text-right">操作</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-100'}`}>
