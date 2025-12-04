@@ -115,7 +115,7 @@ function TokenManager() {
     setSwitchingId(token.id)
     try {
       const usage = await invoke('verify_token', { accessToken: token.access_token, refreshToken: token.refresh_token, csrfToken: token.csrf_token || null, provider: token.provider || 'Google' })
-      await invoke('switch_kiro_account', { accessToken: token.access_token, refreshToken: token.refresh_token, provider: token.provider || 'Google' })
+      await invoke('switch_kiro_account', { accessToken: token.access_token, refreshToken: token.refresh_token, provider: token.provider || 'Google', resetMachineId: true })
       alert(`切换成功！配额: ${usage.current_usage || 0}/${usage.usage_limit || 50}\n\n请重启 Kiro IDE`)
     } catch (e) { alert('切换失败: ' + e) }
     finally { setSwitchingId(null) }
