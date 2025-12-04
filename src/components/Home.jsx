@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
-import { RefreshCw, Users, Zap, Shield, Clock, TrendingUp, ArrowRight, Sparkles } from 'lucide-react'
+import { RefreshCw, Users, Zap, Shield, Clock, TrendingUp, ArrowRight, Sparkles, Plus } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
 function Home({ onNavigate }) {
@@ -8,6 +8,8 @@ function Home({ onNavigate }) {
   const [tokens, setTokens] = useState([])
   const [localToken, setLocalToken] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
 
   useEffect(() => { loadData() }, [])
 
@@ -148,6 +150,25 @@ function Home({ onNavigate }) {
                       </span>
                     </div>
                   </div>
+                  
+                  <button
+                    onClick={async () => {
+                      if (!localToken?.refreshToken) { setImportMsg('无法获取 Refresh Token'); return }
+                      setImporting(true); setImportMsg('')
+                      try {
+                        await invoke('add_token_by_refresh', { refreshToken: localToken.refreshToken })
+                        setImportMsg('添加成功！')
+                        loadData()
+                      } catch (e) { setImportMsg(e.toString()) }
+                      finally { setImporting(false) }
+                    }}
+                    disabled={importing}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 ${isDark ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' : 'bg-green-500 hover:bg-green-600 text-white'} rounded-xl text-sm font-medium transition-colors disabled:opacity-50`}
+                  >
+                    <Plus size={16} />
+                    {importing ? '添加中...' : '添加到账号列表'}
+                  </button>
+                  {importMsg && <div className={`text-xs text-center ${importMsg.includes('成功') ? 'text-green-500' : 'text-red-500'}`}>{importMsg}</div>}
                 </div>
               ) : (
                 <div className="text-center py-10">
