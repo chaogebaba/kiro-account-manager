@@ -24,7 +24,9 @@
 
 ## 截图
 
-<!-- TODO: 添加截图 -->
+![主界面](screenshots/main.png)
+
+<!-- 截图放在 screenshots/ 目录下 -->
 
 ## 系统要求
 
