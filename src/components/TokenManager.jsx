@@ -154,18 +154,18 @@ function TokenManager() {
               <p className={`text-sm ${colors.textMuted} mt-0.5`}>管理你的 Kiro 账号和配额</p>
             </div>
             {/* 统计卡片 */}
-            <div className="flex gap-4 ml-4">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-xl">
+            <div className="flex gap-3 ml-4">
+              <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-blue-500/20' : 'bg-blue-50'} rounded-xl`}>
                 <Users size={16} className="text-blue-500" />
-                <span className="text-sm font-medium text-blue-700">{stats.total} 账号</span>
+                <span className={`text-sm font-medium ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>{stats.total} 账号</span>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-xl">
+              <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-green-500/20' : 'bg-green-50'} rounded-xl`}>
                 <Shield size={16} className="text-green-500" />
-                <span className="text-sm font-medium text-green-700">{stats.active} 正常</span>
+                <span className={`text-sm font-medium ${isDark ? 'text-green-300' : 'text-green-700'}`}>{stats.active} 正常</span>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 rounded-xl">
+              <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-purple-500/20' : 'bg-purple-50'} rounded-xl`}>
                 <Zap size={16} className="text-purple-500" />
-                <span className="text-sm font-medium text-purple-700">{stats.totalUsed}/{stats.totalQuota}</span>
+                <span className={`text-sm font-medium ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>{stats.totalUsed}/{stats.totalQuota}</span>
               </div>
             </div>
           </div>
@@ -214,11 +214,11 @@ function TokenManager() {
                 const percent = getUsagePercent(token.used, token.quota)
                 const isExpired = token.expires_at && new Date(token.expires_at.replace(/\//g, '-')) < new Date()
                 return (
-                  <tr key={token.id} className="hover:bg-gray-50/50 transition-colors group">
+                  <tr key={token.id} className={`${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50/50'} transition-colors group`}>
                     <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(token.id)} onChange={(e) => setSelectedIds(e.target.checked ? [...selectedIds, token.id] : selectedIds.filter(i => i !== token.id))} className="rounded" /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-medium ${token.provider === 'Google' ? 'bg-red-100 text-red-600' : token.provider === 'Github' ? 'bg-gray-200 text-gray-700' : 'bg-blue-100 text-blue-600'}`}>
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-medium shadow-sm ${token.provider === 'Google' ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600') : token.provider === 'Github' ? (isDark ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-700') : (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600')}`}>
                           {token.email[0].toUpperCase()}
                         </div>
                         <div>
@@ -233,37 +233,37 @@ function TokenManager() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${token.subscription_type?.includes('PRO+') ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : token.subscription_type?.includes('PRO') ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                      <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${token.subscription_type?.includes('PRO+') ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm' : token.subscription_type?.includes('PRO') ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm' : isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
                         {token.subscription_type || 'Free'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-medium text-gray-700">{token.used}/{token.quota}</span>
-                          <span className={`font-medium ${percent > 80 ? 'text-red-500' : percent > 50 ? 'text-yellow-600' : 'text-green-600'}`}>{Math.round(percent)}%</span>
+                          <span className={`font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{token.used}/{token.quota}</span>
+                          <span className={`font-medium ${percent > 80 ? 'text-red-500' : percent > 50 ? 'text-yellow-500' : 'text-green-500'}`}>{Math.round(percent)}%</span>
                         </div>
                         <div className={`h-1.5 ${isDark ? 'bg-white/10' : 'bg-gray-100'} rounded-full overflow-hidden`}>
-                          <div className={`h-full rounded-full ${percent > 80 ? 'bg-red-500' : percent > 50 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${percent}%` }} />
+                          <div className={`h-full rounded-full transition-all ${percent > 80 ? 'bg-red-500' : percent > 50 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${percent}%` }} />
                         </div>
                         {(token.free_trial_quota || token.bonus_quota) && (
                           <div className="flex gap-1.5 pt-0.5">
-                            {token.free_trial_quota && <span className={`text-xs px-1.5 py-0.5 rounded ${token.free_trial_status === 'ACTIVE' ? 'bg-cyan-50 text-cyan-600' : 'bg-gray-100 text-gray-400'}`} title={`过期: ${token.free_trial_expiry || '未知'}`}>试用 {token.free_trial_used || 0}/{token.free_trial_quota}</span>}
-                            {token.bonus_quota && <span className={`text-xs px-1.5 py-0.5 rounded ${token.bonus_status === 'ACTIVE' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-400'}`} title={`${token.bonus_name || '奖励'} 过期: ${token.bonus_expiry || '未知'}`}>奖励 {token.bonus_used || 0}/{token.bonus_quota}</span>}
+                            {token.free_trial_quota && <span className={`text-xs px-1.5 py-0.5 rounded ${token.free_trial_status === 'ACTIVE' ? (isDark ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-50 text-cyan-600') : (isDark ? 'bg-gray-700 text-gray-500' : 'bg-gray-100 text-gray-400')}`} title={`过期: ${token.free_trial_expiry || '未知'}`}>试用 {token.free_trial_used || 0}/{token.free_trial_quota}</span>}
+                            {token.bonus_quota && <span className={`text-xs px-1.5 py-0.5 rounded ${token.bonus_status === 'ACTIVE' ? (isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-50 text-purple-600') : (isDark ? 'bg-gray-700 text-gray-500' : 'bg-gray-100 text-gray-400')}`} title={`${token.bonus_name || '奖励'} 过期: ${token.bonus_expiry || '未知'}`}>奖励 {token.bonus_used || 0}/{token.bonus_quota}</span>}
                           </div>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${token.status === '正常' || token.status === '有效' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{token.status}</span>
+                      <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${token.status === '正常' || token.status === '有效' ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700') : (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600')}`}>{token.status}</span>
                     </td>
                     <td className="px-4 py-3">
                       {token.expires_at ? (
-                        <div className={`text-xs ${isExpired ? 'text-red-500' : 'text-gray-500'}`}>
+                        <div className={`text-xs ${isExpired ? 'text-red-500' : colors.textMuted}`}>
                           <div className="flex items-center gap-1"><Clock size={12} />{token.expires_at.split(' ')[1]}</div>
-                          <div className="text-gray-400 mt-0.5">{token.expires_at.split(' ')[0]}</div>
+                          <div className={`${isDark ? 'text-gray-500' : 'text-gray-400'} mt-0.5`}>{token.expires_at.split(' ')[0]}</div>
                         </div>
-                      ) : <span className="text-xs text-gray-400">-</span>}
+                      ) : <span className={`text-xs ${colors.textMuted}`}>-</span>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
