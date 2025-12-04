@@ -6,7 +6,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "KiroTokenManager",
+    "productName": "Kiro Token Manager",
     "version": "1.0.0"
   },
   "tauri": {

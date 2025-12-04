@@ -1,57 +1,63 @@
 # Kiro Token Manager
 
-> 智能管理 Kiro 访问令牌，一键切换，配额监控
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/Version-1.0.0-green" alt="Version">
+  <img src="https://img.shields.io/badge/QQ群-1020204332-12B7F5?logo=tencentqq" alt="QQ群">
+</p>
 
-## 下载
+<p align="center">
+  <b>智能管理 Kiro 访问令牌，一键切换，配额监控</b>
+</p>
+
+---
+
+## ✨ 功能特性
+
+- 🔐 **多账号管理** - 支持 Google、GitHub 等多种登录方式
+- 📊 **配额监控** - 实时查看账号配额使用情况（主配额/试用/奖励）
+- 🔄 **一键切换** - 快速切换 Kiro IDE 账号，自动重置机器 ID
+- ⚙️ **IDE 设置** - 代理/模型设置同步
+- 🎨 **主题切换** - 支持浅色、深色、紫色、绿色主题
+- 💾 **数据导出** - 支持账号数据导出备份
+- 🔒 **本地存储** - 所有数据本地存储
+
+## 📸 截图
+
+![主界面](screenshots/main.png)
+
+## 📥 下载
 
 [![Release](https://img.shields.io/github/v/release/hj01857655/kiro-token-manager?style=flat-square)](https://github.com/hj01857655/kiro-token-manager/releases/latest)
 
 | 平台 | 下载 |
 |------|------|
-| Windows | [MSI 安装包](https://github.com/hj01857655/kiro-token-manager/releases/latest) |
-| macOS | [DMG 安装包](https://github.com/hj01857655/kiro-token-manager/releases/latest) |
+| Windows | [.msi](https://github.com/hj01857655/kiro-token-manager/releases/latest) / [.exe](https://github.com/hj01857655/kiro-token-manager/releases/latest) |
+| macOS | [.dmg](https://github.com/hj01857655/kiro-token-manager/releases/latest) |
 
-## 功能
-
-- ✅ Google/GitHub OAuth 登录
-- ✅ 多账号管理与切换
-- ✅ 配额实时监控 (主配额/试用/奖励)
-- ✅ 一键切换 Kiro IDE 账号
-- ✅ 一键重置机器 ID
-- ✅ Kiro IDE 代理/模型设置
-- ✅ 主题切换 (浅色/深色/紫色/绿色)
-- ✅ 数据导出
-
-## 截图
-
-![主界面](screenshots/main.png)
-
-<!-- 截图放在 screenshots/ 目录下 -->
-
-## 系统要求
+## 💻 系统要求
 
 - **Windows**: Windows 10/11 (64-bit)，需要 WebView2 (Win11 已内置)
-- **macOS**: macOS 10.15+ (Intel/Apple Silicon)
+- **macOS**: macOS 10.15+ (Intel/Apple Silicon 通用)
 
-## 技术栈
+## 🛠️ 技术栈
 
 - **前端**: React 18 + Vite + TailwindCSS
 - **后端**: Tauri 1.x + Rust
-- **存储**: 本地 JSON 文件
+- **图标**: Lucide Icons
 
-## 开发
+## 💬 交流反馈
 
-```bash
-# 安装依赖
-npm install
+<p align="center">
+  <a href="https://qm.qq.com/q/Vh7mUrNpa8">
+    <img src="https://img.shields.io/badge/QQ群-1020204332-12B7F5?style=for-the-badge&logo=tencentqq&logoColor=white" alt="QQ群">
+  </a>
+</p>
 
-# 开发运行
-npm run tauri dev
+## ⚠️ 免责声明
 
-# 构建
-npm run tauri build
-```
+本软件仅供学习交流使用，请勿用于商业用途。使用本软件所产生的任何后果由用户自行承担。
 
-## License
+---
 
-MIT
+<p align="center">Made with ❤️ by hj01857655</p>
