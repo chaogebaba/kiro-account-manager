@@ -68,8 +68,22 @@ impl KiroAuthServiceClient {
         println!("State: {}", state);
         println!();
 
-        open::that(&login_url)
-            .map_err(|e| format!("Failed to open browser for Kiro Auth login: {}", e))?;
+        let login_url = login_url.trim().to_string();
+        
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: 使用 explorer 打开 URL，避免 start 命令的空格问题
+            std::process::Command::new("explorer")
+                .arg(&login_url)
+                .spawn()
+                .map_err(|e| format!("Failed to open browser: {}", e))?;
+        }
+        
+        #[cfg(not(target_os = "windows"))]
+        {
+            open::that(&login_url)
+                .map_err(|e| format!("Failed to open browser for Kiro Auth login: {}", e))?;
+        }
 
         Ok(())
     }
