@@ -358,6 +358,29 @@ function TokenManager() {
                 </button>
               </div>
               
+              {/* 导入本地账号 */}
+              <button
+                onClick={async () => {
+                  setAddLoading(true); setAddError('')
+                  try {
+                    const localToken = await invoke('get_kiro_local_token')
+                    if (!localToken?.refresh_token) {
+                      setAddError('未找到本地 Kiro 账号，请先在 Kiro IDE 中登录')
+                      return
+                    }
+                    await invoke('add_token_by_refresh', { refreshToken: localToken.refresh_token })
+                    loadTokens()
+                    setShowAddModal(false)
+                  } catch (e) { setAddError(e.toString()) }
+                  finally { setAddLoading(false) }
+                }}
+                disabled={addLoading}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-3 ${isDark ? 'bg-green-500/20 hover:bg-green-500/30 border border-green-500/40' : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'} rounded-xl transition-all disabled:opacity-50`}
+              >
+                <Download size={18} className={isDark ? 'text-green-300' : 'text-white'} />
+                <span className={`font-medium text-sm ${isDark ? 'text-green-300' : 'text-white'}`}>导入本地 Kiro 账号</span>
+              </button>
+              
               {/* 分隔线 */}
               <div className="flex items-center gap-3">
                 <div className={`flex-1 h-px ${isDark ? 'bg-white/10' : 'bg-gray-200'}`}></div>
