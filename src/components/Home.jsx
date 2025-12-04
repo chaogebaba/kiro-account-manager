@@ -256,11 +256,11 @@ function Home({ onNavigate }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`font-medium ${colors.text} truncate`}>{token.email}</span>
-                      {token.subscription_type?.includes('PRO') && (
+                      {(token.subscription_type?.includes('PRO') || token.subscription_plan?.includes('PRO')) && (
                         <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${
-                          token.subscription_type.includes('PRO+') ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'bg-blue-500 text-white'
+                          (token.subscription_type?.includes('PRO+') || token.subscription_plan?.includes('PRO+')) ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'bg-blue-500 text-white'
                         }`}>
-                          {token.subscription_type.includes('PRO+') ? 'PRO+' : 'PRO'}
+                          {(token.subscription_type?.includes('PRO+') || token.subscription_plan?.includes('PRO+')) ? 'PRO+' : 'PRO'}
                         </span>
                       )}
                     </div>

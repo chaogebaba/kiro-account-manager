@@ -72,6 +72,11 @@ pub struct Token {
     pub sso_client_secret: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_region: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sso_session_id: Option<String>,
+    // Social 登录专用
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile_arn: Option<String>,
 }
 
 impl Token {
@@ -121,6 +126,8 @@ impl Token {
             sso_client_id: None,
             sso_client_secret: None,
             sso_region: None,
+            sso_session_id: None,
+            profile_arn: None,
         }
     }
 }
@@ -231,19 +238,6 @@ impl TokenStore {
             self.save_to_file();
         }
         deleted
-    }
-
-    #[allow(dead_code)]
-    pub fn refresh_status(&mut self, id: &str) -> Option<Token> {
-        let idx = self.tokens.iter().position(|t| t.id == id)?;
-        if self.tokens[idx].used >= self.tokens[idx].quota {
-            self.tokens[idx].status = "已失效".to_string();
-        } else {
-            self.tokens[idx].status = "正常".to_string();
-        }
-        let result = self.tokens[idx].clone();
-        self.save_to_file();
-        Some(result)
     }
 
     pub fn import_from_json(&mut self, json: &str) -> Result<usize, String> {

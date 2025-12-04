@@ -77,8 +77,8 @@ function EditTokenModal({ token, onClose, onSuccess }) {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className={`text-lg font-semibold ${colors.text}`}>{token.email}</h2>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${token.subscription_type?.includes('PRO+') ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : token.subscription_type?.includes('PRO') ? 'bg-blue-500 text-white' : (isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600')}`}>
-                  {token.subscription_type || 'Free'}
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${(token.subscription_type?.includes('PRO+') || token.subscription_plan?.includes('PRO+')) ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : (token.subscription_type?.includes('PRO') || token.subscription_plan?.includes('PRO')) ? 'bg-blue-500 text-white' : (isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600')}`}>
+                  {token.subscription_plan || token.subscription_type || 'Free'}
                 </span>
               </div>
               <p className={`text-sm ${colors.textMuted}`}>{token.provider || '未知'} · 添加于 {token.created_at?.split(' ')[0]}</p>
@@ -227,7 +227,7 @@ function EditTokenModal({ token, onClose, onSuccess }) {
                           {copied === 'access' ? '已复制' : '复制'}
                         </button>
                       </div>
-                      <textarea value={form.access_token} onChange={(e) => setForm({ ...form, access_token: e.target.value })} placeholder="aoa 开头" className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} />
+                      <textarea value={form.access_token} onChange={(e) => setForm({ ...form, access_token: e.target.value })} placeholder={token.provider === 'BuilderId' ? 'aoa 开头' : 'eyJ 开头'} className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
@@ -237,8 +237,59 @@ function EditTokenModal({ token, onClose, onSuccess }) {
                           {copied === 'refresh' ? '已复制' : '复制'}
                         </button>
                       </div>
-                      <textarea value={form.refresh_token} onChange={(e) => setForm({ ...form, refresh_token: e.target.value })} placeholder="aor 开头" className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} />
+                      <textarea value={form.refresh_token} onChange={(e) => setForm({ ...form, refresh_token: e.target.value })} placeholder={token.provider === 'BuilderId' ? 'aor 开头' : 'refresh token'} className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} />
                     </div>
+                    
+                    {/* IdC (BuilderId) 专用字段 */}
+                    {token.provider === 'BuilderId' && (
+                      <div className={`pt-3 border-t ${colors.cardBorder} space-y-3`}>
+                        <div className={`text-xs font-medium ${colors.textMuted} flex items-center gap-1`}>
+                          <Shield size={12} />
+                          AWS SSO OIDC 凭证
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className={`block text-xs ${colors.textMuted} mb-1`}>Region</label>
+                            <input type="text" value={token.sso_region || 'us-east-1'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                          </div>
+                          <div>
+                            <label className={`block text-xs ${colors.textMuted} mb-1`}>Session ID</label>
+                            <input type="text" value={token.sso_session_id || '-'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60 truncate`} />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className={`text-xs ${colors.textMuted}`}>Client ID</label>
+                            <button type="button" onClick={() => handleCopy(token.sso_client_id, 'client_id')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                              {copied === 'client_id' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                            </button>
+                          </div>
+                          <input type="text" value={token.sso_client_id || ''} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                        </div>
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className={`text-xs ${colors.textMuted}`}>Client Secret</label>
+                            <button type="button" onClick={() => handleCopy(token.sso_client_secret, 'client_secret')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                              {copied === 'client_secret' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                            </button>
+                          </div>
+                          <textarea value={token.sso_client_secret || ''} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 ${colors.text} opacity-60`} />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Social 专用字段 */}
+                    {(token.provider === 'Google' || token.provider === 'Github') && token.profile_arn && (
+                      <div className={`pt-3 border-t ${colors.cardBorder}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`text-xs ${colors.textMuted}`}>Profile ARN</label>
+                          <button type="button" onClick={() => handleCopy(token.profile_arn, 'profile_arn')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                            {copied === 'profile_arn' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                          </button>
+                        </div>
+                        <input type="text" value={token.profile_arn} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

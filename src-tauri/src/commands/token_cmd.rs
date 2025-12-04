@@ -4,6 +4,7 @@ use tauri::State;
 use crate::state::AppState;
 use crate::token::Token;
 use crate::auth::{User, refresh_token_desktop, get_usage_limits_desktop};
+use crate::providers::{AuthProvider, SocialProvider, IdcProvider, RefreshMetadata};
 use serde::{Deserialize, Serialize};
 
 /// verify_token 返回的简化响应
@@ -68,11 +69,7 @@ pub fn delete_tokens(state: State<AppState>, ids: Vec<String>) -> usize {
     state.store.lock().unwrap().delete_many(&ids)
 }
 
-#[allow(dead_code)]
-#[tauri::command]
-pub fn refresh_token_status(state: State<AppState>, id: String) -> Option<Token> {
-    state.store.lock().unwrap().refresh_status(&id)
-}
+
 
 #[tauri::command]
 pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> Result<Token, String> {
@@ -82,21 +79,31 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
     }.ok_or("Token not found")?;
 
     let refresh_token_str = token.refresh_token.as_ref().ok_or("No refresh token")?;
+    let provider_str = token.provider.as_deref().unwrap_or("Google");
     
     // 根据 provider 选择刷新方式
-    let (new_access_token, new_refresh_token, expires_in) = if token.provider.as_deref() == Some("BuilderId") {
-        // BuilderId 使用 AWS SSO OIDC API 刷新
-        let client_id = token.sso_client_id.as_ref().ok_or("No SSO client_id")?;
-        let client_secret = token.sso_client_secret.as_ref().ok_or("No SSO client_secret")?;
-        let region = token.sso_region.as_deref().unwrap_or("us-east-1");
+    let (new_access_token, new_refresh_token, expires_in) = if provider_str == "BuilderId" {
+        // BuilderId 使用 IdcProvider 刷新
+        let metadata = RefreshMetadata {
+            client_id: token.sso_client_id.clone(),
+            client_secret: token.sso_client_secret.clone(),
+            region: token.sso_region.clone(),
+            ..Default::default()
+        };
         
-        let sso_client = crate::aws_sso_client::AWSSSOClient::new(region);
-        let sso_result = sso_client.refresh_token(client_id, client_secret, refresh_token_str).await?;
-        (sso_result.access_token, Some(sso_result.refresh_token), sso_result.expires_in)
+        let idc_provider = IdcProvider::new("BuilderId", metadata.region.as_deref().unwrap_or("us-east-1"), None);
+        let auth_result = idc_provider.refresh_token(refresh_token_str, metadata).await?;
+        (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in)
     } else {
-        // Google/GitHub 使用 Kiro Desktop API 刷新
-        let refresh_result = refresh_token_desktop(refresh_token_str).await?;
-        (refresh_result.access_token, Some(refresh_result.refresh_token), refresh_result.expires_in)
+        // Google/GitHub 使用 SocialProvider 刷新
+        let metadata = RefreshMetadata {
+            profile_arn: token.profile_arn.clone(),
+            ..Default::default()
+        };
+        
+        let social_provider = SocialProvider::new(provider_str);
+        let auth_result = social_provider.refresh_token(refresh_token_str, metadata).await?;
+        (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in)
     };
     
     let new_access_token = new_access_token;
@@ -149,8 +156,8 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
     let overage_cap = breakdown.and_then(|b| b.overage_cap);
     
     let subscription_info = usage.subscription_info.as_ref();
-    let subscription_type = subscription_info.and_then(|s| s.subscription_title.clone());
-    let subscription_plan = subscription_info.and_then(|s| s.subscription_type.clone());
+    let subscription_type = subscription_info.and_then(|s| s.subscription_type.clone());
+    let subscription_plan = subscription_info.and_then(|s| s.subscription_title.clone());
     let overage_capable = subscription_info.and_then(|s| s.overage_capability.as_ref())
         .map(|c| c == "OVERAGE_CAPABLE");
     let upgrade_capable = subscription_info.and_then(|s| s.upgrade_capability.as_ref())
@@ -249,7 +256,7 @@ pub async fn add_token_by_refresh(
     
     let refresh_result = refresh_token_desktop(&refresh_token).await?;
     let access_token = refresh_result.access_token;
-    println!("Got accessToken: {}...", &access_token[..30.min(access_token.len())]);
+    println!("Got accessToken: {}", access_token);
     
     let usage_result = get_usage_limits_desktop(&access_token).await?;
     

@@ -46,6 +46,13 @@ pub struct TokenResponse {
     pub token_type: Option<String>,
     #[serde(rename = "expiresIn")]
     pub expires_in: i64,
+    // AWS SSO 特有字段
+    #[serde(rename = "aws_sso_app_session_id")]
+    pub aws_sso_app_session_id: Option<String>,
+    #[serde(rename = "issuedTokenType")]
+    pub issued_token_type: Option<String>,
+    #[serde(rename = "originSessionId")]
+    pub origin_session_id: Option<String>,
 }
 
 /// PKCE 参数
@@ -68,11 +75,6 @@ impl AWSSSOClient {
             base_url,
             client,
         }
-    }
-
-    /// 获取 Builder ID 的 start URL
-    pub fn get_builder_id_start_url() -> &'static str {
-        "https://view.awsapps.com/start"
     }
 
     /// 注册 OAuth 客户端
@@ -104,17 +106,22 @@ impl AWSSSOClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| format!("Client registration request failed: {}", e))?;
+            .map_err(|e| format!("[{}] Client registration request failed: {}", self.region, e))?;
 
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
 
         if !status.is_success() {
-            return Err(format!("Client registration failed ({}): {}", status, text));
+            return Err(format!("[{}] Client registration failed ({}): {}", self.region, status, text));
         }
 
         println!("Client registered successfully");
-        
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+            if let Ok(pretty) = serde_json::to_string_pretty(&json) {
+                println!("{}", pretty);
+            }
+        }
+
         serde_json::from_str(&text)
             .map_err(|e| format!("Failed to parse client registration: {}", e))
     }
@@ -159,6 +166,11 @@ impl AWSSSOClient {
         }
 
         println!("Token created successfully");
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+            if let Ok(pretty) = serde_json::to_string_pretty(&json) {
+                println!("{}", pretty);
+            }
+        }
 
         serde_json::from_str(&text)
             .map_err(|e| format!("Failed to parse token response: {}", e))
@@ -195,6 +207,13 @@ impl AWSSSOClient {
 
         if !status.is_success() {
             return Err(format!("Token refresh failed ({}): {}", status, text));
+        }
+
+        println!("Token refreshed successfully");
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+            if let Ok(pretty) = serde_json::to_string_pretty(&json) {
+                println!("{}", pretty);
+            }
         }
 
         serde_json::from_str(&text)
@@ -251,12 +270,4 @@ impl AWSSSOClient {
         )
     }
 
-    /// 计算 clientIdHash（用于存储）
-    #[allow(dead_code)]
-    pub fn compute_client_id_hash(start_url: &str) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(start_url.as_bytes());
-        let hash = hasher.finalize();
-        hex::encode(hash)
-    }
 }

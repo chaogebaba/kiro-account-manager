@@ -1,14 +1,5 @@
 use crate::auth::{DesktopRefreshResponse, DESKTOP_AUTH_API};
 
-/// 生成32字节的machineid（hex小写）
-#[allow(dead_code)]
-pub fn generate_machine_id() -> String {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    let bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
-    hex::encode(&bytes).to_lowercase()
-}
-
 /// 生成PKCE code_verifier（32字节，base64url）
 pub fn generate_code_verifier_social() -> String {
     use rand::Rng;

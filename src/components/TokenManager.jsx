@@ -224,8 +224,8 @@ function TokenManager() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${token.subscription_type?.includes('PRO+') ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm' : token.subscription_type?.includes('PRO') ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm' : isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-                        {token.subscription_type || 'Free'}
+                      <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${(token.subscription_type?.includes('PRO+') || token.subscription_plan?.includes('PRO+')) ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm' : (token.subscription_type?.includes('PRO') || token.subscription_plan?.includes('PRO')) ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm' : isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                        {token.subscription_plan || token.subscription_type || 'Free'}
                       </span>
                     </td>
                     <td className="px-4 py-3">

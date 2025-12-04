@@ -3,10 +3,11 @@
 mod auth;
 mod auth_social;
 mod aws_sso_client;
+mod codewhisperer_client;
 mod token;
 mod kiro_auth_client;
 mod oauth_callback_server;
-mod provider_factory;
+mod providers;
 mod kiro;
 mod process;
 mod state;
@@ -33,7 +34,6 @@ fn main() {
             store: Mutex::new(TokenStore::new()),
             auth: AuthState::new(),
             pending_login: Mutex::new(None),
-            auth_temp_dir: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             // Token 命令

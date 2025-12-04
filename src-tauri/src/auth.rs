@@ -207,9 +207,9 @@ pub async fn get_usage_limits_desktop(access_token: &str) -> Result<DesktopUsage
         urlencoding::encode(PROFILE_ARN)
     );
 
-    println!("\n[7] GET USAGE LIMITS REQUEST");
-    println!("URL: {}", url);
-    println!("Token: {}", access_token);
+    // println!("\n[7] GET USAGE LIMITS REQUEST");
+    // println!("URL: {}", url);
+    // println!("Token: {}", access_token);
     
     // 重试机制
     let mut last_error = String::new();
@@ -229,20 +229,20 @@ pub async fn get_usage_limits_desktop(access_token: &str) -> Result<DesktopUsage
                 let status = response.status();
                 let text = response.text().await.unwrap_or_default();
                 
-                println!("\n[7] USAGE LIMITS RESPONSE");
-                println!("Status: {}", status);
+                // println!("\n[7] USAGE LIMITS RESPONSE");
+                // println!("Status: {}", status);
                 
-                // 完整格式化打印 JSON
-                match serde_json::from_str::<serde_json::Value>(&text) {
-                    Ok(json) => {
-                        match serde_json::to_string_pretty(&json) {
-                            Ok(pretty) => println!("{}", pretty),
-                            Err(_) => println!("{}", text),
-                        }
-                    }
-                    Err(_) => println!("{}", text),
-                }
-                println!();
+                // // 完整格式化打印 JSON
+                // match serde_json::from_str::<serde_json::Value>(&text) {
+                //     Ok(json) => {
+                //         match serde_json::to_string_pretty(&json) {
+                //             Ok(pretty) => println!("{}", pretty),
+                //             Err(_) => println!("{}", text),
+                //         }
+                //     }
+                //     Err(_) => println!("{}", text),
+                // }
+                // println!();
                 
                 if !status.is_success() {
                     return Err(format!("GetUsageLimits failed ({})", status));
