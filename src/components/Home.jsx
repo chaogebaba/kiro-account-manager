@@ -166,7 +166,7 @@ function Home({ onNavigate }) {
                     className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 ${isDark ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' : 'bg-green-500 hover:bg-green-600 text-white'} rounded-xl text-sm font-medium transition-colors disabled:opacity-50`}
                   >
                     <Plus size={16} />
-                    {importing ? '添加中...' : '添加到账号列表'}
+                    {importing ? '保存中...' : '保存账号'}
                   </button>
                   {importMsg && <div className={`text-xs text-center ${importMsg.includes('成功') ? 'text-green-500' : 'text-red-500'}`}>{importMsg}</div>}
                 </div>
