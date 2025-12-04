@@ -1,9 +1,35 @@
-import { Github, Heart, Coffee, Star, ExternalLink, Sparkles, Code2, Palette, Cpu } from 'lucide-react'
+import { useState } from 'react'
+import { Github, Heart, Coffee, Star, ExternalLink, Sparkles, Code2, Palette, Cpu, RefreshCw } from 'lucide-react'
+import { open } from '@tauri-apps/api/shell'
 import { useTheme } from '../contexts/ThemeContext'
+
+const VERSION = '1.0.1'
+const GITHUB_REPO = 'hj01857655/kiro-token-manager'
 
 function About() {
   const { theme, colors } = useTheme()
   const isDark = theme === 'dark'
+  const [checking, setChecking] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState(null)
+
+  const checkUpdate = async () => {
+    setChecking(true)
+    setUpdateStatus(null)
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`)
+      if (!res.ok) throw new Error('请求失败')
+      const data = await res.json()
+      const latest = data.tag_name.replace('v', '')
+      if (latest === VERSION) {
+        setUpdateStatus({ type: 'latest', message: '已是最新版本' })
+      } else {
+        setUpdateStatus({ type: 'update', message: `发现新版本 v${latest}`, url: data.html_url })
+      }
+    } catch (e) {
+      setUpdateStatus({ type: 'error', message: '检查失败，请稍后重试' })
+    }
+    setChecking(false)
+  }
 
   const techStack = [
     { icon: Code2, label: '前端', value: 'React 18 + Vite', color: 'text-cyan-500' },
@@ -33,9 +59,29 @@ function About() {
         <h1 className={`text-xl font-bold ${colors.text} mb-1.5`}>Kiro Token Manager</h1>
         <div className="flex items-center justify-center gap-2 mb-3">
           <span className={`px-2.5 py-0.5 ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'} rounded-full text-xs font-medium`}>
-            v1.0.0
+            v{VERSION}
           </span>
+          <button
+            onClick={checkUpdate}
+            disabled={checking}
+            className={`px-2.5 py-0.5 ${isDark ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-green-100 text-green-600 hover:bg-green-200'} rounded-full text-xs font-medium flex items-center gap-1 transition-colors`}
+          >
+            <RefreshCw size={12} className={checking ? 'animate-spin' : ''} />
+            {checking ? '检查中' : '检查更新'}
+          </button>
         </div>
+        {updateStatus && (
+          <div className={`mb-3 px-3 py-2 rounded-lg text-xs ${
+            updateStatus.type === 'latest' ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600') :
+            updateStatus.type === 'update' ? (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600') :
+            (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600')
+          }`}>
+            {updateStatus.message}
+            {updateStatus.url && (
+              <button onClick={() => open(updateStatus.url)} className="ml-2 underline">去下载</button>
+            )}
+          </div>
+        )}
         <p className={`${colors.textMuted} text-sm mb-5`}>智能管理 Kiro 访问令牌，一键切换，配额监控</p>
 
         {/* 技术栈卡片 */}
