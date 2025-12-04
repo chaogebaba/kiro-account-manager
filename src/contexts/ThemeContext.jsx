@@ -1,0 +1,102 @@
+import { createContext, useContext, useState, useEffect } from 'react'
+
+const ThemeContext = createContext()
+
+export const themes = {
+  light: {
+    name: '浅色',
+    sidebar: 'bg-gradient-to-b from-[#4361ee] to-[#3651de]',
+    sidebarText: 'text-white',
+    sidebarHover: 'hover:bg-white/10',
+    sidebarActive: 'bg-white text-[#4361ee]',
+    sidebarBorder: 'border-white/20',
+    sidebarMuted: 'text-blue-200/60',
+    sidebarCard: 'bg-white/10',
+    main: 'bg-gradient-to-br from-gray-50 to-gray-100',
+    card: 'bg-white',
+    cardBorder: 'border-gray-100',
+    text: 'text-gray-800',
+    textMuted: 'text-gray-500',
+    input: 'bg-white border-gray-200',
+    inputFocus: 'focus:ring-blue-500/20 focus:border-blue-500',
+  },
+  dark: {
+    name: '深色',
+    sidebar: 'bg-gradient-to-b from-[#1a1a2e] to-[#16162a]',
+    sidebarText: 'text-white',
+    sidebarHover: 'hover:bg-white/10',
+    sidebarActive: 'bg-blue-600 text-white',
+    sidebarBorder: 'border-white/10',
+    sidebarMuted: 'text-gray-400',
+    sidebarCard: 'bg-white/5',
+    main: 'bg-[#0f0f1a]',
+    card: 'bg-[#1a1a2e]',
+    cardBorder: 'border-gray-800',
+    text: 'text-gray-100',
+    textMuted: 'text-gray-400',
+    input: 'bg-[#252540] border-gray-700',
+    inputFocus: 'focus:ring-blue-500/30 focus:border-blue-500',
+  },
+  purple: {
+    name: '紫色',
+    sidebar: 'bg-gradient-to-b from-[#7c3aed] to-[#6d28d9]',
+    sidebarText: 'text-white',
+    sidebarHover: 'hover:bg-white/10',
+    sidebarActive: 'bg-white text-[#7c3aed]',
+    sidebarBorder: 'border-white/20',
+    sidebarMuted: 'text-purple-200/60',
+    sidebarCard: 'bg-white/10',
+    main: 'bg-gradient-to-br from-purple-50 to-gray-100',
+    card: 'bg-white',
+    cardBorder: 'border-purple-100',
+    text: 'text-gray-800',
+    textMuted: 'text-gray-500',
+    input: 'bg-white border-purple-200',
+    inputFocus: 'focus:ring-purple-500/20 focus:border-purple-500',
+  },
+  green: {
+    name: '绿色',
+    sidebar: 'bg-gradient-to-b from-[#059669] to-[#047857]',
+    sidebarText: 'text-white',
+    sidebarHover: 'hover:bg-white/10',
+    sidebarActive: 'bg-white text-[#059669]',
+    sidebarBorder: 'border-white/20',
+    sidebarMuted: 'text-emerald-200/60',
+    sidebarCard: 'bg-white/10',
+    main: 'bg-gradient-to-br from-emerald-50 to-gray-100',
+    card: 'bg-white',
+    cardBorder: 'border-emerald-100',
+    text: 'text-gray-800',
+    textMuted: 'text-gray-500',
+    input: 'bg-white border-emerald-200',
+    inputFocus: 'focus:ring-emerald-500/20 focus:border-emerald-500',
+  },
+}
+
+export function ThemeProvider({ children }) {
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('kiro-theme')
+    return saved && themes[saved] ? saved : 'light'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('kiro-theme', theme)
+    // 更新 body 类名用于全局样式
+    document.body.className = theme === 'dark' ? 'dark' : ''
+  }, [theme])
+
+  const value = {
+    theme,
+    setTheme,
+    colors: themes[theme],
+    themes,
+  }
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+}
+
+export function useTheme() {
+  const context = useContext(ThemeContext)
+  if (!context) throw new Error('useTheme must be used within ThemeProvider')
+  return context
+}

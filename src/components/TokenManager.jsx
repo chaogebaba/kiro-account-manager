@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
-import { Search, Download, RefreshCw, Edit2, Trash2, Plus, Copy, Check, X, Loader, Users, Zap, Clock, Shield } from 'lucide-react'
+import { Search, Download, RefreshCw, Edit2, Trash2, Plus, Copy, Check, X, Loader, Users, Zap, Clock, Shield, Repeat, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react'
 import EditTokenModal from './EditTokenModal'
+import { useTheme } from '../contexts/ThemeContext'
 
 function TokenManager() {
+  const { theme, colors } = useTheme()
+  const isDark = theme === 'dark'
   const [tokens, setTokens] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
@@ -141,41 +144,41 @@ function TokenManager() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className={`h-full flex flex-col ${colors.main}`}>
       {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
+      <div className={`${colors.card} border-b ${colors.cardBorder} px-6 py-4`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div>
-              <h1 className="text-xl font-bold text-gray-800">账号管理</h1>
-              <p className="text-sm text-gray-500 mt-0.5">管理你的 Kiro 账号和配额</p>
+              <h1 className={`text-xl font-bold ${colors.text}`}>账号管理</h1>
+              <p className={`text-sm ${colors.textMuted} mt-0.5`}>管理你的 Kiro 账号和配额</p>
             </div>
             {/* 统计卡片 */}
             <div className="flex gap-4 ml-4">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-xl">
                 <Users size={16} className="text-blue-500" />
                 <span className="text-sm font-medium text-blue-700">{stats.total} 账号</span>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-lg">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-xl">
                 <Shield size={16} className="text-green-500" />
                 <span className="text-sm font-medium text-green-700">{stats.active} 正常</span>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 rounded-lg">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 rounded-xl">
                 <Zap size={16} className="text-purple-500" />
                 <span className="text-sm font-medium text-purple-700">{stats.totalUsed}/{stats.totalQuota}</span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {lastRefreshTime && !autoRefreshing && <span className="text-xs text-gray-400">上次刷新: {lastRefreshTime}</span>}
+            {lastRefreshTime && !autoRefreshing && <span className={`text-xs ${colors.textMuted}`}>上次刷新: {lastRefreshTime}</span>}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-              <input type="text" placeholder="搜索..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }} className="pl-9 pr-4 py-2 bg-gray-50 border-0 rounded-lg text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white" />
+              <input type="text" placeholder="搜索..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }} className={`pl-9 pr-4 py-2 ${isDark ? 'bg-white/5' : 'bg-gray-50'} border-0 rounded-xl text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} />
             </div>
-            {selectedIds.length > 0 && <button onClick={handleBatchDelete} className="px-3 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 flex items-center gap-1"><Trash2 size={14} />删除 ({selectedIds.length})</button>}
-            <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 flex items-center gap-1.5 shadow-sm"><Plus size={16} />添加</button>
-            <button onClick={handleExport} className="p-2 bg-white border rounded-lg hover:bg-gray-50" title="导出"><Download size={18} className="text-gray-600" /></button>
-            <button onClick={() => autoRefreshAll(tokens, true)} disabled={autoRefreshing} className="p-2 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50" title="刷新全部"><RefreshCw size={18} className={`text-gray-600 ${autoRefreshing ? 'animate-spin' : ''}`} /></button>
+            {selectedIds.length > 0 && <button onClick={handleBatchDelete} className="px-3 py-2 bg-red-500 text-white rounded-xl text-sm hover:bg-red-600 flex items-center gap-1"><Trash2 size={14} />删除 ({selectedIds.length})</button>}
+            <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 flex items-center gap-1.5 shadow-sm"><Plus size={16} />添加</button>
+            <button onClick={handleExport} className={`p-2 ${colors.card} border ${colors.cardBorder} rounded-xl ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`} title="导出"><Download size={18} className={colors.textMuted} /></button>
+            <button onClick={() => autoRefreshAll(tokens, true)} disabled={autoRefreshing} className={`p-2 ${colors.card} border ${colors.cardBorder} rounded-xl ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-50`} title="刷新全部"><RefreshCw size={18} className={`${colors.textMuted} ${autoRefreshing ? 'animate-spin' : ''}`} /></button>
           </div>
         </div>
         {/* 刷新进度 */}
@@ -191,10 +194,10 @@ function TokenManager() {
 
       {/* Table */}
       <div className="flex-1 overflow-auto p-6">
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className={`${colors.card} rounded-2xl shadow-sm overflow-hidden`}>
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <tr className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} border-b ${colors.cardBorder} text-left text-xs font-medium ${colors.textMuted} uppercase tracking-wider`}>
                 <th className="px-4 py-3 w-10"><input type="checkbox" checked={selectedIds.length === filteredTokens.length && filteredTokens.length > 0} onChange={(e) => setSelectedIds(e.target.checked ? filteredTokens.map(t => t.id) : [])} className="rounded" /></th>
                 <th className="px-4 py-3">账号</th>
                 <th className="px-4 py-3 w-28">订阅</th>
@@ -204,9 +207,9 @@ function TokenManager() {
                 <th className="px-4 py-3 w-36 text-right">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-100'}`}>
               {paginatedTokens.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-20 text-center"><div className="flex flex-col items-center gap-3 text-gray-400"><Users size={48} strokeWidth={1} /><p>暂无账号</p><button onClick={() => setShowAddModal(true)} className="text-blue-500 hover:underline text-sm">添加第一个账号</button></div></td></tr>
+                <tr><td colSpan={7} className="px-6 py-20 text-center"><div className={`flex flex-col items-center gap-3 ${colors.textMuted}`}><Users size={48} strokeWidth={1} /><p>暂无账号</p><button onClick={() => setShowAddModal(true)} className="text-blue-500 hover:underline text-sm">添加第一个账号</button></div></td></tr>
               ) : paginatedTokens.map((token) => {
                 const percent = getUsagePercent(token.used, token.quota)
                 const isExpired = token.expires_at && new Date(token.expires_at.replace(/\//g, '-')) < new Date()
@@ -215,22 +218,22 @@ function TokenManager() {
                     <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(token.id)} onChange={(e) => setSelectedIds(e.target.checked ? [...selectedIds, token.id] : selectedIds.filter(i => i !== token.id))} className="rounded" /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium ${token.provider === 'Google' ? 'bg-red-100 text-red-600' : token.provider === 'Github' ? 'bg-gray-200 text-gray-700' : 'bg-blue-100 text-blue-600'}`}>
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-medium ${token.provider === 'Google' ? 'bg-red-100 text-red-600' : token.provider === 'Github' ? 'bg-gray-200 text-gray-700' : 'bg-blue-100 text-blue-600'}`}>
                           {token.email[0].toUpperCase()}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-800 text-sm">{token.email}</span>
+                            <span className={`font-medium ${colors.text} text-sm`}>{token.email}</span>
                             <button onClick={() => { navigator.clipboard.writeText(token.email); setCopiedId(token.id); setTimeout(() => setCopiedId(null), 1500) }} className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {copiedId === token.id ? <Check size={12} className="text-green-500" /> : <Copy size={12} className="text-gray-400" />}
                             </button>
                           </div>
-                          <div className="text-xs text-gray-400">{token.provider || '未知'} · {token.label || '无标签'}</div>
+                          <div className={`text-xs ${colors.textMuted}`}>{token.provider || '未知'} · {token.label || '无标签'}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-1 rounded-md text-xs font-medium ${token.subscription_type?.includes('PRO+') ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : token.subscription_type?.includes('PRO') ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                      <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${token.subscription_type?.includes('PRO+') ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : token.subscription_type?.includes('PRO') ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
                         {token.subscription_type || 'Free'}
                       </span>
                     </td>
@@ -240,7 +243,7 @@ function TokenManager() {
                           <span className="font-medium text-gray-700">{token.used}/{token.quota}</span>
                           <span className={`font-medium ${percent > 80 ? 'text-red-500' : percent > 50 ? 'text-yellow-600' : 'text-green-600'}`}>{Math.round(percent)}%</span>
                         </div>
-                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-1.5 ${isDark ? 'bg-white/10' : 'bg-gray-100'} rounded-full overflow-hidden`}>
                           <div className={`h-full rounded-full ${percent > 80 ? 'bg-red-500' : percent > 50 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${percent}%` }} />
                         </div>
                         {(token.free_trial_quota || token.bonus_quota) && (
@@ -252,7 +255,7 @@ function TokenManager() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-1 rounded-md text-xs font-medium ${token.status === '正常' || token.status === '有效' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{token.status}</span>
+                      <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${token.status === '正常' || token.status === '有效' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{token.status}</span>
                     </td>
                     <td className="px-4 py-3">
                       {token.expires_at ? (
@@ -264,10 +267,10 @@ function TokenManager() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => handleSwitchAccount(token)} disabled={switchingId === token.id} className="px-2.5 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 disabled:opacity-50 font-medium">{switchingId === token.id ? '...' : '切换'}</button>
-                        <button onClick={() => handleRefreshStatus(token.id)} disabled={refreshingId === token.id} className="p-1.5 hover:bg-gray-100 rounded-md" title="刷新"><RefreshCw size={14} className={`text-gray-400 ${refreshingId === token.id ? 'animate-spin' : ''}`} /></button>
-                        <button onClick={() => setEditingToken(token)} className="p-1.5 hover:bg-gray-100 rounded-md" title="编辑"><Edit2 size={14} className="text-gray-400" /></button>
-                        <button onClick={() => handleDelete(token.id)} className="p-1.5 hover:bg-red-50 rounded-md" title="删除"><Trash2 size={14} className="text-red-400" /></button>
+                        <button onClick={() => handleSwitchAccount(token)} disabled={switchingId === token.id} className={`p-1.5 ${isDark ? 'bg-blue-500/20 hover:bg-blue-500/30' : 'bg-blue-50 hover:bg-blue-100'} rounded-lg disabled:opacity-50`} title="切换账号"><Repeat size={14} className={`text-blue-500 ${switchingId === token.id ? 'animate-spin' : ''}`} /></button>
+                        <button onClick={() => handleRefreshStatus(token.id)} disabled={refreshingId === token.id} className={`p-1.5 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-lg`} title="刷新"><RefreshCw size={14} className={`${colors.textMuted} ${refreshingId === token.id ? 'animate-spin' : ''}`} /></button>
+                        <button onClick={() => setEditingToken(token)} className={`p-1.5 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-lg`} title="编辑"><Edit2 size={14} className={colors.textMuted} /></button>
+                        <button onClick={() => handleDelete(token.id)} className={`p-1.5 ${isDark ? 'hover:bg-red-500/20' : 'hover:bg-red-50'} rounded-lg`} title="删除"><Trash2 size={14} className="text-red-400" /></button>
                       </div>
                     </td>
                   </tr>
@@ -280,20 +283,20 @@ function TokenManager() {
 
       {/* Pagination */}
       {filteredTokens.length > 0 && (
-        <div className="bg-white border-t px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
+        <div className={`${colors.card} border-t ${colors.cardBorder} px-6 py-3 flex items-center justify-between`}>
+          <div className={`flex items-center gap-2 text-sm ${colors.textMuted}`}>
             <span>每页</span>
-            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1) }} className="px-2 py-1 border rounded-md bg-white text-sm">
+            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1) }} className={`px-2 py-1 border rounded-lg ${colors.card} ${colors.cardBorder} text-sm ${colors.text}`}>
               <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option>
             </select>
             <span>条，共 {filteredTokens.length} 条</span>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-40">首页</button>
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-40">上一页</button>
-            <span className="px-3 py-1.5 text-sm text-gray-600">{currentPage} / {totalPages}</span>
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-40">下一页</button>
-            <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-40">末页</button>
+            <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`} title="首页"><ChevronsLeft size={16} className={colors.textMuted} /></button>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`} title="上一页"><ChevronLeft size={16} className={colors.textMuted} /></button>
+            <span className={`px-4 py-1.5 text-sm ${colors.text} font-medium`}>{currentPage} / {totalPages}</span>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`} title="下一页"><ChevronRight size={16} className={colors.textMuted} /></button>
+            <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`} title="末页"><ChevronsRight size={16} className={colors.textMuted} /></button>
           </div>
         </div>
       )}
@@ -302,21 +305,21 @@ function TokenManager() {
       {editingToken && <EditTokenModal token={editingToken} onClose={() => setEditingToken(null)} onSuccess={() => { setEditingToken(null); loadTokens() }} />}
       
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAddModal(false)}>
-          <div className="bg-white rounded-xl w-[480px] shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h2 className="text-lg font-semibold">添加账号</h2>
-              <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} className="text-gray-500" /></button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowAddModal(false)}>
+          <div className={`${colors.card} rounded-2xl w-[480px] shadow-2xl`} onClick={e => e.stopPropagation()}>
+            <div className={`flex items-center justify-between px-5 py-4 border-b ${colors.cardBorder}`}>
+              <h2 className={`text-lg font-semibold ${colors.text}`}>添加账号</h2>
+              <button onClick={() => setShowAddModal(false)} className={`p-1.5 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-xl`}><X size={18} className={colors.textMuted} /></button>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">RefreshToken</label>
-                <textarea value={addForm.refreshToken} onChange={(e) => setAddForm({ refreshToken: e.target.value })} placeholder="从 ~/.aws/sso/cache/kiro-auth-token.json 获取" className="w-full px-3 py-2 border rounded-lg text-sm h-24 resize-none font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+                <label className={`block text-sm font-medium ${colors.text} mb-1.5`}>RefreshToken</label>
+                <textarea value={addForm.refreshToken} onChange={(e) => setAddForm({ refreshToken: e.target.value })} placeholder="从 ~/.aws/sso/cache/kiro-auth-token.json 获取" className={`w-full px-3 py-2 border ${colors.cardBorder} rounded-xl text-sm h-24 resize-none font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.input} ${colors.text}`} />
               </div>
-              {addError && <div className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{addError}</div>}
+              {addError && <div className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-xl">{addError}</div>}
               <div className="flex justify-end gap-2">
-                <button onClick={() => setShowAddModal(false)} className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">取消</button>
-                <button onClick={handleAddByRefresh} disabled={addLoading} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2">
+                <button onClick={() => setShowAddModal(false)} className={`px-4 py-2 border ${colors.cardBorder} rounded-xl text-sm ${colors.textMuted} ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}>取消</button>
+                <button onClick={handleAddByRefresh} disabled={addLoading} className="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2">
                   {addLoading && <Loader size={14} className="animate-spin" />}{addLoading ? '添加中...' : '添加'}
                 </button>
               </div>
@@ -326,29 +329,29 @@ function TokenManager() {
       )}
 
       {autoRefreshing && refreshProgress.total > 0 && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl w-[400px] shadow-2xl">
-            <div className="px-5 py-4 border-b bg-blue-50 flex items-center gap-2">
-              <RefreshCw size={18} className="text-blue-600 animate-spin" />
-              <h2 className="font-semibold">刷新账号</h2>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className={`${colors.card} rounded-2xl w-[400px] shadow-2xl overflow-hidden`}>
+            <div className={`px-5 py-4 border-b ${colors.cardBorder} ${isDark ? 'bg-blue-500/20' : 'bg-blue-50'} flex items-center gap-2`}>
+              <RefreshCw size={18} className="text-blue-500 animate-spin" />
+              <h2 className={`font-semibold ${colors.text}`}>刷新账号</h2>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <div className="flex justify-between text-sm mb-2"><span className="text-gray-600">进度</span><span className="text-blue-600 font-medium">{refreshProgress.current}/{refreshProgress.total}</span></div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(refreshProgress.current / refreshProgress.total) * 100}%` }} /></div>
+                <div className={`flex justify-between text-sm mb-2`}><span className={colors.textMuted}>进度</span><span className="text-blue-500 font-medium">{refreshProgress.current}/{refreshProgress.total}</span></div>
+                <div className={`h-2 ${isDark ? 'bg-white/10' : 'bg-gray-200'} rounded-full overflow-hidden`}><div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(refreshProgress.current / refreshProgress.total) * 100}%` }} /></div>
               </div>
-              {refreshProgress.currentEmail && <div className="text-sm text-gray-500">正在刷新: <span className="text-gray-700">{refreshProgress.currentEmail}</span></div>}
+              {refreshProgress.currentEmail && <div className={`text-sm ${colors.textMuted}`}>正在刷新: <span className={colors.text}>{refreshProgress.currentEmail}</span></div>}
               {refreshProgress.results.length > 0 && (
                 <div className="max-h-48 overflow-y-auto space-y-1">
                   {refreshProgress.results.map((r, i) => (
-                    <div key={i} className={`text-xs px-3 py-2 rounded flex justify-between ${r.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                    <div key={i} className={`text-xs px-3 py-2 rounded-xl flex justify-between ${r.success ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-700') : (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600')}`}>
                       <span className="truncate">{r.email}</span>
                       <span>{r.success ? `✓ ${r.message}` : `✗ ${r.message}`}</span>
                     </div>
                   ))}
                 </div>
               )}
-              {refreshProgress.current === refreshProgress.total && <div className="text-center text-green-600 font-medium">刷新完成！</div>}
+              {refreshProgress.current === refreshProgress.total && <div className="text-center text-green-500 font-medium">刷新完成！</div>}
             </div>
           </div>
         </div>

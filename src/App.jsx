@@ -8,12 +8,13 @@ import Settings from './components/Settings'
 import About from './components/About'
 import Login from './components/Login'
 import AuthCallback from './components/AuthCallback'
+import { useTheme } from './contexts/ThemeContext'
 
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeMenu, setActiveMenu] = useState('home')
-  const [showLogin, setShowLogin] = useState(false)
+  const { colors } = useTheme()
 
   useEffect(() => {
     checkAuth()
@@ -57,13 +58,9 @@ function App() {
     setUser(null)
   }
 
-  const handleAddAccount = () => {
-    setShowLogin(true)
-  }
-
   const renderContent = () => {
     switch (activeMenu) {
-      case 'home': return <Home />
+      case 'home': return <Home onNavigate={setActiveMenu} />
       case 'token': return <TokenManager />
       case 'login': return <Login onLogin={(user) => { handleLogin(user); setActiveMenu('token'); }} />
       case 'callback': return <AuthCallback />
@@ -82,7 +79,7 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className={`flex h-screen ${colors.main}`}>
       <Sidebar 
         activeMenu={activeMenu} 
         onMenuChange={setActiveMenu}
@@ -92,8 +89,6 @@ function App() {
       <main className="flex-1 overflow-hidden">
         {renderContent()}
       </main>
-      
-
     </div>
   )
 }
