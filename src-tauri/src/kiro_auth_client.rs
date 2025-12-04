@@ -72,9 +72,9 @@ impl KiroAuthServiceClient {
         
         #[cfg(target_os = "windows")]
         {
-            // Windows: 使用 explorer 打开 URL，避免 start 命令的空格问题
-            std::process::Command::new("explorer")
-                .arg(&login_url)
+            // Windows: 使用 rundll32 打开 URL
+            std::process::Command::new("rundll32")
+                .args(["url.dll,FileProtocolHandler", &login_url])
                 .spawn()
                 .map_err(|e| format!("Failed to open browser: {}", e))?;
         }
