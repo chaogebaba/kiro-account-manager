@@ -42,12 +42,32 @@ pub struct KiroTelemetryInfo {
     pub service_machine_id: Option<String>,
 }
 
+/// 获取 Kiro 数据目录
+fn get_kiro_data_dir() -> Option<std::path::PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var("APPDATA").ok().map(|p| std::path::PathBuf::from(p).join("Kiro"))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var("HOME").ok().map(|p| {
+            std::path::PathBuf::from(p)
+                .join("Library")
+                .join("Application Support")
+                .join("Kiro")
+        })
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        None
+    }
+}
+
 fn get_kiro_telemetry_info_inner() -> Option<KiroTelemetryInfo> {
-    let appdata = std::env::var("APPDATA").ok()?;
+    let kiro_dir = get_kiro_data_dir()?;
     
     // 从 storage.json 读取
-    let storage_path = std::path::Path::new(&appdata)
-        .join("Kiro")
+    let storage_path = kiro_dir
         .join("User")
         .join("globalStorage")
         .join("storage.json");
@@ -63,8 +83,7 @@ fn get_kiro_telemetry_info_inner() -> Option<KiroTelemetryInfo> {
     };
     
     // 从 state.vscdb 读取 serviceMachineId
-    let db_path = std::path::Path::new(&appdata)
-        .join("Kiro")
+    let db_path = kiro_dir
         .join("User")
         .join("globalStorage")
         .join("state.vscdb");
@@ -204,15 +223,14 @@ fn generate_dev_device_id() -> String {
 
 /// 重置机器 ID（内部函数）
 fn reset_kiro_machine_id_inner() -> Result<KiroTelemetryInfo, String> {
-    let appdata = std::env::var("APPDATA")
-        .map_err(|_| "Cannot find APPDATA")?;
+    let kiro_dir = get_kiro_data_dir()
+        .ok_or("Cannot find Kiro data directory")?;
     
     let new_machine_id = generate_machine_id();
     let new_sqm_id = generate_sqm_id();
     let new_dev_device_id = generate_dev_device_id();
     
-    let storage_path = std::path::Path::new(&appdata)
-        .join("Kiro")
+    let storage_path = kiro_dir
         .join("User")
         .join("globalStorage")
         .join("storage.json");
@@ -233,8 +251,7 @@ fn reset_kiro_machine_id_inner() -> Result<KiroTelemetryInfo, String> {
     std::fs::write(&storage_path, new_content)
         .map_err(|e| format!("Failed to write storage.json: {}", e))?;
     
-    let db_path = std::path::Path::new(&appdata)
-        .join("Kiro")
+    let db_path = kiro_dir
         .join("User")
         .join("globalStorage")
         .join("state.vscdb");

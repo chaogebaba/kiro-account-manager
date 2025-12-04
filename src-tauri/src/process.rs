@@ -3,6 +3,7 @@
 use std::process::Command;
 
 /// 检查 Kiro IDE 是否正在运行（内部函数，同步）
+#[cfg(target_os = "windows")]
 pub fn check_kiro_running() -> bool {
     let output = Command::new("tasklist")
         .args(["/FI", "IMAGENAME eq Kiro.exe", "/NH"])
@@ -14,7 +15,25 @@ pub fn check_kiro_running() -> bool {
     }
 }
 
+#[cfg(target_os = "macos")]
+pub fn check_kiro_running() -> bool {
+    let output = Command::new("pgrep")
+        .args(["-x", "Kiro"])
+        .output();
+    
+    match output {
+        Ok(out) => out.status.success(),
+        Err(_) => false
+    }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+pub fn check_kiro_running() -> bool {
+    false
+}
+
 /// 关闭 Kiro IDE（内部函数）
+#[cfg(target_os = "windows")]
 pub fn kill_kiro() -> Result<(), String> {
     let output = Command::new("taskkill")
         .args(["/IM", "Kiro.exe", "/F"])
@@ -30,7 +49,29 @@ pub fn kill_kiro() -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+pub fn kill_kiro() -> Result<(), String> {
+    let output = Command::new("pkill")
+        .args(["-x", "Kiro"])
+        .output()
+        .map_err(|e| format!("Failed to execute pkill: {}", e))?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !stderr.contains("No matching") {
+            return Err(format!("Failed to close Kiro IDE: {}", stderr));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+pub fn kill_kiro() -> Result<(), String> {
+    Err("Unsupported platform".to_string())
+}
+
 /// 启动 Kiro IDE（内部函数）
+#[cfg(target_os = "windows")]
 pub fn launch_kiro() -> Result<(), String> {
     let localappdata = std::env::var("LOCALAPPDATA")
         .map_err(|_| "Cannot find LOCALAPPDATA")?;
@@ -49,6 +90,27 @@ pub fn launch_kiro() -> Result<(), String> {
         .map_err(|e| format!("Failed to start Kiro IDE: {}", e))?;
     
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+pub fn launch_kiro() -> Result<(), String> {
+    let kiro_path = "/Applications/Kiro.app";
+    
+    if !std::path::Path::new(kiro_path).exists() {
+        return Err(format!("Kiro IDE not found at: {}", kiro_path));
+    }
+    
+    Command::new("open")
+        .args(["-a", "Kiro"])
+        .spawn()
+        .map_err(|e| format!("Failed to start Kiro IDE: {}", e))?;
+    
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+pub fn launch_kiro() -> Result<(), String> {
+    Err("Unsupported platform".to_string())
 }
 
 // ===== Tauri Commands (异步，避免阻塞主线程) =====

@@ -34,9 +34,27 @@ fn get_app_settings_path() -> PathBuf {
 }
 
 fn get_kiro_settings_path() -> Option<PathBuf> {
-    std::env::var("APPDATA").ok().map(|appdata| {
-        PathBuf::from(appdata).join("Kiro").join("User").join("settings.json")
-    })
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var("APPDATA").ok().map(|appdata| {
+            PathBuf::from(appdata).join("Kiro").join("User").join("settings.json")
+        })
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var("HOME").ok().map(|home| {
+            PathBuf::from(home)
+                .join("Library")
+                .join("Application Support")
+                .join("Kiro")
+                .join("User")
+                .join("settings.json")
+        })
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        None
+    }
 }
 
 // ===== 内部同步函数 =====
