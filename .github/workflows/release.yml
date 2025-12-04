@@ -21,6 +21,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          # 去掉 v 前缀
+          VERSION_NUM=${VERSION#v}
+          echo "version=$VERSION_NUM" >> $GITHUB_OUTPUT
+
+      - name: Update version in config files
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          # 更新 tauri.conf.json
+          $tauri = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $tauri.package.version = $version
+          $tauri | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json
+          # 更新 Sidebar.jsx
+          (Get-Content src/components/Sidebar.jsx) -replace "const VERSION = '.*'", "const VERSION = '$version'" | Set-Content src/components/Sidebar.jsx
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -66,6 +90,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          VERSION_NUM=${VERSION#v}
+          echo "version=$VERSION_NUM" >> $GITHUB_OUTPUT
+
+      - name: Update version in config files
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # 更新 tauri.conf.json
+          sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
+          # 更新 Sidebar.jsx
+          sed -i '' "s/const VERSION = '.*'/const VERSION = '$VERSION'/" src/components/Sidebar.jsx
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -160,10 +203,13 @@ jobs:
           GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
         run: |
           VERSION=${{ steps.version.outputs.version }}
+          VERSION_NUM=${VERSION#v}
           
+          # 删除旧的 release 和 tag
           gh release delete "$VERSION" --repo ${{ env.PUBLIC_REPO }} --yes 2>/dev/null || true
+          gh api repos/${{ env.PUBLIC_REPO }}/git/refs/tags/$VERSION --method DELETE 2>/dev/null || true
           
-          # 收集文件到数组
+          # 收集文件
           mapfile -t FILES < <(find ./artifacts -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.dmg" \))
           
           if [ ${#FILES[@]} -eq 0 ]; then
@@ -174,23 +220,32 @@ jobs:
           echo "Uploading ${#FILES[@]} files:"
           printf '%s\n' "${FILES[@]}"
           
-          cat > release_notes.md << 'EOF'
+          # 获取文件名
+          MSI_FILE=$(basename "$(find ./artifacts -name '*.msi' | head -1)" 2>/dev/null || echo "")
+          EXE_FILE=$(basename "$(find ./artifacts -name '*.exe' | head -1)" 2>/dev/null || echo "")
+          DMG_FILE=$(basename "$(find ./artifacts -name '*.dmg' | head -1)" 2>/dev/null || echo "")
+          
+          BASE_URL="https://github.com/${{ env.PUBLIC_REPO }}/releases/download/$VERSION"
+          
+          cat > release_notes.md << EOF
           ## 下载
           
           | 平台 | 文件 | 说明 |
           |------|------|------|
-          | Windows | `.msi` | 推荐，双击安装 |
-          | Windows | `.exe` | NSIS 安装程序 |
-          | macOS | `.dmg` | 拖入 Applications |
+          | Windows | [$MSI_FILE]($BASE_URL/$MSI_FILE) | 推荐，双击安装 |
+          | Windows | [$EXE_FILE]($BASE_URL/$EXE_FILE) | NSIS 安装程序 |
+          | macOS | [$DMG_FILE]($BASE_URL/$DMG_FILE) | 拖入 Applications |
           
           ## 系统要求
           - Windows 10/11 (64-bit) + WebView2
           - macOS 10.15+ (Intel/Apple Silicon)
           
           ## 功能
-          - 多账号管理与切换
-          - 配额实时监控
-          - 一键重置机器 ID
+          - 🔐 多账号管理与切换
+          - 📊 配额实时监控
+          - 🔄 一键重置机器 ID
+          - ⚙️ IDE 设置同步
+          - 🎨 多主题切换
           EOF
           
           gh release create "$VERSION" \
