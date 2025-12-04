@@ -84,7 +84,7 @@ fn save_app_settings_inner(settings: AppSettings) -> Result<(), String> {
 
 fn get_kiro_settings_inner() -> Result<KiroSettings, String> {
     let path = get_kiro_settings_path()
-        .ok_or("无法获取 APPDATA 路径")?;
+        .ok_or("无法获取 Kiro 设置路径")?;
     
     if !path.exists() {
         return Ok(KiroSettings::default());
@@ -104,7 +104,7 @@ fn get_kiro_settings_inner() -> Result<KiroSettings, String> {
 
 fn set_kiro_proxy_inner(proxy: String) -> Result<(), String> {
     let path = get_kiro_settings_path()
-        .ok_or("无法获取 APPDATA 路径")?;
+        .ok_or("无法获取 Kiro 设置路径")?;
     
     let mut settings: serde_json::Value = if path.exists() {
         let content = std::fs::read_to_string(&path)
@@ -135,7 +135,7 @@ fn set_kiro_proxy_inner(proxy: String) -> Result<(), String> {
 
 fn set_kiro_model_inner(model: String) -> Result<(), String> {
     let path = get_kiro_settings_path()
-        .ok_or("无法获取 APPDATA 路径")?;
+        .ok_or("无法获取 Kiro 设置路径")?;
     
     let mut settings: serde_json::Value = if path.exists() {
         let content = std::fs::read_to_string(&path)
