@@ -71,13 +71,13 @@ function EditTokenModal({ token, onClose, onSuccess }) {
         {/* Header */}
         <div className={`flex items-center justify-between px-6 py-4 ${colors.card} border-b ${colors.cardBorder}`}>
           <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${token.provider === 'Google' ? 'bg-red-100' : token.provider === 'Github' ? 'bg-gray-200' : 'bg-blue-100'}`}>
-              <User size={24} className={token.provider === 'Google' ? 'text-red-600' : token.provider === 'Github' ? 'text-gray-700' : 'text-blue-600'} />
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${token.provider === 'Google' ? (isDark ? 'bg-red-500/20' : 'bg-red-100') : token.provider === 'Github' ? (isDark ? 'bg-gray-600' : 'bg-gray-200') : (isDark ? 'bg-blue-500/20' : 'bg-blue-100')}`}>
+              <User size={24} className={token.provider === 'Google' ? (isDark ? 'text-red-400' : 'text-red-600') : token.provider === 'Github' ? (isDark ? 'text-gray-300' : 'text-gray-700') : (isDark ? 'text-blue-400' : 'text-blue-600')} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className={`text-lg font-semibold ${colors.text}`}>{token.email}</h2>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${token.subscription_type?.includes('PRO+') ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : token.subscription_type?.includes('PRO') ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${token.subscription_type?.includes('PRO+') ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : token.subscription_type?.includes('PRO') ? 'bg-blue-500 text-white' : (isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600')}`}>
                   {token.subscription_type || 'Free'}
                 </span>
               </div>
