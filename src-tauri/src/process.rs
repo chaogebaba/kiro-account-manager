@@ -2,11 +2,18 @@
 
 use std::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// 检查 Kiro IDE 是否正在运行（内部函数，同步）
 #[cfg(target_os = "windows")]
 pub fn check_kiro_running() -> bool {
     let output = Command::new("tasklist")
         .args(["/FI", "IMAGENAME eq Kiro.exe", "/NH"])
+        .creation_flags(CREATE_NO_WINDOW)
         .output();
     
     match output {
@@ -37,6 +44,7 @@ pub fn check_kiro_running() -> bool {
 pub fn kill_kiro() -> Result<(), String> {
     let output = Command::new("taskkill")
         .args(["/IM", "Kiro.exe", "/F"])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| format!("Failed to execute taskkill: {}", e))?;
     
