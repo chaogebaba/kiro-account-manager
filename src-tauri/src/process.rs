@@ -2,7 +2,7 @@
 
 use std::process::Command;
 
-/// 检查 Kiro IDE 是否正在运行（内部函数）
+/// 检查 Kiro IDE 是否正在运行（内部函数，同步）
 pub fn check_kiro_running() -> bool {
     let output = Command::new("tasklist")
         .args(["/FI", "IMAGENAME eq Kiro.exe", "/NH"])
@@ -51,24 +51,32 @@ pub fn launch_kiro() -> Result<(), String> {
     Ok(())
 }
 
-// ===== Tauri Commands =====
+// ===== Tauri Commands (异步，避免阻塞主线程) =====
 
 /// 检查 Kiro IDE 是否正在运行
 #[tauri::command]
-pub fn is_kiro_ide_running() -> bool {
-    check_kiro_running()
+pub async fn is_kiro_ide_running() -> bool {
+    tokio::task::spawn_blocking(check_kiro_running)
+        .await
+        .unwrap_or(false)
 }
 
 /// 关闭 Kiro IDE 进程
 #[tauri::command]
-pub fn close_kiro_ide() -> Result<bool, String> {
-    let was_running = check_kiro_running();
-    kill_kiro()?;
-    Ok(was_running)
+pub async fn close_kiro_ide() -> Result<bool, String> {
+    tokio::task::spawn_blocking(|| {
+        let was_running = check_kiro_running();
+        kill_kiro()?;
+        Ok(was_running)
+    })
+    .await
+    .map_err(|e| format!("Task failed: {}", e))?
 }
 
 /// 启动 Kiro IDE
 #[tauri::command]
-pub fn start_kiro_ide() -> Result<(), String> {
-    launch_kiro()
+pub async fn start_kiro_ide() -> Result<(), String> {
+    tokio::task::spawn_blocking(launch_kiro)
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
 }

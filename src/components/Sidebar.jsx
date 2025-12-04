@@ -66,7 +66,7 @@ function Sidebar({ activeMenu, onMenuChange, user }) {
       {(user?.email?.includes('@') || localToken) && (
         <div className={`mx-3 mb-3 ${colors.sidebarCard} rounded-xl p-3`}>
           <div className={`text-xs ${colors.sidebarMuted} mb-2 flex items-center gap-1.5`}>
-            <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+            <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
             {localToken ? 'Kiro IDE 已连接' : '已登录'}
           </div>
           <div className="flex items-center gap-2">

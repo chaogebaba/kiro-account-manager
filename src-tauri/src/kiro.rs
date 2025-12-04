@@ -42,8 +42,7 @@ pub struct KiroTelemetryInfo {
     pub service_machine_id: Option<String>,
 }
 
-#[tauri::command]
-pub fn get_kiro_telemetry_info() -> Option<KiroTelemetryInfo> {
+fn get_kiro_telemetry_info_inner() -> Option<KiroTelemetryInfo> {
     let appdata = std::env::var("APPDATA").ok()?;
     
     // 从 storage.json 读取
@@ -84,6 +83,14 @@ pub fn get_kiro_telemetry_info() -> Option<KiroTelemetryInfo> {
     }
     
     Some(info)
+}
+
+#[tauri::command]
+pub async fn get_kiro_telemetry_info() -> Option<KiroTelemetryInfo> {
+    tokio::task::spawn_blocking(get_kiro_telemetry_info_inner)
+        .await
+        .ok()
+        .flatten()
 }
 
 // ===== 切换账号 =====
@@ -254,8 +261,10 @@ fn reset_kiro_machine_id_inner() -> Result<KiroTelemetryInfo, String> {
 }
 
 #[tauri::command]
-pub fn reset_kiro_machine_id() -> Result<KiroTelemetryInfo, String> {
-    reset_kiro_machine_id_inner()
+pub async fn reset_kiro_machine_id() -> Result<KiroTelemetryInfo, String> {
+    tokio::task::spawn_blocking(reset_kiro_machine_id_inner)
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
 }
 
 

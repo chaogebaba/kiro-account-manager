@@ -7,7 +7,6 @@ use std::path::PathBuf;
 // Kiro IDE 设置 (读写 Kiro IDE 的 settings.json)
 // ============================================================
 
-// 简化的 Kiro 设置，只返回需要的字段
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct KiroSettings {
     pub http_proxy: Option<String>,
@@ -34,8 +33,15 @@ fn get_app_settings_path() -> PathBuf {
         .join("app-settings.json")
 }
 
-#[tauri::command]
-pub fn get_app_settings() -> Result<AppSettings, String> {
+fn get_kiro_settings_path() -> Option<PathBuf> {
+    std::env::var("APPDATA").ok().map(|appdata| {
+        PathBuf::from(appdata).join("Kiro").join("User").join("settings.json")
+    })
+}
+
+// ===== 内部同步函数 =====
+
+fn get_app_settings_inner() -> Result<AppSettings, String> {
     let path = get_app_settings_path();
     if !path.exists() {
         return Ok(AppSettings::default());
@@ -46,8 +52,7 @@ pub fn get_app_settings() -> Result<AppSettings, String> {
         .map_err(|e| format!("解析设置失败: {}", e))
 }
 
-#[tauri::command]
-pub fn save_app_settings(settings: AppSettings) -> Result<(), String> {
+fn save_app_settings_inner(settings: AppSettings) -> Result<(), String> {
     let path = get_app_settings_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).ok();
@@ -59,14 +64,7 @@ pub fn save_app_settings(settings: AppSettings) -> Result<(), String> {
     Ok(())
 }
 
-fn get_kiro_settings_path() -> Option<PathBuf> {
-    std::env::var("APPDATA").ok().map(|appdata| {
-        PathBuf::from(appdata).join("Kiro").join("User").join("settings.json")
-    })
-}
-
-#[tauri::command]
-pub fn get_kiro_settings() -> Result<KiroSettings, String> {
+fn get_kiro_settings_inner() -> Result<KiroSettings, String> {
     let path = get_kiro_settings_path()
         .ok_or("无法获取 APPDATA 路径")?;
     
@@ -86,8 +84,7 @@ pub fn get_kiro_settings() -> Result<KiroSettings, String> {
     })
 }
 
-#[tauri::command]
-pub fn set_kiro_proxy(proxy: String) -> Result<(), String> {
+fn set_kiro_proxy_inner(proxy: String) -> Result<(), String> {
     let path = get_kiro_settings_path()
         .ok_or("无法获取 APPDATA 路径")?;
     
@@ -118,8 +115,7 @@ pub fn set_kiro_proxy(proxy: String) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-pub fn set_kiro_model(model: String) -> Result<(), String> {
+fn set_kiro_model_inner(model: String) -> Result<(), String> {
     let path = get_kiro_settings_path()
         .ok_or("无法获取 APPDATA 路径")?;
     
@@ -142,4 +138,41 @@ pub fn set_kiro_model(model: String) -> Result<(), String> {
         .map_err(|e| format!("写入设置文件失败: {}", e))?;
     
     Ok(())
+}
+
+// ===== Tauri Commands (异步) =====
+
+#[tauri::command]
+pub async fn get_app_settings() -> Result<AppSettings, String> {
+    tokio::task::spawn_blocking(get_app_settings_inner)
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn save_app_settings(settings: AppSettings) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || save_app_settings_inner(settings))
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn get_kiro_settings() -> Result<KiroSettings, String> {
+    tokio::task::spawn_blocking(get_kiro_settings_inner)
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn set_kiro_proxy(proxy: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || set_kiro_proxy_inner(proxy))
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn set_kiro_model(model: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || set_kiro_model_inner(model))
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
 }

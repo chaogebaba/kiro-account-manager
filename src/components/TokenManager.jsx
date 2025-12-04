@@ -79,10 +79,12 @@ function TokenManager() {
         }
       } catch (e) { console.error('Failed to handle kiro-login-data:', e) }
     })
+    // 自动刷新改为 5 分钟一次，减少 API 调用
     const interval = setInterval(async () => {
+      if (document.hidden) return // 页面不可见时跳过
       const data = await invoke('get_tokens')
       if (data.length > 0) autoRefreshAll(data)
-    }, 60 * 1000)
+    }, 5 * 60 * 1000)
     return () => { unlistenLoginSuccess.then(fn => fn()); unlistenKiroLoginData.then(fn => fn()); clearInterval(interval) }
   }, [])
 
@@ -190,10 +192,10 @@ function TokenManager() {
                 <th className="px-3 py-3 w-10"><input type="checkbox" checked={selectedIds.length === filteredTokens.length && filteredTokens.length > 0} onChange={(e) => setSelectedIds(e.target.checked ? filteredTokens.map(t => t.id) : [])} className="rounded" /></th>
                 <th className="px-3 py-3 w-[200px]">账号</th>
                 <th className="px-3 py-3 w-[70px]">订阅</th>
-                <th className="px-3 py-3 w-[220px]">配额</th>
+                <th className="px-3 py-3 w-[200px]">配额</th>
                 <th className="px-3 py-3 w-[50px]">状态</th>
-                <th className="px-3 py-3 w-[80px]">Token</th>
-                <th className="px-3 py-3 w-[100px] text-right">操作</th>
+                <th className="px-3 py-3 w-[100px]">Token</th>
+                <th className="px-3 py-3 w-[130px] text-right">操作</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-100'}`}>
@@ -313,48 +315,86 @@ function TokenManager() {
       
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowAddModal(false)}>
-          <div className={`${colors.card} rounded-2xl w-[360px] shadow-2xl`} onClick={e => e.stopPropagation()}>
+          <div className={`${colors.card} rounded-2xl w-[400px] shadow-2xl`} onClick={e => e.stopPropagation()}>
             <div className={`flex items-center justify-between px-5 py-4 border-b ${colors.cardBorder}`}>
               <h2 className={`text-lg font-semibold ${colors.text}`}>添加账号</h2>
               <button onClick={() => setShowAddModal(false)} className={`p-1.5 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-xl`}><X size={18} className={colors.textMuted} /></button>
             </div>
-            <div className="p-5 space-y-3">
-              <p className={`text-sm ${colors.textMuted} text-center`}>选择登录方式添加新账号</p>
-              <button
-                onClick={async () => {
-                  setAddLoading(true); setAddError('')
-                  try { await invoke('kiro_social_login', { provider: 'Google' }) }
-                  catch (e) { setAddError(e.toString()) }
-                  finally { setAddLoading(false); setShowAddModal(false) }
-                }}
-                disabled={addLoading}
-                className={`w-full flex items-center justify-center gap-3 px-4 py-3.5 ${isDark ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40' : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'} rounded-xl transition-all disabled:opacity-50 shadow-sm`}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill={isDark ? '#93c5fd' : 'white'}/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill={isDark ? '#86efac' : 'white'}/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill={isDark ? '#fde047' : 'white'}/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill={isDark ? '#fca5a5' : 'white'}/>
-                </svg>
-                <span className={`font-medium ${isDark ? 'text-blue-300' : 'text-white'}`}>使用 Google 登录</span>
-              </button>
-              <button
-                onClick={async () => {
-                  setAddLoading(true); setAddError('')
-                  try { await invoke('kiro_social_login', { provider: 'Github' }) }
-                  catch (e) { setAddError(e.toString()) }
-                  finally { setAddLoading(false); setShowAddModal(false) }
-                }}
-                disabled={addLoading}
-                className={`w-full flex items-center justify-center gap-3 px-4 py-3.5 ${isDark ? 'bg-gray-600/50 hover:bg-gray-600/70 border border-gray-500/40' : 'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-600 hover:to-gray-800'} rounded-xl transition-all disabled:opacity-50 shadow-sm`}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill={isDark ? '#e5e7eb' : 'white'}>
-                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                </svg>
-                <span className={`font-medium ${isDark ? 'text-gray-200' : 'text-white'}`}>使用 GitHub 登录</span>
-              </button>
+            <div className="p-5 space-y-4">
+              {/* 快捷登录 */}
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    setAddLoading(true); setAddError('')
+                    try { await invoke('kiro_social_login', { provider: 'Google' }) }
+                    catch (e) { setAddError(e.toString()) }
+                    finally { setAddLoading(false); setShowAddModal(false) }
+                  }}
+                  disabled={addLoading}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 ${isDark ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40' : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'} rounded-xl transition-all disabled:opacity-50`}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill={isDark ? '#93c5fd' : 'white'}/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill={isDark ? '#86efac' : 'white'}/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill={isDark ? '#fde047' : 'white'}/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill={isDark ? '#fca5a5' : 'white'}/>
+                  </svg>
+                  <span className={`font-medium text-sm ${isDark ? 'text-blue-300' : 'text-white'}`}>Google</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    setAddLoading(true); setAddError('')
+                    try { await invoke('kiro_social_login', { provider: 'Github' }) }
+                    catch (e) { setAddError(e.toString()) }
+                    finally { setAddLoading(false); setShowAddModal(false) }
+                  }}
+                  disabled={addLoading}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 ${isDark ? 'bg-gray-600/50 hover:bg-gray-600/70 border border-gray-500/40' : 'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-600 hover:to-gray-800'} rounded-xl transition-all disabled:opacity-50`}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill={isDark ? '#e5e7eb' : 'white'}>
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                  </svg>
+                  <span className={`font-medium text-sm ${isDark ? 'text-gray-200' : 'text-white'}`}>GitHub</span>
+                </button>
+              </div>
+              
+              {/* 分隔线 */}
+              <div className="flex items-center gap-3">
+                <div className={`flex-1 h-px ${isDark ? 'bg-white/10' : 'bg-gray-200'}`}></div>
+                <span className={`text-xs ${colors.textMuted}`}>或手动输入</span>
+                <div className={`flex-1 h-px ${isDark ? 'bg-white/10' : 'bg-gray-200'}`}></div>
+              </div>
+              
+              {/* 手动输入 Token */}
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Refresh Token (aor 开头)"
+                  id="manual-token-input"
+                  className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500/30`}
+                />
+                <button
+                  onClick={async () => {
+                    const tokenInput = document.getElementById('manual-token-input')
+                    const token = tokenInput?.value?.trim()
+                    if (!token) { setAddError('请输入 Refresh Token'); return }
+                    if (!token.startsWith('aor')) { setAddError('Token 格式错误，应以 aor 开头'); return }
+                    setAddLoading(true); setAddError('')
+                    try {
+                      await invoke('add_token_by_refresh', { refreshToken: token })
+                      loadTokens()
+                      setShowAddModal(false)
+                    } catch (e) { setAddError(e.toString()) }
+                    finally { setAddLoading(false) }
+                  }}
+                  disabled={addLoading}
+                  className={`w-full px-4 py-2.5 ${isDark ? 'bg-white/10 hover:bg-white/15 border border-white/10' : 'bg-gray-100 hover:bg-gray-200 border border-gray-200'} rounded-xl text-sm font-medium ${colors.text} transition-colors disabled:opacity-50`}
+                >
+                  {addLoading ? '验证中...' : '添加 Token'}
+                </button>
+              </div>
+              
               {addError && <div className={`text-sm ${isDark ? 'text-red-400 bg-red-500/20' : 'text-red-500 bg-red-50'} px-3 py-2 rounded-xl text-center`}>{addError}</div>}
-              <p className={`text-xs ${colors.textMuted} text-center pt-1`}>将打开浏览器完成登录</p>
             </div>
           </div>
         </div>

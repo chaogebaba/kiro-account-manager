@@ -104,7 +104,10 @@ function Settings() {
 
   useEffect(() => {
     checkKiroStatus()
-    const interval = setInterval(checkKiroStatus, 15000) // 每15秒检查一次，减少系统调用
+    // 每30秒检查一次，页面不可见时跳过
+    const interval = setInterval(() => {
+      if (!document.hidden) checkKiroStatus()
+    }, 30000)
     return () => clearInterval(interval)
   }, [])
   
