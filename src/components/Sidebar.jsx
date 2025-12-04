@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
-import { Home, Key, Settings, Info, LogOut, User, LogIn, Sun, Moon, Palette } from 'lucide-react'
+import { Home, Key, Settings, Info, User, LogIn, Sun, Moon, Palette } from 'lucide-react'
 import { useTheme, themes } from '../contexts/ThemeContext'
 
 const VERSION = '1.0.0'
@@ -13,7 +13,7 @@ const menuItems = [
   { id: 'about', label: '关于', icon: Info },
 ]
 
-function Sidebar({ activeMenu, onMenuChange, user, onLogout }) {
+function Sidebar({ activeMenu, onMenuChange, user }) {
   const [localToken, setLocalToken] = useState(null)
   const [showThemeMenu, setShowThemeMenu] = useState(false)
   const { theme, setTheme, colors } = useTheme()
@@ -62,47 +62,23 @@ function Sidebar({ activeMenu, onMenuChange, user, onLogout }) {
         })}
       </nav>
 
-      {/* Kiro IDE Status */}
-      {localToken && (
+      {/* 当前账号状态 - 合并显示 */}
+      {(user?.email?.includes('@') || localToken) && (
         <div className={`mx-3 mb-3 ${colors.sidebarCard} rounded-xl p-3`}>
           <div className={`text-xs ${colors.sidebarMuted} mb-2 flex items-center gap-1.5`}>
             <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-            Kiro IDE 已连接
+            {localToken ? 'Kiro IDE 已连接' : '已登录'}
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
-              <User size={14} className="text-green-300" />
+            <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center text-sm font-medium text-green-300">
+              {user?.email?.[0]?.toUpperCase() || <User size={14} />}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium">{localToken.provider}</div>
-              <div className={`text-xs ${colors.sidebarMuted} truncate`}>
-                {localToken.expiresAt ? new Date(localToken.expiresAt).toLocaleTimeString() : ''}
+              <div className="text-xs font-medium truncate">{user?.email || localToken?.provider}</div>
+              <div className={`text-xs ${colors.sidebarMuted}`}>
+                {user?.provider || (localToken?.expiresAt ? new Date(localToken.expiresAt).toLocaleTimeString() : '')}
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* User Info - 只在登录时显示 */}
-      {user && (
-        <div className={`p-3 border-t ${colors.sidebarBorder}`}>
-          <div className="space-y-2">
-            <div className={`flex items-center gap-2 ${colors.sidebarCard} rounded-xl px-3 py-2.5`}>
-              <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm font-medium">
-                {user.name?.[0] || user.email?.[0] || '?'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{user.email}</div>
-                <div className={`text-xs ${colors.sidebarMuted}`}>{user.provider}</div>
-              </div>
-            </div>
-            <button 
-              onClick={onLogout}
-              className={`flex items-center justify-center gap-2 text-sm ${colors.sidebarMuted} hover:text-white ${colors.sidebarHover} w-full transition-colors py-2 rounded-xl`}
-            >
-              <LogOut size={14} />
-              <span>退出登录</span>
-            </button>
           </div>
         </div>
       )}

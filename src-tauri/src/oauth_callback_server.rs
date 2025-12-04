@@ -203,6 +203,11 @@ fn handle_oauth_callback(request: tiny_http::Request) -> Result<OAuthCallbackRes
         }
     };
 
+    println!("\n[5] OAUTH CALLBACK RECEIVED");
+    println!("Code: {}", code);
+    println!("State: {}", state);
+    println!();
+
     send_success_response(request);
     Ok(OAuthCallbackResult { code, state })
 }

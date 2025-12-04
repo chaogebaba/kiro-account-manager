@@ -250,6 +250,7 @@ impl TokenStore {
         deleted
     }
 
+    #[allow(dead_code)]
     pub fn refresh_status(&mut self, id: &str) -> Option<Token> {
         let idx = self.tokens.iter().position(|t| t.id == id)?;
         if self.tokens[idx].used >= self.tokens[idx].quota {

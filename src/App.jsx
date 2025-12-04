@@ -30,8 +30,8 @@ function App() {
     // 监听登录成功事件
     const unlisten = listen('login-success', (event) => {
       console.log('Login success in App:', event.payload)
-      setShowLogin(false)
       checkAuth()
+      setActiveMenu('token')
     })
     
     return () => { unlisten.then(fn => fn()) }
@@ -49,8 +49,10 @@ function App() {
   }
 
   const handleLogin = (loggedInUser) => {
-    setUser(loggedInUser)
-    setShowLogin(false)
+    if (loggedInUser) {
+      setUser(loggedInUser)
+    }
+    checkAuth()
   }
 
   const handleLogout = async () => {

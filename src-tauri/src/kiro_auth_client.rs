@@ -61,6 +61,13 @@ impl KiroAuthServiceClient {
             state,
         );
 
+        println!("\n[1] KIRO AUTH LOGIN");
+        println!("Provider: {}", provider);
+        println!("Redirect URI: {}", redirect_uri);
+        println!("Code Challenge: {}", code_challenge);
+        println!("State: {}", state);
+        println!();
+
         open::that(&login_url)
             .map_err(|e| format!("Failed to open browser for Kiro Auth login: {}", e))?;
 
@@ -75,6 +82,12 @@ impl KiroAuthServiceClient {
         redirect_uri: &str,
         invitation_code: Option<&str>,
     ) -> Result<T, String> {
+        println!("\n[6] CREATE TOKEN REQUEST");
+        println!("URL: {}", self.create_token_url());
+        println!("Code: {}", code);
+        println!("Code Verifier: {}", code_verifier);
+        println!("Redirect URI: {}", redirect_uri);
+
         #[derive(serde::Serialize)]
         struct Body<'a> {
             code: &'a str,
@@ -105,14 +118,31 @@ impl KiroAuthServiceClient {
             .await
             .map_err(|e| format!("Kiro Auth Service read body failed: {}", e))?;
 
+        println!("\n[6] CREATE TOKEN RESPONSE");
+        println!("Status: {}", status);
+        
+        let body_str = String::from_utf8_lossy(&bytes);
+        
         if !status.is_success() {
-            let body_str = String::from_utf8_lossy(&bytes);
+            println!("Error: {}", body_str);
             return Err(format!(
                 "Kiro Auth Service token creation failed: {} - {}",
                 status,
                 body_str
             ));
         }
+
+        // 完整格式化打印 JSON
+        match serde_json::from_str::<serde_json::Value>(&body_str) {
+            Ok(json) => {
+                match serde_json::to_string_pretty(&json) {
+                    Ok(pretty) => println!("{}", pretty),
+                    Err(_) => println!("{}", body_str),
+                }
+            }
+            Err(_) => println!("{}", body_str),
+        }
+        println!();
 
         serde_json::from_slice::<T>(&bytes).map_err(|e| format!(
             "Kiro Auth Service token creation parse failed: {}",
