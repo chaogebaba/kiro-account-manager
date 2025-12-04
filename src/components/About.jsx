@@ -1,10 +1,21 @@
 import { useState } from 'react'
-import { Github, Heart, Coffee, Star, ExternalLink, Sparkles, Code2, Palette, Cpu, RefreshCw } from 'lucide-react'
+import { Github, Heart, Coffee, ExternalLink, Sparkles, Code2, Palette, Cpu, RefreshCw } from 'lucide-react'
 import { open } from '@tauri-apps/api/shell'
 import { useTheme } from '../contexts/ThemeContext'
 
 const VERSION = '1.0.1'
 const GITHUB_REPO = 'hj01857655/kiro-token-manager'
+
+// 版本比较：a > b 返回 1，a < b 返回 -1，相等返回 0
+const compareVersions = (a, b) => {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1
+  }
+  return 0
+}
 
 function About() {
   const { theme, colors } = useTheme()
@@ -20,10 +31,11 @@ function About() {
       if (!res.ok) throw new Error('请求失败')
       const data = await res.json()
       const latest = data.tag_name.replace('v', '')
-      if (latest === VERSION) {
-        setUpdateStatus({ type: 'latest', message: '已是最新版本' })
-      } else {
+      const cmp = compareVersions(latest, VERSION)
+      if (cmp > 0) {
         setUpdateStatus({ type: 'update', message: `发现新版本 v${latest}`, url: data.html_url })
+      } else {
+        setUpdateStatus({ type: 'latest', message: '已是最新版本' })
       }
     } catch (e) {
       setUpdateStatus({ type: 'error', message: '检查失败，请稍后重试' })
