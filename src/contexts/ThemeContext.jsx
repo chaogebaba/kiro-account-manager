@@ -20,9 +20,9 @@ export const themes = {
     textMuted: 'text-gray-500',
     input: 'bg-white border-gray-200',
     inputFocus: 'focus:ring-blue-500/20 focus:border-blue-500',
-    // 登录按钮样式
-    loginBtn: 'bg-gray-100 hover:bg-gray-200 border-gray-300',
-    loginBtnIcon: '#1a1a1a',
+    // 次要按钮样式
+    btnSecondary: 'bg-gray-100 hover:bg-gray-200 border-gray-300',
+    iconColor: '#1a1a1a',
   },
   dark: {
     name: '深色',
@@ -40,9 +40,9 @@ export const themes = {
     textMuted: 'text-gray-400',
     input: 'bg-[#252540] border-gray-700',
     inputFocus: 'focus:ring-blue-500/30 focus:border-blue-500',
-    // 登录按钮样式
-    loginBtn: 'bg-[#1a1a1a] hover:bg-[#252525] border-[#333]',
-    loginBtnIcon: 'white',
+    // 次要按钮样式
+    btnSecondary: 'bg-[#1a1a1a] hover:bg-[#252525] border-[#333]',
+    iconColor: 'white',
   },
   purple: {
     name: '紫色',

@@ -28,7 +28,8 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install dependencies
+      - name: Clean and install dependencies
+        shell: bash
         run: |
           rm -rf node_modules package-lock.json
           npm install
