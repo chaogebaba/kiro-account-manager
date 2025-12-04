@@ -1,6 +1,7 @@
 use crate::auth::{DesktopRefreshResponse, DESKTOP_AUTH_API};
 
 /// 生成32字节的machineid（hex小写）
+#[allow(dead_code)]
 pub fn generate_machine_id() -> String {
     use rand::Rng;
     let mut rng = rand::thread_rng();

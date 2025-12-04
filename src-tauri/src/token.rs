@@ -26,6 +26,45 @@ pub struct Token {
     pub subscription_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub csrf_token: Option<String>,
+    // 配额相关
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reset_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub days_until_reset: Option<i32>,
+    // 免费试用
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub free_trial_quota: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub free_trial_used: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub free_trial_expiry: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub free_trial_status: Option<String>,
+    // 奖励额度
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bonus_quota: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bonus_used: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bonus_expiry: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bonus_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bonus_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bonus_status: Option<String>,
+    // 超额相关
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overage_rate: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overage_cap: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overage_capable: Option<bool>,
+    // 订阅详情
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subscription_plan: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upgrade_capable: Option<bool>,
 }
 
 impl Token {
@@ -46,6 +85,23 @@ impl Token {
             expires_at: None,
             subscription_type: None,
             csrf_token: None,
+            reset_date: None,
+            days_until_reset: None,
+            free_trial_quota: None,
+            free_trial_used: None,
+            free_trial_expiry: None,
+            free_trial_status: None,
+            bonus_quota: None,
+            bonus_used: None,
+            bonus_expiry: None,
+            bonus_name: None,
+            bonus_code: None,
+            bonus_status: None,
+            overage_rate: None,
+            overage_cap: None,
+            overage_capable: None,
+            subscription_plan: None,
+            upgrade_capable: None,
         }
     }
 
@@ -75,6 +131,23 @@ impl Token {
             expires_at: None,
             subscription_type,
             csrf_token: None,
+            reset_date: None,
+            days_until_reset: None,
+            free_trial_quota: None,
+            free_trial_used: None,
+            free_trial_expiry: None,
+            free_trial_status: None,
+            bonus_quota: None,
+            bonus_used: None,
+            bonus_expiry: None,
+            bonus_name: None,
+            bonus_code: None,
+            bonus_status: None,
+            overage_rate: None,
+            overage_cap: None,
+            overage_capable: None,
+            subscription_plan: None,
+            upgrade_capable: None,
         }
     }
 }

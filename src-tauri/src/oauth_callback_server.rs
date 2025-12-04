@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::net::TcpListener;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};

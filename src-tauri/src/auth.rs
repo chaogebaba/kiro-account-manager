@@ -347,6 +347,10 @@ pub struct DesktopRefreshResponse {
 /// 桌面端 GetUsageLimits 响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DesktopUsageResponse {
+    #[serde(rename = "daysUntilReset")]
+    pub days_until_reset: Option<i32>,
+    #[serde(rename = "nextDateReset")]
+    pub next_date_reset: Option<f64>,
     #[serde(rename = "userInfo")]
     pub user_info: Option<DesktopUserInfo>,
     #[serde(rename = "subscriptionInfo")]
@@ -368,6 +372,10 @@ pub struct DesktopSubscriptionInfo {
     pub subscription_title: Option<String>,
     #[serde(rename = "type")]
     pub subscription_type: Option<String>,
+    #[serde(rename = "overageCapability")]
+    pub overage_capability: Option<String>,
+    #[serde(rename = "upgradeCapability")]
+    pub upgrade_capability: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -376,6 +384,46 @@ pub struct DesktopUsageBreakdown {
     pub usage_limit: Option<i32>,
     #[serde(rename = "currentUsage")]
     pub current_usage: Option<i32>,
+    #[serde(rename = "nextDateReset")]
+    pub next_date_reset: Option<f64>,
+    #[serde(rename = "freeTrialInfo")]
+    pub free_trial_info: Option<FreeTrialInfo>,
+    pub bonuses: Option<Vec<BonusInfo>>,
+    #[serde(rename = "overageRate")]
+    pub overage_rate: Option<f64>,
+    #[serde(rename = "overageCap")]
+    pub overage_cap: Option<i32>,
+    pub currency: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FreeTrialInfo {
+    #[serde(rename = "usageLimit")]
+    pub usage_limit: Option<i32>,
+    #[serde(rename = "currentUsage")]
+    pub current_usage: Option<i32>,
+    #[serde(rename = "freeTrialExpiry")]
+    pub free_trial_expiry: Option<f64>,
+    #[serde(rename = "freeTrialStatus")]
+    pub free_trial_status: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BonusInfo {
+    #[serde(rename = "bonusCode")]
+    pub bonus_code: Option<String>,
+    #[serde(rename = "displayName")]
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    #[serde(rename = "usageLimit")]
+    pub usage_limit: Option<f64>,
+    #[serde(rename = "currentUsage")]
+    pub current_usage: Option<f64>,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: Option<f64>,
+    #[serde(rename = "redeemedAt")]
+    pub redeemed_at: Option<f64>,
+    pub status: Option<String>,
 }
 
 /// 使用桌面端 API 刷新 Token（只需要 RefreshToken）
@@ -458,6 +506,17 @@ pub async fn get_usage_limits_desktop(access_token: &str) -> Result<DesktopUsage
             Ok(response) => {
                 let status = response.status();
                 let text = response.text().await.unwrap_or_default();
+                
+                // 格式化打印 JSON 响应（暂时注释）
+                // if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&text) {
+                //     if let Ok(pretty) = serde_json::to_string_pretty(&json_value) {
+                //         println!("[GetUsageLimits] Status: {}\nResponse:\n{}", status, pretty);
+                //     } else {
+                //         println!("[GetUsageLimits] Status: {}, Response: {}", status, &text);
+                //     }
+                // } else {
+                //     println!("[GetUsageLimits] Status: {}, Response: {}", status, &text);
+                // }
                 
                 if !status.is_success() {
                     return Err(format!("GetUsageLimits failed ({})", status));

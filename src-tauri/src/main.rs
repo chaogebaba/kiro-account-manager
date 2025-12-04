@@ -188,15 +188,64 @@ async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> Resul
     let usage = get_usage_limits_desktop(&new_access_token).await?;
     
     // 从 usage_breakdown_list 提取配额信息
-    let (quota, used) = if let Some(list) = &usage.usage_breakdown_list {
-        if let Some(first) = list.first() {
-            (first.usage_limit.unwrap_or(50), first.current_usage.unwrap_or(0))
-        } else {
-            (50, 0)
-        }
-    } else {
-        (50, 0)
-    };
+    let breakdown = usage.usage_breakdown_list.as_ref().and_then(|list| list.first());
+    let quota = breakdown.and_then(|b| b.usage_limit).unwrap_or(50);
+    let used = breakdown.and_then(|b| b.current_usage).unwrap_or(0);
+    
+    // 提取重置日期和天数（自己计算天数，不用 API 返回的）
+    let (reset_date, days_until_reset) = breakdown.and_then(|b| b.next_date_reset).map(|ts| {
+        let reset_dt = chrono::DateTime::from_timestamp(ts as i64, 0);
+        let date_str = reset_dt.map(|dt| dt.format("%Y/%m/%d").to_string()).unwrap_or_default();
+        let days = reset_dt.map(|dt| {
+            let now = chrono::Utc::now();
+            let diff = dt.signed_duration_since(now);
+            diff.num_days() as i32
+        }).unwrap_or(0);
+        (date_str, days)
+    }).map(|(d, days)| (Some(d), Some(days))).unwrap_or((None, None));
+    
+    // 提取免费试用信息
+    let free_trial = breakdown.and_then(|b| b.free_trial_info.as_ref());
+    let free_trial_quota = free_trial.and_then(|f| f.usage_limit);
+    let free_trial_used = free_trial.and_then(|f| f.current_usage);
+    let free_trial_expiry = free_trial.and_then(|f| f.free_trial_expiry).map(|ts| {
+        chrono::DateTime::from_timestamp(ts as i64, 0)
+            .map(|dt| dt.format("%Y/%m/%d").to_string())
+            .unwrap_or_default()
+    });
+    let free_trial_status = free_trial.and_then(|f| f.free_trial_status.clone());
+    
+    // 提取奖励信息（完整）
+    let (bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status) = breakdown
+        .and_then(|b| b.bonuses.as_ref())
+        .map(|bonuses| {
+            let total_quota: i32 = bonuses.iter().filter_map(|b| b.usage_limit.map(|v| v as i32)).sum();
+            let total_used: i32 = bonuses.iter().filter_map(|b| b.current_usage.map(|v| v as i32)).sum();
+            let first = bonuses.first();
+            let expiry = first.and_then(|b| b.expires_at).map(|ts| {
+                chrono::DateTime::from_timestamp(ts as i64, 0)
+                    .map(|dt| dt.format("%Y/%m/%d").to_string())
+                    .unwrap_or_default()
+            });
+            let name = first.and_then(|b| b.display_name.clone());
+            let code = first.and_then(|b| b.bonus_code.clone());
+            let status = first.and_then(|b| b.status.clone());
+            (total_quota, total_used, expiry, name, code, status)
+        })
+        .unwrap_or((0, 0, None, None, None, None));
+    
+    // 提取超额信息
+    let overage_rate = breakdown.and_then(|b| b.overage_rate);
+    let overage_cap = breakdown.and_then(|b| b.overage_cap);
+    
+    // 提取订阅信息
+    let subscription_info = usage.subscription_info.as_ref();
+    let subscription_type = subscription_info.and_then(|s| s.subscription_title.clone());
+    let subscription_plan = subscription_info.and_then(|s| s.subscription_type.clone());
+    let overage_capable = subscription_info.and_then(|s| s.overage_capability.as_ref())
+        .map(|c| c == "OVERAGE_CAPABLE");
+    let upgrade_capable = subscription_info.and_then(|s| s.upgrade_capability.as_ref())
+        .map(|c| c == "UPGRADE_CAPABLE");
 
     // 3. 计算过期时间
     let expires_at = chrono::Local::now() + chrono::Duration::seconds(refresh_result.expires_in);
@@ -207,10 +256,39 @@ async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> Resul
     let token_idx = store.tokens.iter().position(|t| t.id == id);
     
     if let Some(idx) = token_idx {
+        // 基本配额
         store.tokens[idx].quota = quota;
         store.tokens[idx].used = used;
         store.tokens[idx].access_token = Some(new_access_token);
         store.tokens[idx].expires_at = Some(expires_at_str);
+        store.tokens[idx].reset_date = reset_date;
+        store.tokens[idx].days_until_reset = days_until_reset;
+        
+        // 免费试用
+        store.tokens[idx].free_trial_quota = free_trial_quota;
+        store.tokens[idx].free_trial_used = free_trial_used;
+        store.tokens[idx].free_trial_expiry = free_trial_expiry;
+        store.tokens[idx].free_trial_status = free_trial_status;
+        
+        // 奖励额度
+        store.tokens[idx].bonus_quota = if bonus_quota > 0 { Some(bonus_quota) } else { None };
+        store.tokens[idx].bonus_used = if bonus_quota > 0 { Some(bonus_used) } else { None };
+        store.tokens[idx].bonus_expiry = bonus_expiry;
+        store.tokens[idx].bonus_name = bonus_name;
+        store.tokens[idx].bonus_code = bonus_code;
+        store.tokens[idx].bonus_status = bonus_status;
+        
+        // 超额信息
+        store.tokens[idx].overage_rate = overage_rate;
+        store.tokens[idx].overage_cap = overage_cap;
+        store.tokens[idx].overage_capable = overage_capable;
+        
+        // 订阅信息
+        if subscription_type.is_some() {
+            store.tokens[idx].subscription_type = subscription_type;
+        }
+        store.tokens[idx].subscription_plan = subscription_plan;
+        store.tokens[idx].upgrade_capable = upgrade_capable;
         
         // 更新状态
         if store.tokens[idx].used >= store.tokens[idx].quota {
@@ -413,8 +491,9 @@ async fn kiro_social_login(
         return Err("State mismatch - possible CSRF attack".to_string());
     }
 
-    // 用授权码交换 token，这里暂时只完成协议调用并记录日志
+    // 用授权码交换 token
     #[derive(serde::Deserialize)]
+    #[allow(dead_code)]
     struct SocialTokenResponse {
         #[serde(rename = "accessToken")]
         access_token: String,
