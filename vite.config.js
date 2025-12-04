@@ -11,7 +11,21 @@ export default defineConfig({
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
     target: process.env.TAURI_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
-    minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
+    minify: !process.env.TAURI_DEBUG ? 'terser' : false,
     sourcemap: !!process.env.TAURI_DEBUG,
+    terserOptions: {
+      compress: {
+        drop_console: true,      // 移除 console.log
+        drop_debugger: true,     // 移除 debugger
+        pure_funcs: ['console.info', 'console.debug', 'console.warn'],
+      },
+      mangle: {
+        toplevel: true,          // 混淆顶级变量名
+        safari10: true,
+      },
+      format: {
+        comments: false,         // 移除所有注释
+      },
+    },
   },
 })
