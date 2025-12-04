@@ -90,6 +90,7 @@ async fn login_social(
     );
 
     token.used = used;
+    token.expires_at = Some(auth_result.expires_at.clone());
     token.profile_arn = auth_result.profile_arn;
     extract_usage_fields(&mut token, &usage);
 
@@ -159,6 +160,7 @@ async fn login_idc(
     );
 
     token.used = used;
+    token.expires_at = Some(auth_result.expires_at.clone());
     token.sso_client_id = auth_result.client_id;
     token.sso_client_secret = auth_result.client_secret;
     token.sso_region = auth_result.region;
