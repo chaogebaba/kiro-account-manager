@@ -1,0 +1,104 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v1.0.0)'
+        required: true
+
+env:
+  PUBLIC_REPO: hj01857655/kiro-token-manager
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Tauri App
+        run: npm run tauri build
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+
+  release:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installers
+          path: ./artifacts
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: List artifacts
+        run: find ./artifacts -type f
+
+      - name: Create Release on Public Repo
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          
+          # 检查 release 是否已存在，存在则删除
+          gh release delete "$VERSION" --repo ${{ env.PUBLIC_REPO }} --yes 2>/dev/null || true
+          
+          # 创建新 release
+          gh release create "$VERSION" \
+            --repo ${{ env.PUBLIC_REPO }} \
+            --title "Kiro Token Manager $VERSION" \
+            --notes "## 下载
+
+- **MSI 安装包**: 适合需要安装到系统的用户
+- **EXE 安装包**: 便携式安装程序
+
+## 更新日志
+
+查看 [Commits](https://github.com/${{ env.PUBLIC_REPO }}/commits/main) 了解详情。" \
+            ./artifacts/msi/*.msi \
+            ./artifacts/nsis/*.exe
