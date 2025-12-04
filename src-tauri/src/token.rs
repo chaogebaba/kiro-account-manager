@@ -215,10 +215,11 @@ impl TokenStore {
     ) -> (Token, bool) {
         // 检查是否已存在相同邮箱的账号，如果存在则更新
         if let Some(idx) = self.tokens.iter().position(|t| t.email == email) {
+            self.tokens[idx].label = label;
             self.tokens[idx].access_token = Some(access_token);
             self.tokens[idx].refresh_token = Some(refresh_token);
             self.tokens[idx].quota = quota;
-            self.tokens[idx].provider = provider;
+            self.tokens[idx].provider = Some(provider);
             self.tokens[idx].user_id = user_id;
             self.tokens[idx].subscription_type = subscription_type;
             self.tokens[idx].status = "正常".to_string();
