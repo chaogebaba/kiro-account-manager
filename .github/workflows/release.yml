@@ -147,14 +147,16 @@ jobs:
           
           gh release delete "$VERSION" --repo ${{ env.PUBLIC_REPO }} --yes 2>/dev/null || true
           
-          FILES=$(find ./artifacts -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.dmg" \) | tr '\n' ' ')
+          # 收集文件到数组
+          mapfile -t FILES < <(find ./artifacts -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.dmg" \))
           
-          if [ -z "$FILES" ]; then
+          if [ ${#FILES[@]} -eq 0 ]; then
             echo "Error: No installer files found!"
             exit 1
           fi
           
-          echo "Uploading files: $FILES"
+          echo "Uploading ${#FILES[@]} files:"
+          printf '%s\n' "${FILES[@]}"
           
           cat > release_notes.md << 'EOF'
           ## 下载
@@ -179,4 +181,4 @@ jobs:
             --repo ${{ env.PUBLIC_REPO }} \
             --title "Kiro Token Manager $VERSION" \
             --notes-file release_notes.md \
-            $FILES
+            "${FILES[@]}"
