@@ -127,7 +127,7 @@ function Home({ onNavigate }) {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className={`font-semibold ${colors.text} text-lg`}>{localToken.provider || '未知'}</span>
-                        <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">已登录</span>
+                        <span className={`px-2.5 py-1 ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'} rounded-full text-xs font-medium`}>已登录</span>
                       </div>
                       <div className={`text-sm ${colors.textMuted} mt-1`}>{localToken.authMethod || 'social'}</div>
                     </div>
@@ -174,7 +174,11 @@ function Home({ onNavigate }) {
                     <span className={`${colors.textMuted} ml-2 text-lg`}>/ {stats.totalQuota}</span>
                   </div>
                   <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
-                    usagePercent > 80 ? 'bg-red-100 text-red-600' : usagePercent > 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-600'
+                    usagePercent > 80 
+                      ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600') 
+                      : usagePercent > 50 
+                        ? (isDark ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-700') 
+                        : (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600')
                   }`}>
                     {usagePercent}%
                   </span>
@@ -258,7 +262,9 @@ function Home({ onNavigate }) {
                     </div>
                   </div>
                   <span className={`px-3 py-1.5 rounded-xl text-xs font-medium ${
-                    token.status === '正常' || token.status === '有效' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                    token.status === '正常' || token.status === '有效' 
+                      ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700') 
+                      : (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600')
                   }`}>
                     {token.status}
                   </span>
