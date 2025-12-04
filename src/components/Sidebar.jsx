@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/tauri'
 import { Home, Key, Settings, Info, User, LogIn, Sun, Moon, Palette } from 'lucide-react'
 import { useTheme, themes } from '../contexts/ThemeContext'
 
-const VERSION = '1.0.0'
+const VERSION = '1.0.1'
 
 const menuItems = [
   { id: 'home', label: '首页', icon: Home },
