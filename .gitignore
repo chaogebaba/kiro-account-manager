@@ -16,6 +16,11 @@ Thumbs.db
 
 # Tauri
 src-tauri/target/
+.tauri-updater-key
+.tauri-updater-password
 
 # Logs
 *.log
+
+# Reference project
+kiro-batch-login/

@@ -326,7 +326,7 @@ function TokenManager() {
                 <button
                   onClick={async () => {
                     setAddLoading(true); setAddError('')
-                    try { await invoke('kiro_social_login', { provider: 'Google' }) }
+                    try { await invoke('kiro_login', { provider: 'Google' }) }
                     catch (e) { setAddError(e.toString()) }
                     finally { setAddLoading(false); setShowAddModal(false) }
                   }}
@@ -344,7 +344,7 @@ function TokenManager() {
                 <button
                   onClick={async () => {
                     setAddLoading(true); setAddError('')
-                    try { await invoke('kiro_social_login', { provider: 'Github' }) }
+                    try { await invoke('kiro_login', { provider: 'Github' }) }
                     catch (e) { setAddError(e.toString()) }
                     finally { setAddLoading(false); setShowAddModal(false) }
                   }}
@@ -358,17 +358,34 @@ function TokenManager() {
                 </button>
               </div>
               
-              {/* 导入本地账号 */}
+              {/* AWS Builder ID */}
+              <button
+                onClick={async () => {
+                  setAddLoading(true); setAddError('')
+                  try { await invoke('kiro_login', { provider: 'BuilderId' }) }
+                  catch (e) { setAddError(e.toString()) }
+                  finally { setAddLoading(false); setShowAddModal(false) }
+                }}
+                disabled={addLoading}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-3 ${isDark ? 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40' : 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600'} rounded-xl transition-all disabled:opacity-50`}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={isDark ? '#fdba74' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className={`font-medium text-sm ${isDark ? 'text-orange-300' : 'text-white'}`}>AWS Builder ID</span>
+              </button>
+              
+              {/* 保存本地账号 */}
               <button
                 onClick={async () => {
                   setAddLoading(true); setAddError('')
                   try {
                     const localToken = await invoke('get_kiro_local_token')
-                    if (!localToken?.refresh_token) {
+                    if (!localToken?.refreshToken) {
                       setAddError('未找到本地 Kiro 账号，请先在 Kiro IDE 中登录')
                       return
                     }
-                    await invoke('add_token_by_refresh', { refreshToken: localToken.refresh_token })
+                    await invoke('add_token_by_refresh', { refreshToken: localToken.refreshToken })
                     loadTokens()
                     setShowAddModal(false)
                   } catch (e) { setAddError(e.toString()) }
@@ -378,7 +395,7 @@ function TokenManager() {
                 className={`w-full flex items-center justify-center gap-2 px-4 py-3 ${isDark ? 'bg-green-500/20 hover:bg-green-500/30 border border-green-500/40' : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'} rounded-xl transition-all disabled:opacity-50`}
               >
                 <Download size={18} className={isDark ? 'text-green-300' : 'text-white'} />
-                <span className={`font-medium text-sm ${isDark ? 'text-green-300' : 'text-white'}`}>导入本地 Kiro 账号</span>
+                <span className={`font-medium text-sm ${isDark ? 'text-green-300' : 'text-white'}`}>保存本地账号</span>
               </button>
               
               {/* 分隔线 */}
@@ -393,12 +410,12 @@ function TokenManager() {
                 <input
                   type="text"
                   placeholder="Refresh Token (aor 开头)"
-                  id="manual-token-input"
+                  id="manual-account-input"
                   className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500/30`}
                 />
                 <button
                   onClick={async () => {
-                    const tokenInput = document.getElementById('manual-token-input')
+                    const tokenInput = document.getElementById('manual-account-input')
                     const token = tokenInput?.value?.trim()
                     if (!token) { setAddError('请输入 Refresh Token'); return }
                     if (!token.startsWith('aor')) { setAddError('Token 格式错误，应以 aor 开头'); return }
@@ -413,7 +430,7 @@ function TokenManager() {
                   disabled={addLoading}
                   className={`w-full px-4 py-2.5 ${isDark ? 'bg-white/10 hover:bg-white/15 border border-white/10' : 'bg-gray-100 hover:bg-gray-200 border border-gray-200'} rounded-xl text-sm font-medium ${colors.text} transition-colors disabled:opacity-50`}
                 >
-                  {addLoading ? '验证中...' : '添加 Token'}
+                  {addLoading ? '验证中...' : '添加账号'}
                 </button>
               </div>
               

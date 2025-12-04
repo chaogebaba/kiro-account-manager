@@ -2,6 +2,7 @@
 
 mod auth;
 mod auth_social;
+mod aws_sso_client;
 mod token;
 mod kiro_auth_client;
 mod oauth_callback_server;
@@ -10,7 +11,6 @@ mod kiro;
 mod process;
 mod state;
 mod commands;
-mod legacy;
 
 use std::sync::Mutex;
 use state::AppState;
@@ -49,7 +49,8 @@ fn main() {
             // Auth 命令 (当前使用)
             get_current_user,
             logout,
-            kiro_social_login,
+            kiro_login,
+            get_supported_providers,
             handle_kiro_social_callback,
             add_kiro_token,
             // Kiro IDE 命令

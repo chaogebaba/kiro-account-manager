@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
-import { RefreshCw, Users, Zap, Shield, Clock, TrendingUp, ArrowRight, Sparkles, Plus } from 'lucide-react'
+import { RefreshCw, Users, Zap, Shield, Clock, TrendingUp, ArrowRight, Sparkles } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
 function Home({ onNavigate }) {
@@ -8,8 +8,6 @@ function Home({ onNavigate }) {
   const [tokens, setTokens] = useState([])
   const [localToken, setLocalToken] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [importing, setImporting] = useState(false)
-  const [importMsg, setImportMsg] = useState('')
 
   useEffect(() => { loadData() }, [])
 
@@ -107,10 +105,10 @@ function Home({ onNavigate }) {
         </div>
 
         <div className="grid grid-cols-2 gap-6">
-          {/* 当前 Kiro IDE 状态 */}
+          {/* 本地 Kiro 账号 */}
           <div className={`${colors.card} rounded-2xl shadow-sm border ${colors.cardBorder} overflow-hidden`}>
             <div className={`px-6 py-4 border-b ${colors.cardBorder} flex items-center justify-between`}>
-              <h2 className={`font-semibold ${colors.text}`}>Kiro IDE 状态</h2>
+              <h2 className={`font-semibold ${colors.text}`}>当前登录账号</h2>
               <button onClick={loadData} className={`p-2 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-xl transition-colors`}>
                 <RefreshCw size={16} className={colors.textMuted} />
               </button>
@@ -138,8 +136,20 @@ function Home({ onNavigate }) {
                   <div className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl p-4 space-y-3`}>
                     <div className="flex items-center justify-between text-sm">
                       <span className={colors.textMuted}>Access Token</span>
-                      <span className={`font-mono text-xs ${colors.textMuted} truncate max-w-[180px]`}>
+                      <span title={localToken.accessToken} className={`font-mono text-xs ${colors.textMuted} truncate max-w-[180px] cursor-help`}>
                         {localToken.accessToken?.substring(0, 20)}...
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className={colors.textMuted}>Refresh Token</span>
+                      <span title={localToken.refreshToken} className={`font-mono text-xs ${colors.textMuted} truncate max-w-[180px] cursor-help`}>
+                        {localToken.refreshToken?.substring(0, 20)}...
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className={colors.textMuted}>Profile ARN</span>
+                      <span title={localToken.profileArn} className={`font-mono text-xs ${colors.textMuted} truncate max-w-[180px] cursor-help`}>
+                        {localToken.profileArn || '-'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
@@ -151,24 +161,7 @@ function Home({ onNavigate }) {
                     </div>
                   </div>
                   
-                  <button
-                    onClick={async () => {
-                      if (!localToken?.refreshToken) { setImportMsg('无法获取 Refresh Token'); return }
-                      setImporting(true); setImportMsg('')
-                      try {
-                        await invoke('add_token_by_refresh', { refreshToken: localToken.refreshToken })
-                        setImportMsg('添加成功！')
-                        loadData()
-                      } catch (e) { setImportMsg(e.toString()) }
-                      finally { setImporting(false) }
-                    }}
-                    disabled={importing}
-                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 ${isDark ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' : 'bg-green-500 hover:bg-green-600 text-white'} rounded-xl text-sm font-medium transition-colors disabled:opacity-50`}
-                  >
-                    <Plus size={16} />
-                    {importing ? '保存中...' : '保存账号'}
-                  </button>
-                  {importMsg && <div className={`text-xs text-center ${importMsg.includes('成功') ? 'text-green-500' : 'text-red-500'}`}>{importMsg}</div>}
+
                 </div>
               ) : (
                 <div className="text-center py-10">

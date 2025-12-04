@@ -81,9 +81,25 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         store.tokens.iter().find(|t| t.id == id).cloned()
     }.ok_or("Token not found")?;
 
-    let refresh_token = token.refresh_token.as_ref().ok_or("No refresh token")?;
-    let refresh_result = refresh_token_desktop(refresh_token).await?;
-    let new_access_token = refresh_result.access_token;
+    let refresh_token_str = token.refresh_token.as_ref().ok_or("No refresh token")?;
+    
+    // 根据 provider 选择刷新方式
+    let (new_access_token, new_refresh_token, expires_in) = if token.provider.as_deref() == Some("BuilderId") {
+        // BuilderId 使用 AWS SSO OIDC API 刷新
+        let client_id = token.sso_client_id.as_ref().ok_or("No SSO client_id")?;
+        let client_secret = token.sso_client_secret.as_ref().ok_or("No SSO client_secret")?;
+        let region = token.sso_region.as_deref().unwrap_or("us-east-1");
+        
+        let sso_client = crate::aws_sso_client::AWSSSOClient::new(region);
+        let sso_result = sso_client.refresh_token(client_id, client_secret, refresh_token_str).await?;
+        (sso_result.access_token, Some(sso_result.refresh_token), sso_result.expires_in)
+    } else {
+        // Google/GitHub 使用 Kiro Desktop API 刷新
+        let refresh_result = refresh_token_desktop(refresh_token_str).await?;
+        (refresh_result.access_token, Some(refresh_result.refresh_token), refresh_result.expires_in)
+    };
+    
+    let new_access_token = new_access_token;
     let usage = get_usage_limits_desktop(&new_access_token).await?;
     
     let breakdown = usage.usage_breakdown_list.as_ref().and_then(|list| list.first());
@@ -140,7 +156,7 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
     let upgrade_capable = subscription_info.and_then(|s| s.upgrade_capability.as_ref())
         .map(|c| c == "UPGRADE_CAPABLE");
 
-    let expires_at = chrono::Local::now() + chrono::Duration::seconds(refresh_result.expires_in);
+    let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
     let expires_at_str = expires_at.format("%Y/%m/%d %H:%M:%S").to_string();
 
     let mut store = state.store.lock().unwrap();
@@ -150,6 +166,9 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         store.tokens[idx].quota = quota;
         store.tokens[idx].used = used;
         store.tokens[idx].access_token = Some(new_access_token);
+        if let Some(rt) = new_refresh_token {
+            store.tokens[idx].refresh_token = Some(rt);
+        }
         store.tokens[idx].expires_at = Some(expires_at_str);
         store.tokens[idx].reset_date = reset_date;
         store.tokens[idx].days_until_reset = days_until_reset;
@@ -266,6 +285,11 @@ pub async fn add_token_by_refresh(
         subscription_type,
     );
     println!("Token {}: {}", if is_new { "added" } else { "updated" }, email);
+    
+    // 如果账号已存在，返回错误
+    if !is_new {
+        return Err(format!("账号 {} 已存在", email));
+    }
     
     {
         let mut store = state.store.lock().unwrap();

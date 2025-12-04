@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
-import { open } from '@tauri-apps/api/shell'
-import { getVersion } from '@tauri-apps/api/app'
 import Sidebar from './components/Sidebar'
 import Home from './components/Home'
 import TokenManager from './components/TokenManager'
@@ -10,55 +8,21 @@ import Settings from './components/Settings'
 import About from './components/About'
 import Login from './components/Login'
 import AuthCallback from './components/AuthCallback'
+import UpdateChecker from './components/UpdateChecker'
 import { useTheme } from './contexts/ThemeContext'
-
-const GITHUB_REPO = 'hj01857655/kiro-token-manager'
-
-// 版本比较
-const compareVersions = (a, b) => {
-  const pa = a.split('.').map(Number)
-  const pb = b.split('.').map(Number)
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) > (pb[i] || 0)) return 1
-    if ((pa[i] || 0) < (pb[i] || 0)) return -1
-  }
-  return 0
-}
 
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeMenu, setActiveMenu] = useState('home')
-  const [updateInfo, setUpdateInfo] = useState(null)
-  const [currentVersion, setCurrentVersion] = useState('')
   const { colors } = useTheme()
-
-  // 检查更新
-  const checkForUpdates = async (version) => {
-    try {
-      const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`)
-      if (!res.ok) return
-      const data = await res.json()
-      const latestVersion = data.tag_name.replace('v', '')
-      if (compareVersions(latestVersion, version) > 0) {
-        setUpdateInfo({ version: latestVersion, url: data.html_url })
-      }
-    } catch (e) {
-      console.log('Check update failed:', e)
-    }
-  }
 
   useEffect(() => {
     checkAuth()
-    getVersion().then(v => {
-      setCurrentVersion(v)
-      checkForUpdates(v)
-    })
     
     // 检查是否是回调页面
     const url = new URL(window.location.href)
     if (url.pathname === '/callback' && (url.searchParams.has('code') || url.searchParams.has('state'))) {
-      // 显示回调页面
       setActiveMenu('callback')
       return
     }
@@ -128,27 +92,7 @@ function App() {
         {renderContent()}
       </main>
       
-      {/* 更新提示 */}
-      {updateInfo && (
-        <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50">
-          <div>
-            <div className="font-medium">发现新版本 v{updateInfo.version}</div>
-            <div className="text-sm text-blue-200">当前版本 v{currentVersion}</div>
-          </div>
-          <button
-            onClick={() => open(updateInfo.url)}
-            className="bg-white text-blue-600 px-3 py-1 rounded-lg text-sm font-medium hover:bg-blue-50"
-          >
-            去下载
-          </button>
-          <button
-            onClick={() => setUpdateInfo(null)}
-            className="text-blue-200 hover:text-white"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      <UpdateChecker />
     </div>
   )
 }

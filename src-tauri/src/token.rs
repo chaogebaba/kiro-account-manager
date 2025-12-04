@@ -65,46 +65,16 @@ pub struct Token {
     pub subscription_plan: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upgrade_capable: Option<bool>,
+    // AWS SSO OIDC (BuilderId) 专用
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sso_client_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sso_client_secret: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sso_region: Option<String>,
 }
 
 impl Token {
-    pub fn new(email: String, label: String, quota: i32) -> Self {
-        let now: DateTime<Local> = Local::now();
-        Self {
-            id: Uuid::new_v4().to_string(),
-            email,
-            label,
-            quota,
-            used: 0,
-            status: "正常".to_string(),
-            created_at: now.format("%Y/%m/%d %H:%M:%S").to_string(),
-            access_token: None,
-            refresh_token: None,
-            provider: None,
-            user_id: None,
-            expires_at: None,
-            subscription_type: None,
-            csrf_token: None,
-            reset_date: None,
-            days_until_reset: None,
-            free_trial_quota: None,
-            free_trial_used: None,
-            free_trial_expiry: None,
-            free_trial_status: None,
-            bonus_quota: None,
-            bonus_used: None,
-            bonus_expiry: None,
-            bonus_name: None,
-            bonus_code: None,
-            bonus_status: None,
-            overage_rate: None,
-            overage_cap: None,
-            overage_capable: None,
-            subscription_plan: None,
-            upgrade_capable: None,
-        }
-    }
-
     pub fn new_with_tokens(
         email: String,
         label: String,
@@ -148,6 +118,9 @@ impl Token {
             overage_capable: None,
             subscription_plan: None,
             upgrade_capable: None,
+            sso_client_id: None,
+            sso_client_secret: None,
+            sso_region: None,
         }
     }
 }

@@ -24,9 +24,22 @@ function Login({ onLogin }) {
     setLoadingProvider(provider)
     setError('')
     try {
-      await invoke('kiro_social_login', { provider })
+      await invoke('kiro_login', { provider })
     } catch (e) {
       console.error('Login error:', e)
+      setError(typeof e === 'string' ? e : e.message || '登录失败')
+    } finally {
+      setLoadingProvider(null)
+    }
+  }
+
+  const handleBuilderIdLogin = async () => {
+    setLoadingProvider('BuilderId')
+    setError('')
+    try {
+      await invoke('kiro_login', { provider: 'BuilderId' })
+    } catch (e) {
+      console.error('BuilderId login error:', e)
       setError(typeof e === 'string' ? e : e.message || '登录失败')
     } finally {
       setLoadingProvider(null)
@@ -125,16 +138,29 @@ function Login({ onLogin }) {
             )}
           </button>
 
-          {/* BuilderId 按钮（禁用） */}
+          {/* AWS Builder ID 登录按钮 */}
           <button
-            disabled
-            className={`w-full flex items-center justify-center gap-3 px-4 py-3.5 ${isDark ? 'bg-gray-700/50 border border-gray-600/50' : 'bg-gray-100 border border-gray-200'} rounded-xl opacity-60 cursor-not-allowed`}
+            onClick={() => handleBuilderIdLogin()}
+            disabled={!!loadingProvider}
+            onMouseEnter={() => setHoveredProvider('BuilderId')}
+            onMouseLeave={() => setHoveredProvider(null)}
+            className={`relative w-full flex items-center justify-center gap-3 px-4 py-3.5 ${isDark ? 'bg-orange-500/20 hover:bg-orange-500/30 border-2 border-orange-500/50 hover:border-orange-400' : 'bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 hover:from-orange-600 hover:via-amber-600 hover:to-yellow-600 shadow-lg shadow-orange-500/25'} hover:shadow-lg hover:shadow-orange-500/30 hover:scale-[1.02] rounded-xl transition-all duration-200 disabled:opacity-50 shadow-md`}
           >
-            <svg width="28" height="20" viewBox="0 0 64 32" fill="none">
-              <text x="0" y="16" fill={isDark ? '#9ca3af' : '#374151'} fontSize="14" fontFamily="system-ui" fontWeight="bold">aws</text>
-              <path d="M4 22c6 4 13 6 20 6 7 0 14-2 20-6" stroke="#FF9900" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'} font-medium text-base`}>BuilderId (即将支持)</span>
+            <div className="flex items-center gap-3">
+              {loadingProvider === 'BuilderId' ? (
+                <Loader size={20} className={`animate-spin ${isDark ? 'text-orange-300' : 'text-white'}`} />
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={isDark ? '#fdba74' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+              <span className={`${isDark ? 'text-orange-300' : 'text-white'} font-medium text-base`}>
+                {loadingProvider === 'BuilderId' ? '正在打开登录页面...' : '使用 AWS Builder ID 登录'}
+              </span>
+            </div>
+            {hoveredProvider === 'BuilderId' && !loadingProvider && (
+              <span className={`absolute right-4 ${isDark ? 'text-orange-300' : 'text-white'} text-sm font-medium`}>Sign in →</span>
+            )}
           </button>
 
           <p className={`text-center ${colors.textMuted} text-sm pt-2`}>
