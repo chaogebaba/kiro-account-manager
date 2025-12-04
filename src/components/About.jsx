@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Github, Heart, Coffee, ExternalLink, Sparkles, Code2, Palette, Cpu, RefreshCw } from 'lucide-react'
 import { open } from '@tauri-apps/api/shell'
+import { getVersion } from '@tauri-apps/api/app'
 import { useTheme } from '../contexts/ThemeContext'
 
-const VERSION = '1.0.1'
 const GITHUB_REPO = 'hj01857655/kiro-token-manager'
 
 // 版本比较：a > b 返回 1，a < b 返回 -1，相等返回 0
@@ -20,10 +20,16 @@ const compareVersions = (a, b) => {
 function About() {
   const { theme, colors } = useTheme()
   const isDark = theme === 'dark'
+  const [version, setVersion] = useState('')
   const [checking, setChecking] = useState(false)
   const [updateStatus, setUpdateStatus] = useState(null)
 
+  useEffect(() => {
+    getVersion().then(setVersion)
+  }, [])
+
   const checkUpdate = async () => {
+    if (!version) return
     setChecking(true)
     setUpdateStatus(null)
     try {
@@ -31,7 +37,7 @@ function About() {
       if (!res.ok) throw new Error('请求失败')
       const data = await res.json()
       const latest = data.tag_name.replace('v', '')
-      const cmp = compareVersions(latest, VERSION)
+      const cmp = compareVersions(latest, version)
       if (cmp > 0) {
         setUpdateStatus({ type: 'update', message: `发现新版本 v${latest}`, url: data.html_url })
       } else {
@@ -71,7 +77,7 @@ function About() {
         <h1 className={`text-xl font-bold ${colors.text} mb-1.5`}>Kiro Token Manager</h1>
         <div className="flex items-center justify-center gap-2 mb-3">
           <span className={`px-2.5 py-0.5 ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'} rounded-full text-xs font-medium`}>
-            v{VERSION}
+            v{version || '...'}
           </span>
           <button
             onClick={checkUpdate}

@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { getVersion } from '@tauri-apps/api/app'
 import { Home, Key, Settings, Info, User, LogIn, Sun, Moon, Palette } from 'lucide-react'
 import { useTheme, themes } from '../contexts/ThemeContext'
-
-const VERSION = '1.0.1'
 
 const menuItems = [
   { id: 'home', label: '首页', icon: Home },
@@ -16,10 +15,12 @@ const menuItems = [
 function Sidebar({ activeMenu, onMenuChange, user }) {
   const [localToken, setLocalToken] = useState(null)
   const [showThemeMenu, setShowThemeMenu] = useState(false)
+  const [version, setVersion] = useState('')
   const { theme, setTheme, colors } = useTheme()
 
   useEffect(() => {
     invoke('get_kiro_local_token').then(setLocalToken).catch(() => {})
+    getVersion().then(setVersion)
   }, [])
 
   const themeIcons = { light: Sun, dark: Moon, purple: Palette, green: Palette }
@@ -118,7 +119,7 @@ function Sidebar({ activeMenu, onMenuChange, user }) {
           )}
         </div>
         
-        <span className={`text-xs ${colors.sidebarMuted}`}>v{VERSION}</span>
+        <span className={`text-xs ${colors.sidebarMuted}`}>v{version || '...'}</span>
       </div>
     </div>
   )
