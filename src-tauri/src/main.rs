@@ -38,7 +38,6 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             // Token 命令
             get_tokens,
-            add_token,
             update_token,
             delete_token,
             delete_tokens,

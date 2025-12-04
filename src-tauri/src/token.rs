@@ -194,13 +194,6 @@ impl TokenStore {
         self.tokens.clone()
     }
 
-    pub fn add(&mut self, email: String, label: String, quota: i32) -> Token {
-        let token = Token::new(email, label, quota);
-        self.tokens.insert(0, token.clone());
-        self.save_to_file();
-        token
-    }
-
     /// 返回 (Token, is_new) - is_new 为 true 表示新增，false 表示更新
     pub fn add_with_tokens(
         &mut self,

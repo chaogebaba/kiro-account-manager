@@ -27,11 +27,6 @@ pub fn get_tokens(state: State<AppState>) -> Vec<Token> {
 }
 
 #[tauri::command]
-pub fn add_token(state: State<AppState>, email: String, label: String, quota: i32) -> Token {
-    state.store.lock().unwrap().add(email, label, quota)
-}
-
-#[tauri::command]
 pub fn update_token(
     state: State<AppState>,
     id: String,
