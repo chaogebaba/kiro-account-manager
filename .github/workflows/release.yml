@@ -115,10 +115,8 @@ jobs:
         run: |
           VERSION=${{ steps.version.outputs.version }}
           
-          # 检查 release 是否已存在，存在则删除
           gh release delete "$VERSION" --repo ${{ env.PUBLIC_REPO }} --yes 2>/dev/null || true
           
-          # 收集所有安装包文件
           FILES=""
           for f in ./artifacts/msi/*.msi ./artifacts/nsis/*.exe; do
             if [ -f "$f" ]; then
@@ -133,28 +131,8 @@ jobs:
           
           echo "Uploading files: $FILES"
           
-          # 创建新 release
           gh release create "$VERSION" \
             --repo ${{ env.PUBLIC_REPO }} \
             --title "Kiro Token Manager $VERSION" \
-            --notes "## 下载说明
-
-| 文件 | 说明 |
-|------|------|
-| \`.msi\` | Windows 安装包，推荐使用 |
-| \`.exe\` | NSIS 安装程序 |
-
-## 安装
-
-1. 下载 \`.msi\` 文件
-2. 双击运行安装
-3. 按提示完成安装
-
-## 系统要求
-
-- Windows 10/11 (64-bit)
-- WebView2 Runtime (Windows 11 已内置，Windows 10 会自动安装)
-
----
-*此版本由 GitHub Actions 自动构建*" \
+            --notes "Windows 安装包，下载 .msi 文件双击安装即可。需要 Windows 10/11 64位系统。" \
             $FILES
