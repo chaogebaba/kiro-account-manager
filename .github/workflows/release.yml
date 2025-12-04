@@ -131,20 +131,24 @@ jobs:
           
           echo "Uploading files: $FILES"
           
+          cat > release_notes.md << 'EOF'
+          ## 安装说明
+          
+          - **MSI**: 推荐，双击安装即可
+          - **EXE**: NSIS 安装程序
+          
+          ### 系统要求
+          - Windows 10/11 (64-bit)
+          - WebView2 (Win11 已内置)
+          
+          ### 功能
+          - 多账号管理与切换
+          - 配额实时监控
+          - 一键重置机器 ID
+          EOF
+          
           gh release create "$VERSION" \
             --repo ${{ env.PUBLIC_REPO }} \
             --title "Kiro Token Manager $VERSION" \
-            --notes "## 安装说明
-
-- **MSI**: 推荐，双击安装即可
-- **EXE**: NSIS 安装程序
-
-### 系统要求
-- Windows 10/11 (64-bit)
-- WebView2 (Win11 已内置)
-
-### 功能
-- 多账号管理与切换
-- 配额实时监控
-- 一键重置机器 ID" \
+            --notes-file release_notes.md \
             $FILES
