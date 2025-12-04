@@ -85,7 +85,9 @@ jobs:
           cache-on-failure: true
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
 
       - name: Build Tauri App (Universal)
         run: npm run tauri build -- --target universal-apple-darwin
