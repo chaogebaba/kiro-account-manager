@@ -64,7 +64,8 @@
         "title": "Kiro Token Manager",
         "width": 1280,
         "minWidth": 1100,
-        "minHeight": 650
+        "minHeight": 650,
+        "visible": false
       },
       {
         "label": "callback",
