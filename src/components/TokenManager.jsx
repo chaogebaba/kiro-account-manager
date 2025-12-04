@@ -240,16 +240,34 @@ function TokenManager() {
                     <td className="px-4 py-3">
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
-                          <span className={`font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{token.used}/{token.quota}</span>
-                          <span className={`font-medium ${percent > 80 ? 'text-red-500' : percent > 50 ? 'text-yellow-500' : 'text-green-500'}`}>{Math.round(percent)}%</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{token.used}/{token.quota}</span>
+                            <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'}`}>剩余 {token.quota - token.used}</span>
+                          </div>
+                          <span className={`font-semibold ${percent > 80 ? 'text-red-500' : percent > 50 ? 'text-yellow-500' : 'text-green-500'}`}>{Math.round(percent)}%</span>
                         </div>
-                        <div className={`h-1.5 ${isDark ? 'bg-white/10' : 'bg-gray-100'} rounded-full overflow-hidden`}>
-                          <div className={`h-full rounded-full transition-all ${percent > 80 ? 'bg-red-500' : percent > 50 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${percent}%` }} />
+                        <div className={`h-2 ${isDark ? 'bg-white/10' : 'bg-gray-100'} rounded-full overflow-hidden`}>
+                          <div className={`h-full rounded-full transition-all ${percent > 80 ? 'bg-gradient-to-r from-red-400 to-red-500' : percent > 50 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-green-400 to-emerald-500'}`} style={{ width: `${percent}%` }} />
                         </div>
+                        {token.reset_date && (
+                          <div className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                            {token.reset_date} 重置{token.days_until_reset > 0 && <span className="ml-1">({token.days_until_reset}天后)</span>}
+                          </div>
+                        )}
                         {(token.free_trial_quota || token.bonus_quota) && (
-                          <div className="flex gap-1.5 pt-0.5">
-                            {token.free_trial_quota && <span className={`text-xs px-1.5 py-0.5 rounded ${token.free_trial_status === 'ACTIVE' ? (isDark ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-50 text-cyan-600') : (isDark ? 'bg-gray-700 text-gray-500' : 'bg-gray-100 text-gray-400')}`} title={`过期: ${token.free_trial_expiry || '未知'}`}>试用 {token.free_trial_used || 0}/{token.free_trial_quota}</span>}
-                            {token.bonus_quota && <span className={`text-xs px-1.5 py-0.5 rounded ${token.bonus_status === 'ACTIVE' ? (isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-50 text-purple-600') : (isDark ? 'bg-gray-700 text-gray-500' : 'bg-gray-100 text-gray-400')}`} title={`${token.bonus_name || '奖励'} 过期: ${token.bonus_expiry || '未知'}`}>奖励 {token.bonus_used || 0}/{token.bonus_quota}</span>}
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {token.free_trial_quota && (
+                              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${token.free_trial_status === 'ACTIVE' ? (isDark ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-cyan-50 text-cyan-600 border border-cyan-200') : (isDark ? 'bg-gray-700/50 text-gray-500' : 'bg-gray-100 text-gray-400')}`} title={`过期: ${token.free_trial_expiry || '未知'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${token.free_trial_status === 'ACTIVE' ? 'bg-cyan-500' : 'bg-gray-400'}`}></span>
+                                试用 {token.free_trial_used || 0}/{token.free_trial_quota}
+                              </span>
+                            )}
+                            {token.bonus_quota && (
+                              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${token.bonus_status === 'ACTIVE' ? (isDark ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-purple-50 text-purple-600 border border-purple-200') : (isDark ? 'bg-gray-700/50 text-gray-500' : 'bg-gray-100 text-gray-400')}`} title={`${token.bonus_name || '奖励'} 过期: ${token.bonus_expiry || '未知'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${token.bonus_status === 'ACTIVE' ? 'bg-purple-500' : 'bg-gray-400'}`}></span>
+                                {token.bonus_name || '奖励'} {token.bonus_used || 0}/{token.bonus_quota}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
