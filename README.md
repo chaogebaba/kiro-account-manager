@@ -2,73 +2,54 @@
 
 > 智能管理 Kiro 访问令牌，一键切换，配额监控
 
-## 开发环境
+## 下载
 
-### 前置要求
+[![Release](https://img.shields.io/github/v/release/hj01857655/kiro-token-manager?style=flat-square)](https://github.com/hj01857655/kiro-token-manager/releases/latest)
 
-- Node.js 18+
-- Rust 1.70+
-- pnpm / npm / yarn
-
-### 安装依赖
-
-```bash
-# 前端依赖
-pnpm install
-
-# Rust 依赖会在首次构建时自动安装
-```
-
-### 开发运行
-
-```bash
-pnpm tauri dev
-```
-
-### 构建发布
-
-```bash
-pnpm tauri build
-```
-
-## 项目结构
-
-```
-├── src/                    # React 前端
-│   ├── components/         # 组件
-│   ├── contexts/           # Context (主题等)
-│   └── main.jsx           # 入口
-├── src-tauri/             # Tauri/Rust 后端
-│   ├── src/
-│   │   ├── main.rs        # 主入口
-│   │   ├── auth.rs        # 认证逻辑
-│   │   └── token.rs       # Token 管理
-│   └── tauri.conf.json    # Tauri 配置
-├── index.html
-├── vite.config.js
-├── tailwind.config.js
-└── package.json
-```
-
-## 技术栈
-
-- **前端**: React 18 + Vite + TailwindCSS + Lucide Icons
-- **后端**: Tauri 1.x + Rust
-- **存储**: 本地 JSON 文件
+| 平台 | 下载 |
+|------|------|
+| Windows | [MSI 安装包](https://github.com/hj01857655/kiro-token-manager/releases/latest) |
+| macOS | [DMG 安装包](https://github.com/hj01857655/kiro-token-manager/releases/latest) |
 
 ## 功能
 
-- [x] Google/GitHub OAuth 登录
-- [x] 多账号管理
-- [x] 配额监控 (主配额/试用/奖励)
-- [x] 一键切换账号
-- [x] 主题切换 (浅色/深色/紫色/绿色)
-- [x] 数据导出
-- [ ] 自动刷新 Token
-- [ ] 配额用尽提醒
+- ✅ Google/GitHub OAuth 登录
+- ✅ 多账号管理与切换
+- ✅ 配额实时监控 (主配额/试用/奖励)
+- ✅ 一键切换 Kiro IDE 账号
+- ✅ 一键重置机器 ID
+- ✅ Kiro IDE 代理/模型设置
+- ✅ 主题切换 (浅色/深色/紫色/绿色)
+- ✅ 数据导出
 
-## 注意事项
+## 截图
 
-⚠️ 此仓库为私有开发仓库，请勿泄露源代码。
+<!-- TODO: 添加截图 -->
 
-公开仓库: https://github.com/hj01857655/kiro-token-manager
+## 系统要求
+
+- **Windows**: Windows 10/11 (64-bit)，需要 WebView2 (Win11 已内置)
+- **macOS**: macOS 10.15+ (Intel/Apple Silicon)
+
+## 技术栈
+
+- **前端**: React 18 + Vite + TailwindCSS
+- **后端**: Tauri 1.x + Rust
+- **存储**: 本地 JSON 文件
+
+## 开发
+
+```bash
+# 安装依赖
+npm install
+
+# 开发运行
+npm run tauri dev
+
+# 构建
+npm run tauri build
+```
+
+## License
+
+MIT
