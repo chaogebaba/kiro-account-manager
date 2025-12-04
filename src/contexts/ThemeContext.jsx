@@ -20,6 +20,9 @@ export const themes = {
     textMuted: 'text-gray-500',
     input: 'bg-white border-gray-200',
     inputFocus: 'focus:ring-blue-500/20 focus:border-blue-500',
+    // 登录按钮样式
+    loginBtn: 'bg-gray-100 hover:bg-gray-200 border-gray-300',
+    loginBtnIcon: '#1a1a1a',
   },
   dark: {
     name: '深色',
@@ -37,6 +40,9 @@ export const themes = {
     textMuted: 'text-gray-400',
     input: 'bg-[#252540] border-gray-700',
     inputFocus: 'focus:ring-blue-500/30 focus:border-blue-500',
+    // 登录按钮样式
+    loginBtn: 'bg-[#1a1a1a] hover:bg-[#252525] border-[#333]',
+    loginBtnIcon: 'white',
   },
   purple: {
     name: '紫色',
@@ -56,6 +62,9 @@ export const themes = {
     inputFocus: 'focus:ring-purple-500/30 focus:border-purple-500',
     accent: 'text-purple-600',
     accentBg: 'bg-purple-500',
+    // 登录按钮样式
+    loginBtn: 'bg-purple-100 hover:bg-purple-200 border-purple-300',
+    loginBtnIcon: '#6d28d9',
   },
   green: {
     name: '绿色',
@@ -75,6 +84,9 @@ export const themes = {
     inputFocus: 'focus:ring-emerald-500/30 focus:border-emerald-500',
     accent: 'text-emerald-600',
     accentBg: 'bg-emerald-500',
+    // 登录按钮样式
+    loginBtn: 'bg-emerald-100 hover:bg-emerald-200 border-emerald-300',
+    loginBtnIcon: '#047857',
   },
 }
 
