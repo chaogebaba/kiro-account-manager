@@ -44,6 +44,8 @@ jobs:
           $tauri | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json
           # 更新 Sidebar.jsx
           (Get-Content src/components/Sidebar.jsx) -replace "const VERSION = '.*'", "const VERSION = '$version'" | Set-Content src/components/Sidebar.jsx
+          # 更新 App.jsx
+          (Get-Content src/App.jsx) -replace "const CURRENT_VERSION = '.*'", "const CURRENT_VERSION = '$version'" | Set-Content src/App.jsx
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -109,6 +111,8 @@ jobs:
           sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
           # 更新 Sidebar.jsx
           sed -i '' "s/const VERSION = '.*'/const VERSION = '$VERSION'/" src/components/Sidebar.jsx
+          # 更新 App.jsx
+          sed -i '' "s/const CURRENT_VERSION = '.*'/const CURRENT_VERSION = '$VERSION'/" src/App.jsx
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
