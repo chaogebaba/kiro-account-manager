@@ -7,8 +7,8 @@ import { useTheme, themes } from '../contexts/ThemeContext'
 const menuItems = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'token', label: '账号管理', icon: Key },
-  { id: 'login', label: '登录', icon: LogIn },
-  { id: 'web-oauth', label: 'Web OAuth', icon: Globe },
+  { id: 'login', label: 'IdC 登录', icon: LogIn, desc: 'Builder ID / SSO' },
+  { id: 'web-oauth', label: 'Web 登录', icon: Globe, desc: 'Google / GitHub' },
   { id: 'settings', label: '设置', icon: Settings },
   { id: 'about', label: '关于', icon: Info },
 ]
@@ -58,7 +58,10 @@ function Sidebar({ activeMenu, onMenuChange, user }) {
               }`}
             >
               <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
-              <span className="text-sm">{item.label}</span>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm">{item.label}</span>
+                {item.desc && <p className={`text-xs ${colors.sidebarMuted} truncate`}>{item.desc}</p>}
+              </div>
             </button>
           )
         })}
