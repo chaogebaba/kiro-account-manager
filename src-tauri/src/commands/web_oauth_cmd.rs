@@ -29,8 +29,8 @@ pub async fn web_oauth_initiate(provider: String) -> Result<WebOAuthInitResponse
     println!("\n========== web_oauth_initiate START ==========");
     println!("Provider: {}", provider);
     
-    if provider != "Google" && provider != "GitHub" {
-        return Err(format!("Unsupported provider: {}. Use 'Google' or 'GitHub'", provider));
+    if provider != "Google" && provider != "GitHub" && provider != "BuilderId" {
+        return Err(format!("Unsupported provider: {}. Use 'Google', 'GitHub' or 'BuilderId'", provider));
     }
 
     let web_provider = WebOAuthProvider::new(&provider);
@@ -355,8 +355,8 @@ pub async fn web_oauth_login(
     println!("\n========== web_oauth_login START ==========");
     println!("Provider: {}", provider);
     
-    if provider != "Google" && provider != "GitHub" {
-        return Err(format!("Unsupported provider: {}. Use 'Google' or 'GitHub'", provider));
+    if provider != "Google" && provider != "GitHub" && provider != "BuilderId" {
+        return Err(format!("Unsupported provider: {}. Use 'Google', 'GitHub' or 'BuilderId'", provider));
     }
 
     // 1. 发起登录获取授权 URL

@@ -1,0 +1,12 @@
+h2 200
+date: Fri, 05 Dec 2025 10:42:18 GMT
+content-type: application/cbor
+content-length: 573
+x-amzn-requestid: 576a9b45-b64d-403e-aa08-f2f38a06b82f
+access-control-allow-origin: https://app.kiro.dev
+smithy-protocol: rpc-v2-cbor
+vary: Origin
+access-control-expose-headers: x-amzn-RequestId,x-amzn-ErrorType,x-amzn-ErrorMessage,Date,smithy-protocol
+access-control-allow-credentials: true
+
+¿kredirectUrly,https://oidc.us-east-1.amazonaws.com/authorize?response_type=code&redirect_uri=https%3A%2F%2Fapp.kiro.dev%2Fsignin%2Foauth&state=QUFBQURtdGxlUzB4TlRZNE9UVTFNekEzbGp3dkpPbk1Xc0d2RW9fRnhTdjltdXoxemU2Y0Rubk5vQ08xZ1paNFNaUUZhUFpocm9JMTlxSURyNXVOMjZGNk1BVmZFOHNCeHZ3ajk3Yld3NXkwazE0cTNaYlFVS2d0VzY2U0xMVzNwbHUwTlh4d3JuR1NVTV9QbmRkVG5KRmJTOEk2NDJTb3dESTFWQUY0dGoxN05ib2FOSWtkeFRvcmtKc2YwVGs1THhlVWlRdjl5TllqV3hybkhnUThsNkhKVGFuOGU3T2k4b1otMGZtRDZMck5XbWxD&client_id=arn%3Aaws%3Asso%3A%3A432677196278%3Aapplication%2Fssoins-7223047e142125f4%2Fapl-e595db3280d78b63ÿ
