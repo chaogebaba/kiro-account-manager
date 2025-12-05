@@ -59,24 +59,21 @@ async fn login_social(
     
     let auth_result = social_provider.login().await?;
 
-    let usage = get_usage_limits_desktop(&auth_result.access_token).await.ok();
+    let usage = get_usage_limits_desktop(&auth_result.access_token).await?;
 
-    let email = usage.as_ref()
-        .and_then(|u| u.user_info.as_ref())
+    let email = usage.user_info.as_ref()
         .and_then(|ui| ui.email.clone())
-        .unwrap_or_else(|| format!("user@{}.com", provider_id.to_lowercase()));
-    let user_id = usage.as_ref()
-        .and_then(|u| u.user_info.as_ref())
+        .ok_or("No email in GetUsageLimits response")?;
+    let user_id = usage.user_info.as_ref()
         .and_then(|ui| ui.user_id.clone());
-    let subscription_type = usage.as_ref()
-        .and_then(|u| u.subscription_info.as_ref())
+    let subscription_type = usage.subscription_info.as_ref()
         .and_then(|si| si.subscription_type.clone());
 
-    let (quota, used) = usage.as_ref()
-        .and_then(|u| u.usage_breakdown_list.as_ref())
+    let breakdown = usage.usage_breakdown_list.as_ref()
         .and_then(|list| list.first())
-        .map(|b| (b.usage_limit.unwrap_or(50), b.current_usage.unwrap_or(0)))
-        .unwrap_or((50, 0));
+        .ok_or("No usage_breakdown_list in GetUsageLimits response")?;
+    let quota = breakdown.usage_limit.ok_or("No usage_limit in response")?;
+    let used = breakdown.current_usage.unwrap_or(0);
 
     let (mut token, _is_new) = state.store.lock().unwrap().add_with_tokens(
         email.clone(),
@@ -93,7 +90,7 @@ async fn login_social(
     token.expires_at = Some(auth_result.expires_at.clone());
     token.profile_arn = auth_result.profile_arn;
     token.csrf_token = auth_result.csrf_token;
-    extract_usage_fields(&mut token, &usage);
+    extract_usage_fields(&mut token, &Some(usage));
 
     {
         let mut store = state.store.lock().unwrap();

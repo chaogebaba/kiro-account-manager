@@ -17,8 +17,8 @@ Kiro 桌面端支持通过第三方社交账号登录。
 
 ```
 1. Desktop Auth API 登录 → 获取 accessToken, refreshToken, csrfToken
-2. Desktop API 获取配额 → 获取 usageBreakdownList, bonuses 等
-3. Desktop Auth API 刷新 → 获取新的 accessToken, refreshToken, csrfToken
+2. Desktop Auth API 刷新 → 获取新的 accessToken, refreshToken, csrfToken
+3. Desktop API 获取配额 → 获取 usageBreakdownList, bonuses 等
 4. Web Portal API 兑换 → 使用 csrfToken 兑换奖励码
 ```
 
@@ -75,36 +75,7 @@ Content-Type: application/json
 
 ---
 
-## 3. POST /refreshToken - 刷新 Token
-
-**端点**: `https://prod.us-east-1.auth.desktop.kiro.dev/refreshToken`
-
-**请求头**:
-```
-Content-Type: application/json
-```
-
-**请求体**:
-```json
-{
-  "refreshToken": "string"
-}
-```
-
-**响应**:
-```json
-{
-  "accessToken": "string",
-  "refreshToken": "string",
-  "profileArn": "string | null",
-  "expiresIn": 3600,
-  "csrfToken": "string | null"
-}
-```
-
----
-
-## 4. GET /getUsageLimits - 获取配额
+## 3. GET /getUsageLimits - 获取配额 (可选)
 
 **端点**: `https://codewhisperer.us-east-1.amazonaws.com/getUsageLimits`
 
@@ -170,6 +141,35 @@ Accept: application/json
     "email": "user@gmail.com",
     "userId": "d-xxx.xxx-xxx-xxx"
   }
+}
+```
+
+---
+
+## 4. POST /refreshToken - 刷新 Token
+
+**端点**: `https://prod.us-east-1.auth.desktop.kiro.dev/refreshToken`
+
+**请求头**:
+```
+Content-Type: application/json
+```
+
+**请求体**:
+```json
+{
+  "refreshToken": "string"
+}
+```
+
+**响应**:
+```json
+{
+  "accessToken": "string",
+  "refreshToken": "string",
+  "profileArn": "string | null",
+  "expiresIn": 3600,
+  "csrfToken": "string | null"
 }
 ```
 

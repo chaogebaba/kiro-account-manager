@@ -1,0 +1,20 @@
+POST /log h2
+host: log.sso-portal.us-east-1.amazonaws.com
+content-length: 316
+sec-ch-ua-platform: "Windows"
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0 80592
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+dnt: 1
+content-type: application/json
+sec-ch-ua-mobile: ?0
+accept: */*
+origin: https://view.awsapps.com
+sec-fetch-site: cross-site
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://view.awsapps.com/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+priority: u=1, i
+
+{"user-event":{"eventType":"federation","eventContext":"sp-init-oidc-federation","userId":"NDMyNjc3MTk2Mjc4L2QtOTA2NzY0MmFjNy81NGE4YjRlOC0zMDcxLTcwNTEtOGQ3MC1mYmM3Njg4YzM5NDI=","variant":"sono-356dbde54ba21c6b393ea0971f847c552b24dbdaf27373e24eb11a02f2778ba8","directoryId":"d-9067642ac7","accountId":"432677196278"}}

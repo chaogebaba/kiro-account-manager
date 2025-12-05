@@ -117,74 +117,61 @@ pub async fn web_oauth_complete(
         &init_result.state,
     ).await?;
 
-    // 立即刷新一次 token，验证 csrfToken 可用并获取最新 token
     let csrf_token = auth_result.csrf_token.as_ref()
         .ok_or("No csrf_token from ExchangeToken")?;
     let session_token = auth_result.session_token.as_ref()
         .ok_or("No session_token from ExchangeToken")?;
-    let refresh_result = web_provider.refresh_token_impl(
+
+    // 1. GetUserInfo - 获取 email, userId
+    let portal_client = crate::providers::web_oauth::KiroWebPortalClient::new();
+    let user_info = portal_client.get_user_info(
         &auth_result.access_token,
         csrf_token,
         session_token,
-    ).await?;
-    
-    println!("[WebOAuth] RefreshToken after login: {}", serde_json::json!({
-        "success": true,
-        "newCsrfToken": refresh_result.csrf_token
-    }));
-
-    // 用刷新后的 token 获取用户配额信息 (使用 KiroWebPortalService)
-    let portal_client = crate::providers::web_oauth::KiroWebPortalClient::new();
-    let usage = portal_client.get_user_usage_and_limits(
-        &refresh_result.access_token,
-        refresh_result.csrf_token.as_deref().unwrap_or(""),
-        session_token,
         &init_result.idp,
-    ).await.ok();
-
-    if let Some(ref u) = usage {
-        println!("[WebOAuth] GetUserUsageAndLimits Response: {}", serde_json::to_string_pretty(u).unwrap_or_default());
-    } else {
-        println!("[WebOAuth] GetUserUsageAndLimits: null");
-    }
+    ).await?;
 
     let provider = &init_result.provider_id;
-    let email = usage.as_ref()
-        .and_then(|u| u.user_info.as_ref())
-        .and_then(|ui| ui.email.clone())
-        .unwrap_or_else(|| format!("user@{}.com", provider.to_lowercase()));
-    let user_id = usage.as_ref()
-        .and_then(|u| u.user_info.as_ref())
-        .and_then(|ui| ui.user_id.clone());
-    let subscription_type = usage.as_ref()
-        .and_then(|u| u.subscription_info.as_ref())
+    let email = user_info.email.clone()
+        .ok_or("No email in GetUserInfo response")?;
+    let user_id = user_info.user_id.clone();
+
+    // 2. GetUserUsageAndLimits - 获取配额信息
+    let usage = portal_client.get_user_usage_and_limits(
+        &auth_result.access_token,
+        csrf_token,
+        session_token,
+        &init_result.idp,
+    ).await?;
+
+    let subscription_type = usage.subscription_info.as_ref()
         .and_then(|si| si.subscription_type.clone());
 
-    let (quota, used) = usage.as_ref()
-        .and_then(|u| u.usage_breakdown_list.as_ref())
+    let breakdown = usage.usage_breakdown_list.as_ref()
         .and_then(|list| list.first())
-        .map(|b| (b.usage_limit.unwrap_or(50), b.current_usage.unwrap_or(0)))
-        .unwrap_or((50, 0));
+        .ok_or("No usage_breakdown_list in GetUserUsageAndLimits response")?;
+    let quota = breakdown.usage_limit.ok_or("No usage_limit in response")?;
+    let used = breakdown.current_usage.unwrap_or(0);
 
-    // 保存 Token（使用刷新后的 token）
+    // 保存 Token
     let (mut token, _is_new) = state.store.lock().unwrap().add_with_tokens(
         email.clone(),
         format!("Kiro {} (Web OAuth)", provider),
         quota,
-        refresh_result.access_token.clone(),
-        refresh_result.refresh_token.clone(),
+        auth_result.access_token.clone(),
+        auth_result.refresh_token.clone(),
         provider.clone(),
         user_id,
         subscription_type,
     );
 
     token.used = used;
-    token.expires_at = Some(refresh_result.expires_at.clone());
+    token.expires_at = Some(auth_result.expires_at.clone());
     token.profile_arn = auth_result.profile_arn.clone();
-    token.csrf_token = refresh_result.csrf_token;
-    token.session_token = auth_result.session_token.clone();  // 保存 SessionToken
+    token.csrf_token = auth_result.csrf_token.clone();
+    token.session_token = auth_result.session_token.clone();
     token.auth_method = Some("web_oauth".to_string());
-    extract_usage_fields_web_portal(&mut token, &usage);
+    extract_usage_fields_web_portal(&mut token, &Some(usage));
 
     {
         let mut store = state.store.lock().unwrap();
@@ -320,7 +307,7 @@ fn extract_usage_fields_web_portal(
         }
         token.days_until_reset = u.days_until_reset;
         if let Some(reset_ts) = u.next_date_reset {
-            if let Some(dt) = chrono::DateTime::from_timestamp(reset_ts, 0) {
+            if let Some(dt) = chrono::DateTime::from_timestamp(reset_ts as i64, 0) {
                 token.reset_date = Some(dt.format("%Y/%m/%d").to_string());
             }
         }
@@ -336,7 +323,7 @@ fn extract_usage_fields_web_portal(
                         token.free_trial_quota = ft.usage_limit;
                         token.free_trial_used = ft.current_usage;
                         if let Some(exp_ts) = ft.free_trial_expiry {
-                            if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts, 0) {
+                            if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts as i64, 0) {
                                 token.free_trial_expiry = Some(dt.format("%Y/%m/%d").to_string());
                             }
                         }
@@ -352,7 +339,7 @@ fn extract_usage_fields_web_portal(
                         token.bonus_name = first.display_name.clone();
                         token.bonus_status = first.status.clone();
                         if let Some(exp_ts) = first.expires_at {
-                            if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts, 0) {
+                            if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts as i64, 0) {
                                 token.bonus_expiry = Some(dt.format("%Y/%m/%d").to_string());
                             }
                         }
@@ -364,7 +351,7 @@ fn extract_usage_fields_web_portal(
                         usage_limit: b.usage_limit,
                         current_usage: b.current_usage,
                         expires_at: b.expires_at.map(|ts| {
-                            chrono::DateTime::from_timestamp(ts, 0)
+                            chrono::DateTime::from_timestamp(ts as i64, 0)
                                 .map(|dt| dt.format("%Y/%m/%d %H:%M").to_string())
                                 .unwrap_or_default()
                         }),

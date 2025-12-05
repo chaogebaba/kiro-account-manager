@@ -1,0 +1,21 @@
+h2 200
+date: Fri, 05 Dec 2025 19:02:13 GMT
+content-type: application/json
+content-length: 652
+x-amzn-requestid: X-Amzn-Trace-Id=Root=1-69332c35-1d21d1de2a04a6797fe5bdf2;RequestId=a79b7079-6d1b-4922-903f-a1fc199372bd
+set-cookie: aws-ubid-main=183-7700225-2515580; Domain=.amazon.com; Max-Age=31536000; Path=/; Secure; HttpOnly; SameSite=None
+x-frame-options: DENY
+x-ua-compatible: IE=Edge
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+cache-control: no-cache, no-store, must-revalidate
+pragma: no-cache
+expires: Thu, 01 Jan 1970 00:00:00 GMT
+content-security-policy: default-src 'none' https://*.monitoring.iam.signin.aws https://aws.amazon.com https://*.signin.aws.amazon.com https://signin.aws.amazon.com https://*.analytics.console.aws.a2z.com https://*.feedback.console.aws.dev 'nonce-SdKh0SP60IYQEaWnHOb37Q=='; script-src 'self' https://aws.amazon.com https://*.signin.aws.amazon.com https://signin.aws.amazon.com https://d1dgtfo2wk29o4.cloudfront.net/fwcim.js https://m.media-amazon.com https://l0.awsstatic.com https://images-na.ssl-images-amazon.com 'report-sample' https://cdn.us-east-1.threat-mitigation.aws.amazon.com https://a0.awsstatic.com/s_code/js/3.0/awshome_s_code_registration.min.js 'nonce-SdKh0SP60IYQEaWnHOb37Q=='; style-src 'self' https://aws.amazon.com https://*.signin.aws.amazon.com https://signin.aws.amazon.com https://aws-signin-website-assets.s3.amazonaws.com https://l0.awsstatic.com https://images-na.ssl-images-amazon.com 'unsafe-inline'; font-src data: 'self';; img-src 'self' data: https://*.signin.aws.amazon.com https://signin.aws.amazon.com https://opfcaptcha-prod.s3.amazonaws.com https://amcs-captcha-prod-us-east-1.s3.dualstack.us-east-1.amazonaws.com https://amcs-captcha-prod-us-east-1.s3.us-east-1.amazonaws.com https://images-na.ssl-images-amazon.com https://d1.awsstatic.com https://internal-cdn.amazon.com https://media.amazonwebservices.com https://d36cz9buwru1tt.cloudfront.net https://d0.awsstatic.com; media-src 'self' https://*.signin.aws.amazon.com https://signin.aws.amazon.com https://media.amazonwebservices.com https://d36cz9buwru1tt.cloudfront.net https://opfcaptcha-prod.s3.amazonaws.com https://amcs-captcha-prod-us-east-1.s3.dualstack.us-east-1.amazonaws.com https://amcs-captcha-prod-us-east-1.s3.us-east-1.amazonaws.com; frame-src 'self' https://aws.amazon.com https://*.signin.aws.amazon.com https://signin.aws.amazon.com https://*.analytics.console.aws.a2z.com https://cdn.us-east-1.threat-mitigation.aws.amazon.com; report-uri /metrics/cspreport; base-uri 'none'; upgrade-insecure-requests;
+accept-ranges: bytes
+etag: W/"652-1764221596000"
+last-modified: Thu, 27 Nov 2025 05:33:16 GMT
+server: Server
+
+{"header":"Username: <br />{{username}}","headerFriendlyEmailOTP":"We sent an email with a verification code to {{username}}","headerSonoEmailOTP":"We sent an email with a verification code to {{username}}","headerFriendlyPassword":"Email address <br /> {{username}} </b>","headerSonoPassword":"Username: <br />{{username}}","headerSonovMFA":"Security is critical, so we hope you don't mind. <br /><br /> Our systems indicate multi-factor <br /> authentication (MFA) is used to protect <br /> {{username}}","leftParanthesis":" (","notYou":"not you?","rightParanthesis":")","builderIdChangeEmail":"Change","builderIdChangeEmailAriaLabel":"Change email"}

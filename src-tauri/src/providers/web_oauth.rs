@@ -165,7 +165,7 @@ pub struct FreeTrialInfo {
     #[serde(rename = "currentUsage")]
     pub current_usage: Option<i32>,
     #[serde(rename = "freeTrialExpiry")]
-    pub free_trial_expiry: Option<i64>,
+    pub free_trial_expiry: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -179,7 +179,7 @@ pub struct BonusInfo {
     #[serde(rename = "currentUsage")]
     pub current_usage: Option<f64>,
     #[serde(rename = "expiresAt")]
-    pub expires_at: Option<i64>,
+    pub expires_at: Option<f64>,
     pub status: Option<String>,
 }
 
@@ -201,7 +201,7 @@ pub struct GetUserUsageAndLimitsResponse {
     #[serde(rename = "daysUntilReset")]
     pub days_until_reset: Option<i32>,
     #[serde(rename = "nextDateReset")]
-    pub next_date_reset: Option<i64>,
+    pub next_date_reset: Option<f64>,
     #[serde(rename = "userInfo")]
     pub user_info: Option<GetUserInfoResponse>,
 }
@@ -436,6 +436,75 @@ impl KiroWebPortalClient {
 
         println!("[WebOAuth] RefreshToken Status: {} ({} bytes)", status, bytes.len());
         cbor_decode(&bytes)
+    }
+
+    /// 调用 GetUserInfo 接口 (KiroWebPortalService)
+    /// 使用 Cookie 认证: AccessToken, SessionToken, Idp
+    pub async fn get_user_info(
+        &self,
+        access_token: &str,
+        csrf_token: &str,
+        session_token: &str,
+        idp: &str,
+    ) -> Result<GetUserInfoResponse, String> {
+        let url = format!(
+            "{}/service/KiroWebPortalService/operation/GetUserInfo",
+            self.endpoint
+        );
+
+        #[derive(Serialize)]
+        struct GetUserInfoRequest {
+            origin: String,
+        }
+
+        let request = GetUserInfoRequest {
+            origin: "KIRO_IDE".to_string(),
+        };
+
+        let body = cbor_encode(&request)?;
+        let cookie = format!("AccessToken={}; SessionToken={}; Idp={}", access_token, session_token, idp);
+
+        println!("[WebOAuth] GetUserInfo Request: {}", serde_json::json!({
+            "url": url,
+            "idp": idp
+        }));
+
+        let response = self.client
+            .post(&url)
+            .header("Content-Type", "application/cbor")
+            .header("Accept", "application/cbor")
+            .header("smithy-protocol", "rpc-v2-cbor")
+            .header("authorization", format!("Bearer {}", access_token))
+            .header("x-csrf-token", csrf_token)
+            .header("Cookie", cookie)
+            .body(body)
+            .send()
+            .await
+            .map_err(|e| format!("GetUserInfo request failed: {}", e))?;
+
+        let status = response.status();
+        let bytes = response.bytes().await
+            .map_err(|e| format!("Failed to read response: {}", e))?;
+
+        if !status.is_success() {
+            let error_msg = if let Ok(error) = cbor_decode::<serde_json::Value>(&bytes) {
+                serde_json::to_string(&error).unwrap_or_default()
+            } else {
+                String::from_utf8_lossy(&bytes).to_string()
+            };
+            println!("[WebOAuth] GetUserInfo Error: {}", serde_json::json!({"status": status.to_string(), "error": error_msg}));
+            return Err(format!("GetUserInfo failed ({}): {}", status, error_msg));
+        }
+
+        println!("[WebOAuth] GetUserInfo Status: {} ({} bytes)", status, bytes.len());
+        let resp: GetUserInfoResponse = cbor_decode(&bytes)?;
+        println!("[WebOAuth] GetUserInfo Response: {}", serde_json::json!({
+            "email": resp.email,
+            "userId": resp.user_id,
+            "idp": resp.idp,
+            "status": resp.status
+        }));
+        Ok(resp)
     }
 
     /// 调用 GetUserUsageAndLimits 接口 (KiroWebPortalService)

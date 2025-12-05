@@ -1,0 +1,14 @@
+h2 304
+date: Fri, 05 Dec 2025 16:09:51 GMT
+last-modified: Wed, 19 Nov 2025 17:31:40 GMT
+etag: W/"ea5ca649756a03eb6a87d51036f90136"
+x-amz-server-side-encryption: AES256
+cache-control: max-age=900
+server: AmazonS3
+vary: Accept-Encoding
+x-cache: Hit from cloudfront
+via: 1.1 6cf45c264be57f5ba791594592c4a026.cloudfront.net (CloudFront)
+x-amz-cf-pop: BOM78-P3
+x-amz-cf-id: jbUnj-Ju6JiHvwv3nHXgYhmbi6SrQbq54VPZ2brIsBYJPRwsvw9cEA==
+age: 10335
+

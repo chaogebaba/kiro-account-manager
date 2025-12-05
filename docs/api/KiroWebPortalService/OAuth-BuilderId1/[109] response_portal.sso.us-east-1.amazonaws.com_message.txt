@@ -1,0 +1,14 @@
+h2 200
+date: Fri, 05 Dec 2025 19:02:32 GMT
+content-type: application/json
+content-length: 453
+access-control-allow-credentials: true
+access-control-allow-origin: https://view.awsapps.com
+access-control-expose-headers: RequestId
+access-control-expose-headers: x-amzn-RequestId
+cache-control: no-cache
+requestid: f64d31e8-ff5e-4c2d-8be5-dd5a5b8532d7
+server: AWS SSO
+x-amzn-requestid: f64d31e8-ff5e-4c2d-8be5-dd5a5b8532d7
+
+{"userIdentifier":"NDMyNjc3MTk2Mjc4L2QtOTA2NzY0MmFjNy81NGE4YjRlOC0zMDcxLTcwNTEtOGQ3MC1mYmM3Njg4YzM5NDI=","token":null,"createDate":1764961350000,"tokenType":"NATIVE","expireDate":1767553347000,"accountId":"432677196278","directoryId":"d-9067642ac7","authenticationType":"NATIVE","identityStoreUserId":"54a8b4e8-3071-7051-8d70-fbc7688c3942","originSessionId":"75732d656173742d312d41aaf8bb7c08fb1f6ed641364eced704","legacyAccessPortalEndpointStatus":null}

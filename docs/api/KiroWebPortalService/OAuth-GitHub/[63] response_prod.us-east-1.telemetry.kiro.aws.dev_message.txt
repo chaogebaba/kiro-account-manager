@@ -1,9 +1,0 @@
-h2 200
-date: Sun, 30 Nov 2025 16:53:25 GMT
-content-type: application/json
-content-length: 21
-access-control-allow-credentials: true
-access-control-allow-origin: https://app.kiro.dev
-vary: Origin
-
-{"partialSuccess":{}}
