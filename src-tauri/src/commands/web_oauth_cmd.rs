@@ -388,6 +388,7 @@ pub async fn web_oauth_login(
     .title(format!("Login with {}", provider))
     .inner_size(500.0, 700.0)
     .center()
+    .incognito(true)  // 隐私模式：不保留 Cookie，每次都是全新登录
     .on_navigation(move |url| {
         let url_str = url.as_str();
         println!("[WebView] Navigation: {}", url_str);
