@@ -18,6 +18,7 @@ function TokenManager() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState('')
+  const [addType, setAddType] = useState('social')
   const [autoRefreshing, setAutoRefreshing] = useState(false)
   const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0, currentEmail: '', results: [] })
   const [lastRefreshTime, setLastRefreshTime] = useState(null)
@@ -335,12 +336,7 @@ function TokenManager() {
                 onClick={async () => {
                   setAddLoading(true); setAddError('')
                   try {
-                    const localToken = await invoke('get_kiro_local_token')
-                    if (!localToken?.refreshToken) {
-                      setAddError('未找到本地 Kiro 账号，请先在 Kiro IDE 中登录')
-                      return
-                    }
-                    await invoke('add_token_by_refresh', { refreshToken: localToken.refreshToken })
+                    await invoke('add_local_kiro_account')
                     loadTokens()
                     setShowAddModal(false)
                   } catch (e) { setAddError(e.toString()) }
@@ -360,23 +356,36 @@ function TokenManager() {
                 <div className={`flex-1 h-px ${colors.cardBorder}`}></div>
               </div>
               
-              {/* 手动输入 Token */}
+              {/* 账号类型切换 */}
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setAddType('social')} className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${addType === 'social' ? 'bg-blue-500 text-white' : `${colors.loginBtn} ${colors.text}`}`}>Social</button>
+                <button type="button" onClick={() => setAddType('idc')} className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${addType === 'idc' ? 'bg-blue-500 text-white' : `${colors.loginBtn} ${colors.text}`}`}>BuilderId</button>
+              </div>
+              
+              {/* 手动输入表单 */}
               <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Refresh Token (aor 开头)"
-                  id="manual-account-input"
-                  className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${colors.input} focus:outline-none focus:ring-2 ${colors.inputFocus}`}
-                />
+                <input type="text" placeholder="Refresh Token (aor 开头)" id="manual-refresh-token" className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${colors.input} focus:outline-none focus:ring-2 ${colors.inputFocus}`} />
+                {addType === 'idc' && (
+                  <>
+                    <input type="text" placeholder="Client ID" id="manual-client-id" className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${colors.input} focus:outline-none focus:ring-2 ${colors.inputFocus}`} />
+                    <input type="text" placeholder="Client Secret" id="manual-client-secret" className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${colors.input} focus:outline-none focus:ring-2 ${colors.inputFocus}`} />
+                  </>
+                )}
                 <button
                   onClick={async () => {
-                    const tokenInput = document.getElementById('manual-account-input')
-                    const token = tokenInput?.value?.trim()
-                    if (!token) { setAddError('请输入 Refresh Token'); return }
-                    if (!token.startsWith('aor')) { setAddError('Token 格式错误，应以 aor 开头'); return }
+                    const refreshToken = document.getElementById('manual-refresh-token')?.value?.trim()
+                    if (!refreshToken) { setAddError('请输入 Refresh Token'); return }
+                    if (!refreshToken.startsWith('aor')) { setAddError('Token 格式错误，应以 aor 开头'); return }
                     setAddLoading(true); setAddError('')
                     try {
-                      await invoke('add_token_by_refresh', { refreshToken: token })
+                      if (addType === 'idc') {
+                        const clientId = document.getElementById('manual-client-id')?.value?.trim()
+                        const clientSecret = document.getElementById('manual-client-secret')?.value?.trim()
+                        if (!clientId || !clientSecret) { setAddError('请输入 Client ID 和 Client Secret'); setAddLoading(false); return }
+                        await invoke('add_account_by_idc', { refreshToken, clientId, clientSecret })
+                      } else {
+                        await invoke('add_account_by_social', { refreshToken })
+                      }
                       loadTokens()
                       setShowAddModal(false)
                     } catch (e) { setAddError(e.toString()) }
@@ -389,7 +398,7 @@ function TokenManager() {
                 </button>
               </div>
               
-              {addError && <div className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-xl text-center">{addError}</div>}
+              {addError && <div className={`text-sm text-red-500 ${isDark ? 'bg-red-500/20' : 'bg-red-50'} px-3 py-2 rounded-xl text-center`}>{addError}</div>}
             </div>
           </div>
         </div>

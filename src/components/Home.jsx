@@ -146,12 +146,29 @@ function Home({ onNavigate }) {
                         {localToken.refreshToken?.substring(0, 20)}...
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className={colors.textMuted}>Profile ARN</span>
-                      <span title={localToken.profileArn} className={`font-mono text-xs ${colors.textMuted} truncate max-w-[180px] cursor-help`}>
-                        {localToken.profileArn || '-'}
-                      </span>
-                    </div>
+                    {localToken.authMethod === 'IdC' ? (
+                      <>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className={colors.textMuted}>Client ID Hash</span>
+                          <span title={localToken.clientIdHash} className={`font-mono text-xs ${colors.textMuted} truncate max-w-[180px] cursor-help`}>
+                            {localToken.clientIdHash || '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className={colors.textMuted}>Region</span>
+                          <span className={`font-mono text-xs ${colors.textMuted}`}>
+                            {localToken.region || '-'}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className={colors.textMuted}>Profile ARN</span>
+                        <span title={localToken.profileArn} className={`font-mono text-xs ${colors.textMuted} truncate max-w-[180px] cursor-help`}>
+                          {localToken.profileArn || '-'}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-sm">
                       <span className={colors.textMuted}>过期时间</span>
                       <span className={`${colors.text} flex items-center gap-1`}>

@@ -10,10 +10,23 @@ use rusqlite::{Connection, OpenFlags};
 pub struct KiroLocalToken {
     pub access_token: Option<String>,
     pub refresh_token: Option<String>,
-    pub profile_arn: Option<String>,
     pub expires_at: Option<String>,
     pub auth_method: Option<String>,
     pub provider: Option<String>,
+    // Social 专用
+    pub profile_arn: Option<String>,
+    // IdC 专用
+    pub client_id_hash: Option<String>,
+    pub region: Option<String>,
+}
+
+/// IdC 客户端注册信息 (从 {clientIdHash}.json 读取)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientRegistration {
+    pub client_id: String,
+    pub client_secret: String,
+    pub expires_at: Option<String>,
 }
 
 #[tauri::command]
@@ -26,6 +39,21 @@ pub fn get_kiro_local_token() -> Option<KiroLocalToken> {
         .join("sso")
         .join("cache")
         .join("kiro-auth-token.json");
+    
+    let content = std::fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+/// 读取 IdC 客户端注册信息
+pub fn get_client_registration(client_id_hash: &str) -> Option<ClientRegistration> {
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .ok()?;
+    let path = std::path::Path::new(&home)
+        .join(".aws")
+        .join("sso")
+        .join("cache")
+        .join(format!("{}.json", client_id_hash));
     
     let content = std::fs::read_to_string(&path).ok()?;
     serde_json::from_str(&content).ok()
@@ -125,20 +153,45 @@ pub struct SwitchAccountResult {
     pub kiro_restarted: bool,
 }
 
+/// 切换账号参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwitchAccountParams {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub provider: String,
+    #[serde(default)]
+    pub auth_method: Option<String>,
+    // Social 专用
+    #[serde(default)]
+    pub profile_arn: Option<String>,
+    // IdC 专用
+    #[serde(default)]
+    pub client_id_hash: Option<String>,
+    #[serde(default)]
+    pub region: Option<String>,
+    // 选项
+    #[serde(default)]
+    pub reset_machine_id: Option<bool>,
+    #[serde(default)]
+    pub auto_restart: Option<bool>,
+}
+
 /// 切换 Kiro 账号（完整流程：关闭IDE → 重置机器ID → 替换Token → 启动IDE）
 #[tauri::command]
-pub async fn switch_kiro_account(
-    access_token: String,
-    refresh_token: String,
-    provider: String,
-    reset_machine_id: Option<bool>,
-    auto_restart: Option<bool>,
-) -> Result<SwitchAccountResult, String> {
+pub async fn switch_kiro_account(params: SwitchAccountParams) -> Result<SwitchAccountResult, String> {
     // 使用 spawn_blocking 避免阻塞异步运行时
     tokio::task::spawn_blocking(move || {
         let kiro_was_running = check_kiro_running();
-        let should_reset = reset_machine_id.unwrap_or(false);
-        let should_restart = auto_restart.unwrap_or(true);
+        let should_reset = params.reset_machine_id.unwrap_or(false);
+        let should_restart = params.auto_restart.unwrap_or(true);
+        let auth_method = params.auth_method.unwrap_or_else(|| "social".to_string());
+        let access_token = params.access_token;
+        let refresh_token = params.refresh_token;
+        let provider = params.provider;
+        let profile_arn = params.profile_arn;
+        let client_id_hash = params.client_id_hash;
+        let region = params.region;
         
         // 1. 如果 Kiro 正在运行，先关闭
         if kiro_was_running {
@@ -168,14 +221,38 @@ pub async fn switch_kiro_account(
         let file_path = dir_path.join("kiro-auth-token.json");
         
         let expires_at = chrono::Utc::now() + chrono::Duration::hours(1);
-        let token_data = serde_json::json!({
-            "accessToken": access_token,
-            "refreshToken": refresh_token,
-            "profileArn": "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK",
-            "expiresAt": expires_at.to_rfc3339(),
-            "authMethod": "social",
-            "provider": provider
-        });
+        
+        // 根据 auth_method 构建不同的 token 数据
+        let token_data = if auth_method == "IdC" {
+            // IdC 账号: clientIdHash + region
+            let mut data = serde_json::json!({
+                "accessToken": access_token,
+                "refreshToken": refresh_token,
+                "expiresAt": expires_at.to_rfc3339(),
+                "authMethod": "IdC",
+                "provider": provider
+            });
+            if let Some(hash) = client_id_hash {
+                data["clientIdHash"] = serde_json::json!(hash);
+            }
+            if let Some(r) = region {
+                data["region"] = serde_json::json!(r);
+            }
+            data
+        } else {
+            // Social 账号: profileArn
+            let arn = profile_arn.unwrap_or_else(|| 
+                "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK".to_string()
+            );
+            serde_json::json!({
+                "accessToken": access_token,
+                "refreshToken": refresh_token,
+                "profileArn": arn,
+                "expiresAt": expires_at.to_rfc3339(),
+                "authMethod": "social",
+                "provider": provider
+            })
+        };
         
         let content = serde_json::to_string_pretty(&token_data)
             .map_err(|e| format!("Failed to serialize: {}", e))?;
@@ -192,7 +269,7 @@ pub async fn switch_kiro_account(
         
         Ok(SwitchAccountResult {
             success: true,
-            message: format!("Switched to {} account", provider),
+            message: format!("Switched to {} ({}) account", provider, auth_method),
             kiro_was_running,
             kiro_restarted,
         })

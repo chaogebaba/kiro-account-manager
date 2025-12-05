@@ -43,7 +43,9 @@ fn main() {
             delete_tokens,
             refresh_token_from_api,
             verify_token,
-            add_token_by_refresh,
+            add_account_by_social,
+            add_local_kiro_account,
+            add_account_by_idc,
 
             import_tokens,
             export_tokens,

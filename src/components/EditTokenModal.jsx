@@ -289,6 +289,15 @@ function EditTokenModal({ token, onClose, onSuccess }) {
                           <Shield size={12} />
                           AWS SSO OIDC 凭证
                         </div>
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className={`text-xs ${colors.textMuted}`}>Client ID Hash</label>
+                            <button type="button" onClick={() => handleCopy(token.client_id_hash, 'client_id_hash')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                              {copied === 'client_id_hash' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                            </button>
+                          </div>
+                          <input type="text" value={token.client_id_hash || '-'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                        </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className={`block text-xs ${colors.textMuted} mb-1`}>Region</label>

@@ -116,18 +116,21 @@ pub struct Token {
     pub subscription_management_target: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overage_status: Option<String>,
-    // AWS SSO OIDC (BuilderId) 专用
+    // IdC (BuilderId/Enterprise) 专用
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_client_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_client_secret: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_region: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sso_session_id: Option<String>,
     // Social 登录专用
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile_arn: Option<String>,
+    // 认证方式: social / IdC
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth_method: Option<String>,
 }
 
 impl Token {
@@ -192,11 +195,12 @@ impl Token {
             currency: None,
             subscription_management_target: None,
             overage_status: None,
+            client_id_hash: None,
             sso_client_id: None,
             sso_client_secret: None,
             sso_region: None,
-            sso_session_id: None,
             profile_arn: None,
+            auth_method: None,
         }
     }
 }

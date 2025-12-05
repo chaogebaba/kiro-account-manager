@@ -433,7 +433,7 @@ pub async fn verify_token(
 }
 
 #[tauri::command]
-pub async fn add_token_by_refresh(
+pub async fn add_account_by_social(
     state: State<'_, AppState>,
     refresh_token: String,
     provider: Option<String>,
@@ -599,4 +599,200 @@ pub fn import_tokens(state: State<AppState>, tokens_json: String) -> Result<usiz
 #[tauri::command]
 pub fn export_tokens(state: State<AppState>) -> String {
     state.store.lock().unwrap().export_to_json()
+}
+
+/// 添加本地 Kiro IDE 账号（支持 Social 和 BuilderId）
+#[tauri::command]
+pub async fn add_local_kiro_account(state: State<'_, AppState>) -> Result<Token, String> {
+    use crate::kiro::{get_kiro_local_token, get_client_registration};
+    
+    let local_token = get_kiro_local_token()
+        .ok_or("未找到本地 Kiro 账号，请先在 Kiro IDE 中登录")?;
+    
+    let refresh_token = local_token.refresh_token
+        .ok_or("本地账号缺少 refresh_token")?;
+    
+    let auth_method = local_token.auth_method.as_deref().unwrap_or("social");
+    let provider = local_token.provider.clone().unwrap_or_else(|| "Google".to_string());
+    
+    let (access_token, new_refresh_token, expires_in, client_id, client_secret, client_id_hash, region) = 
+        if auth_method == "IdC" {
+            let hash = local_token.client_id_hash.clone()
+                .ok_or("IdC 账号缺少 clientIdHash")?;
+            let region = local_token.region.clone().unwrap_or_else(|| "us-east-1".to_string());
+            
+            let client_reg = get_client_registration(&hash)
+                .ok_or(format!("未找到客户端注册信息: {}.json", hash))?;
+            
+            let metadata = RefreshMetadata {
+                client_id: Some(client_reg.client_id.clone()),
+                client_secret: Some(client_reg.client_secret.clone()),
+                region: Some(region.clone()),
+                ..Default::default()
+            };
+            
+            let idc_provider = IdcProvider::new("BuilderId", &region, None);
+            let auth_result = idc_provider.refresh_token(&refresh_token, metadata).await?;
+            
+            (auth_result.access_token, auth_result.refresh_token, auth_result.expires_in,
+             Some(client_reg.client_id), Some(client_reg.client_secret), Some(hash), Some(region))
+        } else {
+            let metadata = RefreshMetadata {
+                profile_arn: local_token.profile_arn.clone(),
+                ..Default::default()
+            };
+            
+            let social_provider = SocialProvider::new(&provider);
+            let auth_result = social_provider.refresh_token(&refresh_token, metadata).await?;
+            
+            (auth_result.access_token, auth_result.refresh_token, auth_result.expires_in,
+             None, None, None, None)
+        };
+    
+    let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
+    let cw_client = CodeWhispererClient::new(machine_id);
+    let usage = cw_client.get_usage_limits(&access_token).await
+        .map_err(|e| format!("获取配额失败: {}", e))?;
+    
+    let email = usage.user_info.as_ref()
+        .and_then(|u| u.email.clone())
+        .unwrap_or_else(|| format!("{}@kiro.dev", provider.to_lowercase()));
+    
+    let breakdown = usage.usage_breakdown_list.as_ref().and_then(|list| list.first());
+    let quota = breakdown.and_then(|b| b.usage_limit).unwrap_or(50) as i32;
+    let used = breakdown.and_then(|b| b.current_usage).unwrap_or(0) as i32;
+    
+    let subscription_type = usage.subscription_info.as_ref()
+        .and_then(|s| s.subscription_title.clone());
+    let user_id = usage.user_info.as_ref()
+        .and_then(|u| u.user_id.clone());
+    
+    let (mut token, is_new) = state.store.lock().unwrap().add_with_tokens(
+        email.clone(),
+        format!("Kiro {} 账号", provider),
+        quota,
+        access_token,
+        new_refresh_token,
+        provider.clone(),
+        user_id,
+        subscription_type,
+    );
+    
+    if !is_new {
+        return Err(format!("账号 {} 已存在", email));
+    }
+    
+    {
+        let mut store = state.store.lock().unwrap();
+        if let Some(t) = store.tokens.iter_mut().find(|t| t.id == token.id) {
+            t.used = used;
+            t.auth_method = Some(auth_method.to_string());
+            t.client_id_hash = client_id_hash;
+            t.sso_client_id = client_id;
+            t.sso_client_secret = client_secret;
+            t.sso_region = region;
+            t.profile_arn = local_token.profile_arn;
+            
+            let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
+            t.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
+            
+            if let Some(ts) = usage.next_date_reset {
+                if let Some(dt) = chrono::DateTime::from_timestamp(ts as i64, 0) {
+                    t.reset_date = Some(dt.format("%Y/%m/%d").to_string());
+                    t.days_until_reset = usage.days_until_reset;
+                }
+            }
+            
+            token = t.clone();
+            store.save_to_file();
+        }
+    }
+    
+    Ok(token)
+}
+
+/// 手动添加 BuilderId 账号
+#[tauri::command]
+pub async fn add_account_by_idc(
+    state: State<'_, AppState>,
+    refresh_token: String,
+    client_id: String,
+    client_secret: String,
+    region: String,
+) -> Result<Token, String> {
+    let metadata = RefreshMetadata {
+        client_id: Some(client_id.clone()),
+        client_secret: Some(client_secret.clone()),
+        region: Some(region.clone()),
+        ..Default::default()
+    };
+    
+    let idc_provider = IdcProvider::new("BuilderId", &region, None);
+    let auth_result = idc_provider.refresh_token(&refresh_token, metadata).await?;
+    
+    let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
+    let cw_client = CodeWhispererClient::new(machine_id);
+    let usage = cw_client.get_usage_limits(&auth_result.access_token).await
+        .map_err(|e| format!("获取配额失败: {}", e))?;
+    
+    let email = usage.user_info.as_ref()
+        .and_then(|u| u.email.clone())
+        .unwrap_or_else(|| "builderid@kiro.dev".to_string());
+    
+    let breakdown = usage.usage_breakdown_list.as_ref().and_then(|list| list.first());
+    let quota = breakdown.and_then(|b| b.usage_limit).unwrap_or(50) as i32;
+    let used = breakdown.and_then(|b| b.current_usage).unwrap_or(0) as i32;
+    
+    let subscription_type = usage.subscription_info.as_ref()
+        .and_then(|s| s.subscription_title.clone());
+    let user_id = usage.user_info.as_ref()
+        .and_then(|u| u.user_id.clone());
+    
+    use sha2::{Digest, Sha256};
+    let start_url = "https://view.awsapps.com/start";
+    let mut hasher = Sha256::new();
+    hasher.update(start_url.as_bytes());
+    let client_id_hash = hex::encode(hasher.finalize());
+    
+    let (mut token, is_new) = state.store.lock().unwrap().add_with_tokens(
+        email.clone(),
+        "Kiro BuilderId 账号".to_string(),
+        quota,
+        auth_result.access_token,
+        auth_result.refresh_token,
+        "BuilderId".to_string(),
+        user_id,
+        subscription_type,
+    );
+    
+    if !is_new {
+        return Err(format!("账号 {} 已存在", email));
+    }
+    
+    {
+        let mut store = state.store.lock().unwrap();
+        if let Some(t) = store.tokens.iter_mut().find(|t| t.id == token.id) {
+            t.used = used;
+            t.auth_method = Some("IdC".to_string());
+            t.client_id_hash = Some(client_id_hash);
+            t.sso_client_id = Some(client_id);
+            t.sso_client_secret = Some(client_secret);
+            t.sso_region = Some(region);
+            
+            let expires_at = chrono::Local::now() + chrono::Duration::seconds(auth_result.expires_in);
+            t.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
+            
+            if let Some(ts) = usage.next_date_reset {
+                if let Some(dt) = chrono::DateTime::from_timestamp(ts as i64, 0) {
+                    t.reset_date = Some(dt.format("%Y/%m/%d").to_string());
+                    t.days_until_reset = usage.days_until_reset;
+                }
+            }
+            
+            token = t.clone();
+            store.save_to_file();
+        }
+    }
+    
+    Ok(token)
 }

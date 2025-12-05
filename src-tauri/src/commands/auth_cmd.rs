@@ -162,10 +162,12 @@ async fn login_idc(
 
     token.used = used;
     token.expires_at = Some(auth_result.expires_at.clone());
+    token.client_id_hash = auth_result.client_id_hash;
     token.sso_client_id = auth_result.client_id;
     token.sso_client_secret = auth_result.client_secret;
     token.sso_region = auth_result.region;
-    token.sso_session_id = auth_result.sso_session_id;
+    token.auth_method = Some(auth_result.auth_method.clone());
+    token.profile_arn = auth_result.profile_arn.clone();
     extract_usage_fields_cw(&mut token, &usage);
 
     {
