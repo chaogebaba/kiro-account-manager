@@ -50,7 +50,8 @@ jobs:
   sync-to-public:
     needs: release
     runs-on: ubuntu-latest
-    if: success()
+    if: always() && needs.release.result == 'success'
+    continue-on-error: true
     steps:
       - name: Wait for all builds
         run: sleep 60
@@ -60,7 +61,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p release_assets
-          gh release download ${{ github.ref_name }} --repo ${{ github.repository }} --dir release_assets
+          gh release download ${{ github.ref_name }} --repo ${{ github.repository }} --dir release_assets || true
 
       - name: Upload to public repo
         env:
@@ -70,4 +71,4 @@ jobs:
             --repo hj01857655/kiro-token-manager \
             --title "Kiro Token Manager ${{ github.ref_name }}" \
             --notes "请查看 CHANGELOG 了解更新内容。" \
-            release_assets/* || echo "Release may already exist"
+            release_assets/* || echo "Release may already exist or token not configured"
