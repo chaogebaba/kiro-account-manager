@@ -718,8 +718,9 @@ pub async fn add_account_by_idc(
     refresh_token: String,
     client_id: String,
     client_secret: String,
-    region: String,
+    region: Option<String>,
 ) -> Result<Token, String> {
+    let region = region.unwrap_or_else(|| "us-east-1".to_string());
     let metadata = RefreshMetadata {
         client_id: Some(client_id.clone()),
         client_secret: Some(client_secret.clone()),

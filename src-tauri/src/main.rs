@@ -4,33 +4,37 @@ mod auth;
 mod auth_social;
 mod aws_sso_client;
 mod codewhisperer_client;
-mod token;
+mod commands;
+mod kiro;
 mod kiro_auth_client;
 mod oauth_callback_server;
-mod providers;
-mod kiro;
 mod process;
+mod providers;
 mod state;
-mod commands;
+mod token;
 
-use std::sync::Mutex;
-use state::AppState;
-use token::TokenStore;
 use auth::AuthState;
+use state::AppState;
+use std::sync::Mutex;
+use token::TokenStore;
 
 // 导入命令
-use commands::token_cmd::*;
 use commands::auth_cmd::*;
 use commands::settings_cmd::*;
+use commands::token_cmd::*;
 use commands::web_oauth_cmd::*;
-use kiro::{get_kiro_local_token, get_kiro_telemetry_info, switch_kiro_account, reset_kiro_machine_id};
-use process::{close_kiro_ide, start_kiro_ide, is_kiro_ide_running};
+use kiro::{
+    get_kiro_local_token, get_kiro_telemetry_info, reset_kiro_machine_id, switch_kiro_account,
+};
+use process::{close_kiro_ide, is_kiro_ide_running, start_kiro_ide};
 
 fn main() {
     tauri::Builder::default()
-        .setup(|_app| {
-            Ok(())
-        })
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_opener::init())
+        .setup(|_app| Ok(()))
         .manage(AppState {
             store: Mutex::new(TokenStore::new()),
             auth: AuthState::new(),
@@ -47,10 +51,9 @@ fn main() {
             add_account_by_social,
             add_local_kiro_account,
             add_account_by_idc,
-
             import_tokens,
             export_tokens,
-            // Auth 命令 (当前使用)
+            // Auth 命令
             get_current_user,
             logout,
             kiro_login,

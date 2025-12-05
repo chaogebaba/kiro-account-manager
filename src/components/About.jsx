@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Github, Heart, Coffee, ExternalLink, Sparkles, Code2, Palette, Cpu, RefreshCw } from 'lucide-react'
-import { open } from '@tauri-apps/api/shell'
+import { open } from '@tauri-apps/plugin-shell'
 import { getVersion } from '@tauri-apps/api/app'
 import { useTheme } from '../contexts/ThemeContext'
 

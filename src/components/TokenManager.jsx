@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { Search, Download, RefreshCw, Edit2, Trash2, Plus, Copy, Check, X, Loader, Users, Zap, Clock, Shield, Repeat, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react'
 import EditTokenModal from './EditTokenModal'

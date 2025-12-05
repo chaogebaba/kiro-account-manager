@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import { RefreshCw, Users, Zap, Shield, Clock, TrendingUp, ArrowRight, Sparkles } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 

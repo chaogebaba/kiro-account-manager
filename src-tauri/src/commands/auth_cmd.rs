@@ -1,7 +1,7 @@
 // Auth 相关命令
 // 使用 providers 模块进行认证
 
-use tauri::{State, Manager};
+use tauri::{Emitter, State};
 use crate::state::AppState;
 use crate::auth::{User, get_usage_limits_desktop};
 use crate::auth_social;
@@ -107,7 +107,7 @@ async fn login_social(
 
     println!("\n[{}] LOGIN SUCCESS: {} - {}/{}", auth_method, token.email, token.used, token.quota);
 
-    let _ = app_handle.emit_all("login-success", token.id.clone());
+    let _ = app_handle.emit("login-success", token.id.clone());
     Ok(format!("{} login completed for {}", auth_method, provider_id))
 }
 
@@ -182,7 +182,7 @@ async fn login_idc(
 
     println!("\n[{}] LOGIN SUCCESS: {} - {}/{}", auth_method, token.email, token.used, token.quota);
 
-    let _ = app_handle.emit_all("login-success", token.id.clone());
+    let _ = app_handle.emit("login-success", token.id.clone());
     Ok(format!("{} login completed for {}", auth_method, email))
 }
 
@@ -426,7 +426,7 @@ pub async fn handle_kiro_social_callback(
     }
     
     update_auth_state(&state, &email, &pending.provider, &token_response.access_token, &token_response.refresh_token);
-    let _ = app_handle.emit_all("login-success", token.id);
+    let _ = app_handle.emit("login-success", token.id);
     println!("Social callback login completed: {}", email);
     Ok(())
 }
@@ -512,3 +512,4 @@ pub async fn add_kiro_token(
 pub fn get_supported_providers() -> Vec<&'static str> {
     crate::providers::get_supported_providers()
 }
+

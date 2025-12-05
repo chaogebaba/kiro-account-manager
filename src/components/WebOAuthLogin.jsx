@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { open } from '@tauri-apps/api/shell'
+import { open } from '@tauri-apps/plugin-shell'
 import { Loader, Globe, ClipboardPaste, ExternalLink, Zap } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 

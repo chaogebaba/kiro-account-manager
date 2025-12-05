@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { checkUpdate, installUpdate } from '@tauri-apps/api/updater'
-import { relaunch } from '@tauri-apps/api/process'
+import { check } from '@tauri-apps/plugin-updater'
+import { relaunch } from '@tauri-apps/plugin-process'
 import { Download, RefreshCw, X } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -11,13 +11,18 @@ function UpdateChecker() {
   const [checking, setChecking] = useState(false)
   const [installing, setInstalling] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const [update, setUpdate] = useState(null)
 
   const checkForUpdate = async () => {
     setChecking(true)
     try {
-      const { shouldUpdate, manifest } = await checkUpdate()
-      if (shouldUpdate && manifest) {
-        setUpdateInfo(manifest)
+      const updateResult = await check()
+      if (updateResult) {
+        setUpdate(updateResult)
+        setUpdateInfo({
+          version: updateResult.version,
+          body: updateResult.body
+        })
         setDismissed(false)
       }
     } catch (e) {
@@ -27,9 +32,10 @@ function UpdateChecker() {
   }
 
   const doUpdate = async () => {
+    if (!update) return
     setInstalling(true)
     try {
-      await installUpdate()
+      await update.downloadAndInstall()
       await relaunch()
     } catch (e) {
       console.error('安装更新失败:', e)

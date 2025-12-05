@@ -1,7 +1,7 @@
 // Web OAuth API - Cognito + CBOR 登录
 // 两步流程：initiate -> complete
 
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 
 /**
  * 第一步：发起 Web OAuth 登录

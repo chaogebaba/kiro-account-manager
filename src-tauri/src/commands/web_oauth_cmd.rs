@@ -5,7 +5,7 @@
 // 2. 一键登录：web_oauth_login (WebView 自动捕获回调)
 
 use std::sync::{Mutex, OnceLock};
-use tauri::{State, Manager, WindowBuilder, WindowUrl};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use crate::state::AppState;
 use crate::auth::User;
 use crate::providers::web_oauth::{WebOAuthProvider, WebOAuthInitResult};
@@ -191,7 +191,7 @@ pub async fn web_oauth_complete(
 
     println!("\n[WebOAuth] LOGIN SUCCESS: {} - {}/{}", token.email, token.used, token.quota);
 
-    let _ = app_handle.emit_all("login-success", token.id.clone());
+    let _ = app_handle.emit("login-success", token.id.clone());
     Ok(format!("Web OAuth login completed for {}", provider))
 }
 
@@ -343,14 +343,13 @@ fn extract_usage_fields_web(
 
 
 // ============================================================
-// 一键登录 - 使用 WebView 窗口自动捕获回调
+// 一键登录 - 使用 WebView 窗口自动捕获回调 (Tauri v2)
 // ============================================================
 
-/// 一键登录：打开 WebView 窗口
-/// 前端需要配置 dangerousRemoteDomainIpcAccess 来监听回调
+/// 一键登录：打开 WebView 窗口，自动监听 URL 变化捕获回调
 #[tauri::command]
 pub async fn web_oauth_login(
-    app_handle: tauri::AppHandle,
+    app_handle: AppHandle,
     provider: String,
 ) -> Result<WebOAuthLoginResponse, String> {
     println!("\n========== web_oauth_login START ==========");
@@ -370,26 +369,50 @@ pub async fn web_oauth_login(
     // 保存到全局状态
     *get_pending_login().lock().unwrap() = Some(init_result.clone());
     
-    // 2. 创建 WebView 窗口
+    // 2. 创建 WebView 窗口 (Tauri v2 API)
     let window_label = format!("oauth_{}", provider.to_lowercase());
     
     // 先关闭已存在的同名窗口
-    if let Some(existing) = app_handle.get_window(&window_label) {
+    if let Some(existing) = app_handle.get_webview_window(&window_label) {
         let _ = existing.close();
     }
     
-    let _window = WindowBuilder::new(
+    let app_handle_clone = app_handle.clone();
+    let window_label_clone = window_label.clone();
+    
+    let window = WebviewWindowBuilder::new(
         &app_handle,
         &window_label,
-        WindowUrl::External(init_result.authorize_url.parse().unwrap())
+        WebviewUrl::External(init_result.authorize_url.parse().unwrap())
     )
     .title(format!("Login with {}", provider))
     .inner_size(500.0, 700.0)
     .center()
+    .on_navigation(move |url| {
+        let url_str = url.as_str();
+        println!("[WebView] Navigation: {}", url_str);
+        
+        // 检查是否是回调 URL
+        if url_str.starts_with("https://app.kiro.dev/signin/oauth") && url_str.contains("code=") {
+            println!("[WebView] Callback URL detected! Emitting event...");
+            
+            // 发送事件到前端
+            let _ = app_handle_clone.emit("web-oauth-callback", url_str.to_string());
+            
+            // 关闭窗口
+            if let Some(win) = app_handle_clone.get_webview_window(&window_label_clone) {
+                let _ = win.close();
+            }
+            
+            return false; // 阻止导航到回调页面
+        }
+        
+        true // 允许其他导航
+    })
     .build()
     .map_err(|e| format!("Failed to create auth window: {}", e))?;
     
-    println!("Created auth window: {}", window_label);
+    println!("Created auth window: {}", window.label());
     println!("========== web_oauth_login WINDOW OPENED ==========\n");
     
     Ok(WebOAuthLoginResponse {
@@ -407,10 +430,10 @@ pub struct WebOAuthLoginResponse {
 /// 关闭 OAuth 窗口
 #[tauri::command]
 pub fn web_oauth_close_window(
-    app_handle: tauri::AppHandle,
+    app_handle: AppHandle,
     window_label: String,
 ) -> Result<(), String> {
-    if let Some(window) = app_handle.get_window(&window_label) {
+    if let Some(window) = app_handle.get_webview_window(&window_label) {
         window.close().map_err(|e| format!("Failed to close window: {}", e))?;
     }
     Ok(())
