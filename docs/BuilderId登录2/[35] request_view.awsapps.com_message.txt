@@ -1,0 +1,18 @@
+GET /start/?callback_url=https%3A%2F%2Foidc.us-east-1.amazonaws.com%2Fauthentication_result&orchestrator_id=AAAADmtleS0xNTY0MDI4MDc4SluzpcoeVL3iiE20BbXNo354BICyiHgYIU0yPwIksai0e3eG0nF-sHGxvYHq2t1Q-ZpW9DhP3xGH2V3xAfdx0tufljm7HGLP0Pavb_eB3iDoy6fwmI5U5R5ZFSuh_-Ns-r5bcWLpmS9MMPHoN6Pa79sQpOXKRpkYnNF7M9p8QC-jihaL1QfBCkKBPi_jU-nYls7mxiP76UcWx4qbRLAXAaTVFPZXO2NGnl2FGNW2pGlazamwP5P5JlfcruuYuZhIcxbASWq815-ajwtnIOKxCt3xCGFvxJFIAZcPGL1F-Bqy1wB2uObBjti-Z5eyR20XIne-U-7ZsgV3FXe1FOaCnsvpHnKQvPYBEMTGNUvERF5hAPZmKgQUZOhpByrem_2ImyTKJe6Z5SCyBr9A_uwDQzV_vu1EzLRTVJk-wXitn6LCIIKG_k5-5hdcdWm5OV4jKJXj-JSo6vsJdi-CD2Z3WGYffQYwnME0lnmuCC9_59FILE2oEfPVX11us7CID8afrKc4yKe_2fxGqYQALePdejwyjutAU-2JcEOQcgj4W-t9OQ4P8awKvkGchz9PXiXpItlwcp_gnAn07_0_wuByRxu4t-_UT-RZXQ0hiUmU7WGds8wP59aDhMRRzdGBEKG5kRn9V0HwN6to8HiqSqbIYhQExUk1MW7Dr609muW8x-D3uncHkr8bGTcbS2Ik7b1KKB48Z5H5zFqAfU7RzVxaxDsNfCQsZ3fCazv_wU8d_m_9_qGKG5piu5SIJM7Ctfcd2jKy68mcfl4AGejrRA_VF0kK3eg73ByXUfOGBkCMG-80-_8Tzs24GHgYho0BZMovhMC1BQ4_byntCMM7imfXRejCOv3v7Lr_Wkg1jqEyzFfoxDq5cdLm_rT2hRROIn7eXWXkGAfRyqNZISjlH--l7XxKROPlGJM8itK-By7hP-D2VRr-s-Lza-k0eaksK6nO1uuCuG-7UE-JMA4mOH1kNniYdZkB3yAmIOjSyghdvuvltF7N8jGm3fkrfv63xBVuuEGY62A h2
+host: view.awsapps.com
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 YaBrowser/25.10.0.0 Safari/537.36
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: cross-site
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+sec-ch-ua: "Chromium";v="140", "Not=A?Brand";v="24", "YaBrowser";v="25.10", "Yowser";v="2.5"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+referer: https://app.kiro.dev/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7
+priority: u=0, i
+

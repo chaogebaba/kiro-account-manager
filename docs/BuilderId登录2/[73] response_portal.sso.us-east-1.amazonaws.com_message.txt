@@ -1,0 +1,15 @@
+h2 200
+date: Fri, 05 Dec 2025 11:31:41 GMT
+content-type: application/json
+content-length: 156
+access-control-allow-credentials: true
+access-control-allow-origin: https://view.awsapps.com
+access-control-expose-headers: RequestId
+access-control-expose-headers: x-amzn-RequestId
+cache-control: no-cache
+p3p: policyref="https://www.amazon.com/w3c/p3p.xml", CP="CAO DSP LAW CUR ADM IVAo IVDo CONo OTPo OUR DELi PUBi OTRi BUS PHY ONL UNI PUR FIN COM NAV INT DEM CNT STA HEA PRE LOC GOV OTC"
+requestid: e6222272-1877-49e7-a793-650ba8c7d9b2
+server: AWS SSO
+x-amzn-requestid: e6222272-1877-49e7-a793-650ba8c7d9b2
+
+{"redirectUrl":"https://us-east-1.signin.aws/platform/d-9067642ac7/login?workflowStateHandle=35ad927c-1b0b-4f19-aa5e-55bede8c6fa9","csrfToken":"-353025491"}

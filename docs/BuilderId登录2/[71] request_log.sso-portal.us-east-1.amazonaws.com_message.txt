@@ -1,0 +1,20 @@
+POST /log h2
+host: log.sso-portal.us-east-1.amazonaws.com
+content-length: 2626
+sec-ch-ua-platform: "Windows"
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 YaBrowser/25.10.0.0 Safari/537.36
+sec-ch-ua: "Chromium";v="140", "Not=A?Brand";v="24", "YaBrowser";v="25.10", "Yowser";v="2.5"
+dnt: 1
+content-type: application/json
+sec-ch-ua-mobile: ?0
+accept: */*
+origin: https://view.awsapps.com
+sec-fetch-site: cross-site
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://view.awsapps.com/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7
+priority: u=1, i
+
+{"web-vitals":{"name":"TTFB","value":133.40000000596046,"rating":"good","delta":133.40000000596046,"entries":[{"name":"https://view.awsapps.com/start/#/?callback_url=https%3A%2F%2Foidc.us-east-1.amazonaws.com%2Fauthentication_result&orchestrator_id=AAAADmtleS0xNTY0MDI4MDc4SluzpcoeVL3iiE20BbXNo354BICyiHgYIU0yPwIksai0e3eG0nF-sHGxvYHq2t1Q-ZpW9DhP3xGH2V3xAfdx0tufljm7HGLP0Pavb_eB3iDoy6fwmI5U5R5ZFSuh_-Ns-r5bcWLpmS9MMPHoN6Pa79sQpOXKRpkYnNF7M9p8QC-jihaL1QfBCkKBPi_jU-nYls7mxiP76UcWx4qbRLAXAaTVFPZXO2NGnl2FGNW2pGlazamwP5P5JlfcruuYuZhIcxbASWq815-ajwtnIOKxCt3xCGFvxJFIAZcPGL1F-Bqy1wB2uObBjti-Z5eyR20XIne-U-7ZsgV3FXe1FOaCnsvpHnKQvPYBEMTGNUvERF5hAPZmKgQUZOhpByrem_2ImyTKJe6Z5SCyBr9A_uwDQzV_vu1EzLRTVJk-wXitn6LCIIKG_k5-5hdcdWm5OV4jKJXj-JSo6vsJdi-CD2Z3WGYffQYwnME0lnmuCC9_59FILE2oEfPVX11us7CID8afrKc4yKe_2fxGqYQALePdejwyjutAU-2JcEOQcgj4W-t9OQ4P8awKvkGchz9PXiXpItlwcp_gnAn07_0_wuByRxu4t-_UT-RZXQ0hiUmU7WGds8wP59aDhMRRzdGBEKG5kRn9V0HwN6to8HiqSqbIYhQExUk1MW7Dr609muW8x-D3uncHkr8bGTcbS2Ik7b1KKB48Z5H5zFqAfU7RzVxaxDsNfCQsZ3fCazv_wU8d_m_9_qGKG5piu5SIJM7Ctfcd2jKy68mcfl4AGejrRA_VF0kK3eg73ByXUfOGBkCMG-80-_8Tzs24GHgYho0BZMovhMC1BQ4_byntCMM7imfXRejCOv3v7Lr_Wkg1jqEyzFfoxDq5cdLm_rT2hRROIn7eXWXkGAfRyqNZISjlH--l7XxKROPlGJM8itK-By7hP-D2VRr-s-Lza-k0eaksK6nO1uuCuG-7UE-JMA4mOH1kNniYdZkB3yAmIOjSyghdvuvltF7N8jGm3fkrfv63xBVuuEGY62A","entryType":"navigation","startTime":0,"duration":813.1000000089407,"initiatorType":"navigation","deliveryType":"cache","nextHopProtocol":"h2","renderBlockingStatus":"non-blocking","workerStart":0,"workerRouterEvaluationStart":0,"workerCacheLookupStart":0,"workerMatchedSourceType":"","workerFinalSourceType":"","redirectStart":0,"redirectEnd":0,"fetchStart":13.200000002980232,"domainLookupStart":13.200000002980232,"domainLookupEnd":13.200000002980232,"connectStart":13.200000002980232,"secureConnectionStart":13.200000002980232,"connectEnd":13.200000002980232,"requestStart":19.900000005960464,"responseStart":133.40000000596046,"firstInterimResponseStart":0,"finalResponseHeadersStart":133.40000000596046,"responseEnd":134.6000000089407,"transferSize":300,"encodedBodySize":2925,"decodedBodySize":8062,"responseStatus":200,"serverTiming":[],"unloadEventStart":142.90000000596046,"unloadEventEnd":142.90000000596046,"domInteractive":153.40000000596046,"domContentLoadedEventStart":759.1000000089407,"domContentLoadedEventEnd":759.2000000029802,"domComplete":813.1000000089407,"loadEventStart":813.1000000089407,"loadEventEnd":813.1000000089407,"type":"navigate","redirectCount":0,"activationStart":0,"criticalCHRestart":0,"notRestoredReasons":null}],"id":"v3-1764934106902-2834097756272","navigationType":"navigate"}}

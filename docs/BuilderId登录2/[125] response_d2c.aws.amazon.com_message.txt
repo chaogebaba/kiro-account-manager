@@ -1,0 +1,14 @@
+h2 202
+content-type: text/xml
+content-length: 0
+date: Fri, 05 Dec 2025 11:31:54 GMT
+access-control-allow-credentials: true
+x-amzn-requestid: 3ded5194-3aae-49b8-8e94-edf484aaccb0
+access-control-allow-origin: https://us-east-1.signin.aws
+vary: Origin
+access-control-expose-headers: x-amzn-RequestId,x-amzn-ErrorType,x-amzn-ErrorMessage,Date,smithy-protocol
+x-cache: Miss from cloudfront
+via: 1.1 9a4e915f3a0228d45d0c5671557c0de8.cloudfront.net (CloudFront)
+x-amz-cf-pop: SIN2-P7
+x-amz-cf-id: -RuRfdOk4D5keTGDmW6OkE5tZnMgEvl-qMZWzFMKrd1Cym_aHngB4Q==
+

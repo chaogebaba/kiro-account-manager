@@ -1,0 +1,12 @@
+h2 200
+date: Fri, 05 Dec 2025 11:31:41 GMT
+content-type: application/json
+content-length: 0
+x-amzn-requestid: 93c7978b-1811-4630-bcf2-ef6352f7a690
+access-control-allow-origin: https://view.awsapps.com
+access-control-allow-headers: p3p, Origin, X-Requested-With, Content-Type, x-amz-sso_bearer_token, x-amz-sso-bearer-token, authtoken
+x-amz-apigw-id: VHNYmHgUIAMENjQ=
+access-control-allow-methods: POST
+x-amzn-trace-id: Root=1-6932c29c-77619be05b1cebe1705e7d43;Parent=599c0834d160ac4e;Sampled=0;Lineage=1:8d9821fb:0
+access-control-allow-credentials: true
+

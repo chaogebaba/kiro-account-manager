@@ -1,0 +1,24 @@
+POST /autofill/v1/pages:get2?brandID=int&alt=proto h2
+host: api.browser.yandex.com
+content-length: 74
+x-goog-encode-response-if-executable: base64
+content-type: application/x-protobuf
+sec-fetch-site: none
+sec-fetch-mode: no-cors
+sec-fetch-dest: empty
+sec-ch-ua: "Chromium";v="140", "Not=A?Brand";v="24", "YaBrowser";v="25.10", "Yowser";v="2.5"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+sec-ch-ua-arch: "x86"
+sec-ch-ua-platform-version: "19.0.0"
+sec-ch-ua-full-version-list: "Chromium";v="140.0.7339.1176", "Not=A?Brand";v="24.0.0.0", "YaBrowser";v="25.10.2.1176", "Yowser";v="2.5"
+sec-ch-ua-bitness: "64"
+sec-ch-ua-wow64: ?0
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 YaBrowser/25.10.0.0 Safari/537.36
+accept-encoding: gzip, deflate, br, zstd
+accept-language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7
+y-browser-experiments: MTQwMTQ1OCwwLDc2OzEzODg3OTEsMCwxMDsxMzYyMTkwLDAsNzg7MTExMDAzNSwwLDEx
+priority: u=4, i
+
+
+HChZDaHJvbWUvMTQwLjAuNzMzOS4xMTc2EhkJ8mDLojg-wDYSBQ1TDceHIYaPYW9LACR9qAYB

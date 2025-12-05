@@ -1,0 +1,11 @@
+h2 200
+content-length: 0
+date: Fri, 05 Dec 2025 11:32:02 GMT
+set-cookie: is_gdpr=0; Path=/; Domain=.yandex.com; Expires=Sun, 05 Dec 2027 11:32:02 GMT; SameSite=None; Secure
+set-cookie: is_gdpr_b=CJjWLhDm5gI=; Path=/; Domain=.yandex.com; Expires=Sun, 05 Dec 2027 11:32:02 GMT; SameSite=None; Secure
+set-cookie: _yasc=J8IgPgivKuJwraz+2tDQBHuQNO+8YKDzBY8s8vJOZA5dQgUx/EmqF/U7tWIVPQ==; domain=.yandex.com; path=/; expires=Mon, 03 Dec 2035 11:32:02 GMT; secure
+set-cookie: bh=ElEiQ2hyb21pdW0iO3Y9IjE0MCIsICJOb3Q9QT9CcmFuZCI7dj0iMjQiLCAiWWFCcm93c2VyIjt2PSIyNS4xMCIsICJZb3dzZXIiO3Y9IjIuNSIaBSJ4ODYiKgI/MDoJIldpbmRvd3MiQggiMTkuMC4wIkoEIjY0IlJqIkNocm9taXVtIjt2PSIxNDAuMC43MzM5LjExNzYiLCAiTm90PUE/QnJhbmQiO3Y9IjI0LjAuMC4wIiwgIllhQnJvd3NlciI7dj0iMjUuMTAuMi4xMTc2IiwgIllvd3NlciI7dj0iMi41IloCPzBgsoXLyQZqIdzK4f8IktihsQOfz+HqA/v68OcN6//99g/+vPfWBfOBAg==; Path=/; Domain=.yandex.com; Expires=Sat, 09 Jan 2027 11:32:02 GMT; SameSite=None; Secure
+x-yandex-req-id: 1764934322098864-17751343408975447917-msynmtc4mkruoovs-BAL
+cache-control: max-age=3600, must-revalidate
+content-type: application/x-protobuf
+

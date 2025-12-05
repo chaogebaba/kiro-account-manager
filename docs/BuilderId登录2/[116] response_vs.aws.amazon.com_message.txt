@@ -1,0 +1,16 @@
+h2 200
+content-type: application/json
+content-length: 288
+date: Fri, 05 Dec 2025 11:31:53 GMT
+access-control-allow-credentials: true
+x-amzn-requestid: d7446c0d-1de5-445e-a5d1-ea3c6b68dec4
+access-control-allow-origin: https://us-east-1.signin.aws
+set-cookie: awsd2c-token=eyJraWQiOiJlNTM3YTcxNy1iMjg4LTQ5YjMtODY4MS0zNDllMmJkZGE2MDAiLCJhbGciOiJFUzI1NiJ9.eyJ2aWQiOiIzMmNkNzcxOC0zYTk1LWU4MGMtYWVlOS00NTdhZWQ5YzEwODciLCJpc3MiOiJzX3AiLCJleHAiOjE3NjQ5MzQ5MTN9.MEQCICl89KliDAt1fLPY7SzPTvVUbuam2iiPtlUtkBElbmEfAiB1sVWGCeQRGE-lEwdnvLRJT0cp3kx-ncGOVJ7gc6NN_w; Max-Age=31536000; Domain=aws.amazon.com; Secure; Path=/; SameSite=None
+vary: Origin
+access-control-expose-headers: x-amzn-RequestId,x-amzn-ErrorType,x-amzn-ErrorMessage,Date,smithy-protocol
+x-cache: Miss from cloudfront
+via: 1.1 55d94df59f464f3a6eb1d87a058e6a56.cloudfront.net (CloudFront)
+x-amz-cf-pop: SIN2-P8
+x-amz-cf-id: Lj5y-LxMnw6c1JtpPjb4Y1VBFl7L9ePdxO_7i5VqPX-4nyZRpJoYpw==
+
+{"token":"eyJraWQiOiJlNTM3YTcxNy1iMjg4LTQ5YjMtODY4MS0zNDllMmJkZGE2MDAiLCJhbGciOiJFUzI1NiJ9.eyJ2aWQiOiIzMmNkNzcxOC0zYTk1LWU4MGMtYWVlOS00NTdhZWQ5YzEwODciLCJpc3MiOiJzX3AiLCJleHAiOjE3NjQ5MzQ5MTN9.MEQCICl89KliDAt1fLPY7SzPTvVUbuam2iiPtlUtkBElbmEfAiB1sVWGCeQRGE-lEwdnvLRJT0cp3kx-ncGOVJ7gc6NN_w"}

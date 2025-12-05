@@ -67,6 +67,7 @@ struct ExchangeTokenRequest {
     code_verifier: String,
     #[serde(rename = "redirectUri")]
     redirect_uri: String,
+    state: String,
 }
 
 /// ExchangeToken 响应
@@ -194,20 +195,31 @@ impl KiroWebPortalClient {
         code: &str,
         code_verifier: &str,
         redirect_uri: &str,
+        state: &str,
     ) -> Result<ExchangeTokenResponse, String> {
         let url = format!(
             "{}/service/KiroWebPortalService/operation/ExchangeToken",
             self.endpoint
         );
 
+        println!("\n[WebOAuth] ExchangeToken Request:");
+        println!("  URL: {}", url);
+        println!("  idp: {}", idp);
+        println!("  code: {}...{}", &code[..20.min(code.len())], if code.len() > 30 { &code[code.len()-10..] } else { "" });
+        println!("  code_verifier: {}", code_verifier);
+        println!("  redirect_uri: {}", redirect_uri);
+        println!("  state: {}...", &state[..20.min(state.len())]);
+
         let request = ExchangeTokenRequest {
             idp: idp.to_string(),
             code: code.to_string(),
             code_verifier: code_verifier.to_string(),
             redirect_uri: redirect_uri.to_string(),
+            state: state.to_string(),
         };
 
         let body = cbor_encode(&request)?;
+        println!("  body size: {} bytes", body.len());
 
         let response = self.client
             .post(&url)
@@ -220,13 +232,23 @@ impl KiroWebPortalClient {
             .map_err(|e| format!("ExchangeToken request failed: {}", e))?;
 
         let status = response.status();
+        println!("  Status: {}", status);
+        
         let bytes = response.bytes().await
             .map_err(|e| format!("Failed to read response: {}", e))?;
 
         if !status.is_success() {
-            return Err(format!("ExchangeToken failed ({}): {:?}", status, bytes));
+            // 尝试解析 CBOR 错误响应
+            let error_msg = if let Ok(error) = cbor_decode::<serde_json::Value>(&bytes) {
+                format!("{:?}", error)
+            } else {
+                String::from_utf8_lossy(&bytes).to_string()
+            };
+            println!("  Error: {}", error_msg);
+            return Err(format!("ExchangeToken failed ({}): {}", status, error_msg));
         }
 
+        println!("  Response size: {} bytes", bytes.len());
         cbor_decode(&bytes)
     }
 
@@ -349,10 +371,9 @@ impl WebOAuthProvider {
     }
 
     /// 完成登录 - 用回调 URL 中的 code 换取 token
-    pub async fn complete_login(&self, code: &str, _state: &str, code_verifier: &str, _expected_state: &str) -> Result<AuthResult, String> {
-        // 注意：跳过 state 验证
-        // Kiro 服务端返回的 state 是编码后的值（以 QUFBQU... 开头），和我们发送的 UUID 不匹配
-        // 实际的 CSRF 保护由 code_verifier (PKCE) 提供
+    pub async fn complete_login(&self, code: &str, returned_state: &str, code_verifier: &str, _expected_state: &str) -> Result<AuthResult, String> {
+        // 注意：returned_state 是 AWS/Cognito 返回的 state（可能是编码后的值）
+        // 需要传给 ExchangeToken API
 
         let idp = self.get_idp_name();
         let redirect_uri = KIRO_REDIRECT_URI;
@@ -361,7 +382,7 @@ impl WebOAuthProvider {
         println!("[WebOAuth] Exchanging code for tokens via CBOR API...");
         let client = KiroWebPortalClient::new();
         let token_response = client
-            .exchange_token(idp, code, code_verifier, redirect_uri)
+            .exchange_token(idp, code, code_verifier, redirect_uri, returned_state)
             .await?;
 
         // 构建 AuthResult

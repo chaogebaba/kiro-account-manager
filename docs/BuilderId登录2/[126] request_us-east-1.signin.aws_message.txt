@@ -1,0 +1,18 @@
+GET /assets/locales/en/emailOTPAuthentication.json h2
+host: us-east-1.signin.aws
+sec-ch-ua-platform: "Windows"
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 YaBrowser/25.10.0.0 Safari/537.36
+sec-ch-ua: "Chromium";v="140", "Not=A?Brand";v="24", "YaBrowser";v="25.10", "Yowser";v="2.5"
+dnt: 1
+sec-ch-ua-mobile: ?0
+accept: */*
+sec-fetch-site: same-origin
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://us-east-1.signin.aws/platform/d-9067642ac7/login?workflowStateHandle=35ad927c-1b0b-4f19-aa5e-55bede8c6fa9
+accept-encoding: gzip, deflate, br, zstd
+accept-language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7
+cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiZDg3YjhhZjgtMWU4OS00ZmY1LWEzZjctNDRmZDA3NmQ2YzA1IiwidiI6IjEifQ==
+cookie: awsd2c-token-c=eyJraWQiOiJlNTM3YTcxNy1iMjg4LTQ5YjMtODY4MS0zNDllMmJkZGE2MDAiLCJhbGciOiJFUzI1NiJ9.eyJ2aWQiOiIzMmNkNzcxOC0zYTk1LWU4MGMtYWVlOS00NTdhZWQ5YzEwODciLCJpc3MiOiJzX3AiLCJleHAiOjE3NjQ5MzQ5MTN9.MEQCICl89KliDAt1fLPY7SzPTvVUbuam2iiPtlUtkBElbmEfAiB1sVWGCeQRGE-lEwdnvLRJT0cp3kx-ncGOVJ7gc6NN_w
+priority: u=1, i
+

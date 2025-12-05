@@ -1,0 +1,12 @@
+h2 200
+date: Fri, 05 Dec 2025 11:31:46 GMT
+content-type: application/json
+content-length: 76
+x-amzn-requestid: dbdad78f-572f-4d10-b781-7201926cd064
+access-control-allow-origin: https://view.awsapps.com
+access-control-allow-headers: Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-amzn-waf-bot-category,Panorama-Appentity
+x-amz-apigw-id: VHNZeGnvoAMEVGg=
+access-control-allow-methods: GET,OPTIONS,POST
+x-amzn-trace-id: Root=1-6932c2a2-1451f5e665c3bdf256800cf1;Parent=22570e469a8b4b13;Sampled=0;Lineage=1:8e9e8be3:0
+
+{"batchRequestId":"5be4e3b0-8752-486a-8a2f-3217ff7d75c2","status":"SUCCESS"}

@@ -1,0 +1,27 @@
+POST /service/KiroWebPortalService/operation/ExchangeToken h2
+host: app.kiro.dev
+content-length: 699
+x-amz-user-agent: aws-sdk-js/1.0.0 ua/2.1 os/Windows#NT-10.0 lang/js md/browser#Yandex-Browser_25.10.0.0 m/M,E
+sec-ch-ua-platform: "Windows"
+x-kiro-visitorid: 1764932537901-vqf15arqgpi
+sec-ch-ua: "Chromium";v="140", "Not=A?Brand";v="24", "YaBrowser";v="25.10", "Yowser";v="2.5"
+amz-sdk-request: attempt=1; max=1
+amz-sdk-invocation-id: 5ab9e563-7541-4c2d-bd2b-d8e37ccd5ffd
+sec-ch-ua-mobile: ?0
+smithy-protocol: rpc-v2-cbor
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 YaBrowser/25.10.0.0 Safari/537.36
+accept: application/cbor
+dnt: 1
+content-type: application/cbor
+origin: https://app.kiro.dev
+sec-fetch-site: same-origin
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://app.kiro.dev/signin/oauth?code=eyJraWQiOiJrZXktMTU2NDAyODA3OCIsImFsZyI6IkhTMzg0In0.eyJwbGFpbnRleHQiOiJmaHZWQjJPUFYzWXZXcGpQbWllXzYxZjMydklGc3kxd191UF9IT0tKamw0IiwiZXhwIjoxNzY0OTM0NjI4LCJ0eXBlIjoiYXV0aENvZGUifQ.J_YiOu4TCY7LtsdODU8JFbAN1T4QQ600Y67IWPa1uX_O7Ex5o3hwOYAtT9oocZ12&state=QUFBQURtdGxlUzB4TlRZNE9UVTFNekEzUHp4NUItQldoWGNhcWlvRV9aQXFkaURxZk5JT1MzWHBWazdPaHhTR1p0UGFxdF85Z3lWM3lTVk1rZEMzcE42OGlrVUVhWXJvYnM1TFVHcVd2X2lzN0R3bldqaDFrb1BITkhTRWNkeEc1eFFDVUdGWmJEdlVZUHg2ZzVOSTJsdnZHQ25NZU1MSXJMQzVKYXlaRWhkbDVGbGFlNndLcC1PTDV2eE9iZUN6d1hlSTFlZ1JOUzVwSFR2bE55V2VENkFjQWlMUkRzMFVDSDZaVTBxVkZDZlZmNGJD
+accept-encoding: gzip, deflate, br, zstd
+accept-language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7
+cookie: kiro-visitor-id=1764932537901-vqf15arqgpi
+cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiMGYwYjYzY2QtYzhhZC00YjFkLWI0MTQtM2RiOGU1NjRmMmJlIiwidiI6IjEifQ==
+priority: u=1, i
+
+¥cidpiBuilderIddcodexóeyJraWQiOiJrZXktMTU2NDAyODA3OCIsImFsZyI6IkhTMzg0In0.eyJwbGFpbnRleHQiOiJmaHZWQjJPUFYzWXZXcGpQbWllXzYxZjMydklGc3kxd191UF9IT0tKamw0IiwiZXhwIjoxNzY0OTM0NjI4LCJ0eXBlIjoiYXV0aENvZGUifQ.J_YiOu4TCY7LtsdODU8JFbAN1T4QQ600Y67IWPa1uX_O7Ex5o3hwOYAtT9oocZ12lcodeVerifierx+hsoYa-bqD9eqbMCUHgZWXbl4kbSCUJaUtj_bTTbh7o0kredirectUrix!https://app.kiro.dev/signin/oauthestatey@QUFBQURtdGxlUzB4TlRZNE9UVTFNekEzUHp4NUItQldoWGNhcWlvRV9aQXFkaURxZk5JT1MzWHBWazdPaHhTR1p0UGFxdF85Z3lWM3lTVk1rZEMzcE42OGlrVUVhWXJvYnM1TFVHcVd2X2lzN0R3bldqaDFrb1BITkhTRWNkeEc1eFFDVUdGWmJEdlVZUHg2ZzVOSTJsdnZHQ25NZU1MSXJMQzVKYXlaRWhkbDVGbGFlNndLcC1PTDV2eE9iZUN6d1hlSTFlZ1JOUzVwSFR2bE55V2VENkFjQWlMUkRzMFVDSDZaVTBxVkZDZlZmNGJD
