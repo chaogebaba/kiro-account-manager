@@ -47,7 +47,7 @@
       "dangerousRemoteDomainIpcAccess": [
         {
           "domain": "app.kiro.dev",
-          "windows": ["auth"],
+          "windows": ["auth", "oauth_google", "oauth_github"],
           "enableTauriAPI": true
         }
       ]

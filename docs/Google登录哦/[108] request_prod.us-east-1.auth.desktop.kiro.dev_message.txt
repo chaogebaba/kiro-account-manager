@@ -1,0 +1,17 @@
+GET /login?idp=Google&redirect_uri=kiro://kiro.kiroAgent/authenticate-success&code_challenge=C5xlcq8L4Z5neX5lplX-u3cNTwt8San7OVPNNvS28Ok&code_challenge_method=S256&state=03ed4dc7-59d4-4677-b6ea-66e1a4c3528f h2
+host: prod.us-east-1.auth.desktop.kiro.dev
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0 80592
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: none
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+priority: u=0, i
+

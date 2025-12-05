@@ -1,0 +1,35 @@
+POST /v3/signin/_/AccountsSignInUi/data/batchexecute?rpcids=WZfWSd%2CetGTrd%2CAho3hb%2Ci3kFoc%2CzKAP2e%2CRzSO2e&source-path=%2Fv3%2Fsignin%2Fchallenge%2Fpwd&f.sid=-8090245653533774652&bl=boq_identityfrontendauthuiserver_20251202.03_p0&hl=zh-CN&TL=ANzgctRrv5w2v4xGjWZP0HiCUA8I2led3FlMggwgeuCnY1kSIzmURmJIS-tGi_IH&_reqid=261140&rt=c h2
+host: accounts.google.com
+content-length: 672
+sec-ch-ua-platform: "Windows"
+sec-ch-ua: "Chromium";v="142", "Not_A Brand";v="99", "Google Chrome";v="142"
+sec-ch-ua-bitness: "64"
+sec-ch-ua-model: ""
+sec-ch-ua-mobile: ?0
+x-same-domain: 1
+sec-ch-ua-wow64: ?0
+x-goog-ext-278367001-jspb: ["GeneralOAuthFlow"]
+sec-ch-ua-arch: "x86"
+content-type: application/x-www-form-urlencoded;charset=UTF-8
+x-goog-ext-391502476-jspb: ["S2067456621:1764925327532643","lso"]
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0 80592
+dnt: 1
+sec-ch-ua-platform-version: "19.0.0"
+accept: */*
+origin: https://accounts.google.com
+x-browser-channel: stable
+x-browser-year: 1969
+x-browser-validation: Aj9fzfu+SaGLBY9Oqr3S7RokOtM=
+x-browser-copyright: Copyright 2025 Google LLC. All rights reserved.
+sec-fetch-site: same-origin
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://accounts.google.com/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: __Host-GAPS=1:vSCHxHTK4mjuheug8f-0RiCAzvVgng:qNS-ngkwGQ0OqzR_
+cookie: NID=526=tj8BJB2kzifZnNksaDi-BNCLZtgsjlrMTa1I3pUfp2XsFLf7cL4fYCyJIcW4H9idTlXzIm8Ds13jzozaBk9hxGj6geKEZtymNEfJiSos7nn4VF8_PqfBA1j5ke1pbFL2SBmtQaoHgcbzkvmUJs_4x4bgCyGNtUmlHRKETGaWXo1Y2sVKtfbn0XNSYTuNttssnozDIXkPkHc0JFY
+cookie: OTZ=8377019_24_24__24_
+priority: u=1, i
+
+f.req=%5B%5B%5B%22WZfWSd%22%2C%22%5B2%2C1%5D%22%2Cnull%2C%221%22%5D%2C%5B%22etGTrd%22%2C%22%5B%5C%22183617306620-gqedod9q1su19ghqs84m1tje4lp761ks.apps.googleusercontent.com%5C%22%2C%5C%22https%3A%2F%2Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%5C%22%5D%22%2Cnull%2C%222%22%5D%2C%5B%22Aho3hb%22%2C%22%5B%5D%22%2Cnull%2C%223%22%5D%2C%5B%22i3kFoc%22%2C%22%5B%5D%22%2Cnull%2C%224%22%5D%2C%5B%22zKAP2e%22%2C%22%5B%5C%22identity-signin-password%5C%22%5D%22%2Cnull%2C%226%22%5D%2C%5B%22RzSO2e%22%2C%22%5B%5C%22183617306620-gqedod9q1su19ghqs84m1tje4lp761ks.apps.googleusercontent.com%5C%22%5D%22%2Cnull%2C%227%22%5D%5D%5D&at=ACnRkCh54UpBmcQ6GRimkLNsQIgE%3A1764925327685&

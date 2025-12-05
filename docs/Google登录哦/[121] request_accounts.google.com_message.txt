@@ -1,0 +1,27 @@
+GET /v3/signin/identifier?opparams=%253F&dsh=S2067456621%3A1764925327532643&access_type=offline&client_id=183617306620-gqedod9q1su19ghqs84m1tje4lp761ks.apps.googleusercontent.com&o2v=2&redirect_uri=https%3A%2F%2Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%2Foauth2%2Fidpresponse&response_type=code&scope=email+openid&service=lso&state=H4sIAAAAAAAAAE2RW4_aMBCF_4ufMThObCe8ZZcWwmZZlvtSrZDjOORGnJIEKFX_ewepqvZlxkc-37E18xtJNERdg7VsWmwdpmuWjxr1tkU9FMHN2JhjqUEoEMyLYovp1CFai1pRkpKoUJ3IYjDEYCiysxkOBo_WfxT_qKt2ILs2hZ4p2WrcdErppgFAA6BM_AhPvr50RMMfSJ9kVoIwta4g_rOHUvAQW8dOrARmXuxghwuBI64l5lxb0lE2o24CUAbWZ3Yr1U83dPas0jtW1uUOd7aara6tu5SVeNvMZ7PLkrpvBRA5EEvKOBwLOAa76j3yrzdei_sqsmgw2paZeiJemJxfu-oSicKuQ2odjmztVXqVmBc9mRBxsl6mh3KJvYLu72RbZ3GQk5a4bT792Iz9g-RLJ8m7W1GzcRNUJtznoUXmLStTzxPf0wDLPA1_8W_-7t1M0kXiB_GIfNzE-mlBWLr25-7t6m6eyXg2WvDXbTfz4cflv8nj-mxi_H-X_cfc-1_kSd5NpcyxylrTV-YE6AkNLcEdjzKb8h6q0TCRZaN76AyZVDFBPGbhKNIcO9QWWHLbxg5UxxJe7EUMMi6wr88_fwEehGUCSQIAAA.H4sIAAAAAAAAAAEgAN__0t48hXSfxSwCQV7A_EHDBfh8ReLBUn1D8ueoz3yD-C9_hIoPIAAAAA.4&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAOzblPNbvbNwpxX7Q76kdKM3JZ6g_lkCy02E8EivJru_K5B0HX3zZLPEuA-0A9KU_ySyn7R43SmOuQxJGUnGCgthg6Gg23XtKOoCOuHPZXkH3ipH-_56bg1E2xB-K4D89FajYtNGKGgUPYA07Jy71iAg_zC8bc8j53gMmh8mVNCo3p9LdgUSaoR_ywqapf4nZog_RLByRO4BF68Q6OCpjpgVNJ-sp80yy6-65hDx20BrcxRugZzUgbUylNeXhAfNst99r_UjlLOPFkK0qJyy3I_3sx4HeRGO6-CRTLncYb2pdyzUo9K7EJRixFD1Bz-PQUJwYmYuj6UOeOCN5AoycqaQwjxkcnoc4Mvo1ZQJIFo2UbCqpsWMjmztNd0iRheV-sqGM0ZD2439qsZgcpy9HWh-oGPO4zp5TajyTyhlMNbh9Nugt2cJeu_bBR9GcaYWdw8_6ELRGZy3GdDidlmw10EST_jRIBWsefVPvnPf-HteixOOz6Ms3dHnPzIE4QpFkcpZmEJ%26flowName%3DGeneralOAuthFlow%26as%3DS2067456621%253A1764925327532643%26client_id%3D183617306620-gqedod9q1su19ghqs84m1tje4lp761ks.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com&rart=ANgoxcfZaxDS80LiRgFM2bh1Ar8W7Upz_D0OzmjgDaeKjzztpdjh8Wb4CMHBLvlddeZt_PzMVomRxEVk1tkXb2Gip-ksdGaWeIXKsLF9UQLFT1xEzTaOFlM h2
+host: accounts.google.com
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0 80592
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: none
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+sec-ch-ua: "Chromium";v="142", "Not_A Brand";v="99", "Google Chrome";v="142"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-arch: "x86"
+sec-ch-ua-platform: "Windows"
+sec-ch-ua-platform-version: "19.0.0"
+sec-ch-ua-model: ""
+sec-ch-ua-bitness: "64"
+sec-ch-ua-wow64: ?0
+x-browser-channel: stable
+x-browser-year: 1969
+x-browser-validation: Aj9fzfu+SaGLBY9Oqr3S7RokOtM=
+x-browser-copyright: Copyright 2025 Google LLC. All rights reserved.
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: __Host-GAPS=1:vSCHxHTK4mjuheug8f-0RiCAzvVgng:qNS-ngkwGQ0OqzR_
+priority: u=0, i
+

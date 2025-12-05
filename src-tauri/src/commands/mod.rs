@@ -3,3 +3,4 @@
 pub mod token_cmd;
 pub mod auth_cmd;
 pub mod settings_cmd;
+pub mod web_oauth_cmd;

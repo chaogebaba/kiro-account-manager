@@ -1,0 +1,20 @@
+GET /oauth2/idpresponse?state=H4sIAAAAAAAAAE2RW6-iMBSF_0ufrbZAufimGEXU8YKKOjkx0BZBEDjc4vFk_vtsk8nkvHTvla5vtdn7GwVoiNoay6BuML26B3af1Hztox4K4WZWFLdMguAgmBUKymSsESmNkiskJmHKWyMRYBBgSJOqGA4G79J_H6ObzJtB0DYx1IQHjcR1y7msawAkALwQ7_Do50s3NPyN5CNIMhBFKXOI_-ihGDyqxXRqEYkjIgTWuBpgSxoGZoFkISWqGakWQAlYrbaslqlq73NyqZRX7GTiednPO7c7iwXO-fHOZbptP0cXAsQdCE9hOrQptOcXvejepvWTPJ_l8aecj-315jH3j9PIzs630TOlzna896uF19VrdfK1xF22_RxNrN2SXJlSm6vpgjtdKr-qlbxOo-q6d7e6z1z3-DTHd-uQdw2j7k5682Yzd5zb6SUWh-DKnNmLXNJUzKJoxmJari3s_aKbnTc-6Ym9GR3sdCXC54narlv6yxR-nP2bPC6rQuD_u-y_597_IR_Bq8h5ccuTpujz4gHoAw2poWuWwghVe6hEwyjIatlDFWQKzQyJYUbY0BQNps0IDs2AYBoKaRHdVLihQUYH-_r48xc2VSEHSQIAAA.H4sIAAAAAAAAAJufP6su6mpw6UpenuT-l73npf9Ou-J52o8jq3x_-5xNzBoAvi0AeyAAAAA.4&code=4%2F0Ab32j90cfztshe0rSi1IZhaKowjntIG0hd34z8eYtcJZL5u7pfjJfkYhckDh1Uy2jN-uSg&scope=email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid&authuser=0&prompt=none h2
+host: kiro-prod-us-east-1.auth.us-east-1.amazoncognito.com
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 YaBrowser/25.10.0.0 Safari/537.36
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: none
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+sec-ch-ua: "Chromium";v="140", "Not=A?Brand";v="24", "YaBrowser";v="25.10", "Yowser";v="2.5"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+accept-encoding: gzip, deflate, br, zstd
+accept-language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7
+cookie: XSRF-TOKEN=b7b0ce49-e667-4c52-9878-0a8f0642ab62
+cookie: csrf-state=Yz1Z6SPuWinnGnhqeIBCOPmIWVFfClYgAxk1HQBTWrKSvsO3DyL-vlQqAD9RL0_52s8MFKcHvkeyrMe_Ffr_TJQ6W5JJVx8Bj9Unvt51JReSItPIHHgXzdKUa_5HGz0ZkkdGffG5h1pO9-SN1PRSBX6iCPAUCkMdbxX1CJJpWLk
+cookie: csrf-state-legacy=Yz1Z6SPuWinnGnhqeIBCOPmIWVFfClYgAxk1HQBTWrKSvsO3DyL-vlQqAD9RL0_52s8MFKcHvkeyrMe_Ffr_TJQ6W5JJVx8Bj9Unvt51JReSItPIHHgXzdKUa_5HGz0ZkkdGffG5h1pO9-SN1PRSBX6iCPAUCkMdbxX1CJJpWLk
+priority: u=0, i
+

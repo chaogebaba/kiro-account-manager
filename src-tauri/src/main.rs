@@ -22,6 +22,7 @@ use auth::AuthState;
 use commands::token_cmd::*;
 use commands::auth_cmd::*;
 use commands::settings_cmd::*;
+use commands::web_oauth_cmd::*;
 use kiro::{get_kiro_local_token, get_kiro_telemetry_info, switch_kiro_account, reset_kiro_machine_id};
 use process::{close_kiro_ide, start_kiro_ide, is_kiro_ide_running};
 
@@ -71,7 +72,13 @@ fn main() {
             set_kiro_model,
             // 应用设置命令
             get_app_settings,
-            save_app_settings
+            save_app_settings,
+            // Web OAuth 命令 (Cognito + CBOR)
+            web_oauth_initiate,
+            web_oauth_complete,
+            web_oauth_refresh,
+            web_oauth_login,
+            web_oauth_close_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

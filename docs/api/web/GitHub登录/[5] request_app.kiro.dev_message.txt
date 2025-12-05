@@ -24,4 +24,4 @@ cookie: kiro-visitor-id=1764521395589-gnfpuptff3
 cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiZDA4ZjQwM2UtNTIzZi00NGNlLWE3YWUtNGU5YmJkMTMwNTk2IiwidiI6IjEifQ==
 priority: u=1, i
 
-¥cidpfGithubkredirectUrix!https://app.kiro.dev/signin/oauthmcodeChallengex+mXwwTK115W1P-v5M66zGH6duAGlBSDwYun_xuRZHst8scodeChallengeMethoddS256estatex$12bd873a-2f03-4f81-b951-ee287ca775a3
+ï¿½cidpfGithubkredirectUrix!https://app.kiro.dev/signin/oauthmcodeChallengex+mXwwTK115W1P-v5M66zGH6duAGlBSDwYun_xuRZHst8scodeChallengeMethoddS256estatex$12bd873a-2f03-4f81-b951-ee287ca775a3

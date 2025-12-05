@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { getVersion } from '@tauri-apps/api/app'
-import { Home, Key, Settings, Info, User, LogIn, Sun, Moon, Palette } from 'lucide-react'
+import { Home, Key, Settings, Info, User, LogIn, Globe, Sun, Moon, Palette } from 'lucide-react'
 import { useTheme, themes } from '../contexts/ThemeContext'
 
 const menuItems = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'token', label: '账号管理', icon: Key },
   { id: 'login', label: '登录', icon: LogIn },
+  { id: 'web-oauth', label: 'Web OAuth', icon: Globe },
   { id: 'settings', label: '设置', icon: Settings },
   { id: 'about', label: '关于', icon: Info },
 ]

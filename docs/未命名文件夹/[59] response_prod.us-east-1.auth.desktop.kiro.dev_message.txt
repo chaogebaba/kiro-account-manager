@@ -1,0 +1,12 @@
+h2 302
+content-type: application/json
+content-length: 2
+location: https://kiro-prod-us-east-1.auth.us-east-1.amazoncognito.com/oauth2/authorize?client_id=59bd15eh40ee7pc20h0bkcu7id&response_type=code&scope=email+openid&redirect_uri=kiro%3A%2F%2Fkiro.kiroAgent%2Fauthenticate-success&state=3956190e-f0dd-4c3a-9e77-5ae5b1038f39&code_challenge=9uprLk3CTn0Zr2zhHldxZTIvJvYdK-ncVjcekQuqAZ0&code_challenge_method=S256&identity_provider=Google
+date: Fri, 05 Dec 2025 08:56:51 GMT
+x-amzn-requestid: f93079f2-a64b-42bf-b45f-91282629e8db
+x-cache: Miss from cloudfront
+via: 1.1 121e4f23a8dc87c5e7f14fb52c388482.cloudfront.net (CloudFront)
+x-amz-cf-pop: SIN2-P11
+x-amz-cf-id: 4AuJo6PlxJ7-oFbv_rROddbwiSSwViEtPqy9lxhu3k-Ry5nOsDyWVg==
+
+{}

@@ -1,0 +1,16 @@
+h2 302
+date: Fri, 05 Dec 2025 09:02:06 GMT
+content-length: 0
+location: https://accounts.google.com/o/oauth2/v2/auth?client_id=183617306620-gqedod9q1su19ghqs84m1tje4lp761ks.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%2Foauth2%2Fidpresponse&scope=email+openid&response_type=code&state=H4sIAAAAAAAAAE2RW4_aMBCF_4ufMThObCe8ZZcWwmZZlvtSrZDjOORGnJIEKFX_ewepqvZlxkc-37E18xtJNERdg7VsWmwdpmuWjxr1tkU9FMHN2JhjqUEoEMyLYovp1CFai1pRkpKoUJ3IYjDEYCiysxkOBo_WfxT_qKt2ILs2hZ4p2WrcdErppgFAA6BM_AhPvr50RMMfSJ9kVoIwta4g_rOHUvAQW8dOrARmXuxghwuBI64l5lxb0lE2o24CUAbWZ3Yr1U83dPas0jtW1uUOd7aara6tu5SVeNvMZ7PLkrpvBRA5EEvKOBwLOAa76j3yrzdei_sqsmgw2paZeiJemJxfu-oSicKuQ2odjmztVXqVmBc9mRBxsl6mh3KJvYLu72RbZ3GQk5a4bT792Iz9g-RLJ8m7W1GzcRNUJtznoUXmLStTzxPf0wDLPA1_8W_-7t1M0kXiB_GIfNzE-mlBWLr25-7t6m6eyXg2WvDXbTfz4cflv8nj-mxi_H-X_cfc-1_kSd5NpcyxylrTV-YE6AkNLcEdjzKb8h6q0TCRZaN76AyZVDFBPGbhKNIcO9QWWHLbxg5UxxJe7EUMMi6wr88_fwEehGUCSQIAAA.H4sIAAAAAAAAAAEgAN__0t48hXSfxSwCQV7A_EHDBfh8ReLBUn1D8ueoz3yD-C9_hIoPIAAAAA.4&access_type=offline
+set-cookie: XSRF-TOKEN=db20c6c7-c4ff-4456-bad7-585e8323a3c1; Path=/; Secure; HttpOnly; SameSite=Lax
+x-amz-cognito-request-id: 2c570951-bbe6-4237-a633-4a634179d9b5
+cache-control: no-cache, no-store, max-age=0, must-revalidate
+pragma: no-cache
+set-cookie: csrf-state=IXnQbAwx6p7zTb12IDWlicB09LfrMunvb7k3pL21_g5U9neTfoKeHH07m1KJ_lS-9k2Zz0WpidIj0t08tjJYVGA_a6S4fjuxkp5GsInoLZjL10Pt5lh997FhI-ajhLy6EAXQoHhRfAIdD0Yx7UBR05hUAP8xw8VC0GNDR6MWuNA; Expires=Fri, 05-Dec-2025 09:07:06 GMT; Path=/; Secure; HttpOnly; SameSite=None
+set-cookie: csrf-state-legacy=IXnQbAwx6p7zTb12IDWlicB09LfrMunvb7k3pL21_g5U9neTfoKeHH07m1KJ_lS-9k2Zz0WpidIj0t08tjJYVGA_a6S4fjuxkp5GsInoLZjL10Pt5lh997FhI-ajhLy6EAXQoHhRfAIdD0Yx7UBR05hUAP8xw8VC0GNDR6MWuNA; Expires=Fri, 05-Dec-2025 09:07:06 GMT; Path=/; Secure; HttpOnly
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+strict-transport-security: max-age=31536000 ; includeSubDomains
+x-frame-options: DENY
+server: Server
+

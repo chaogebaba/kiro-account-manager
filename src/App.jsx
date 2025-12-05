@@ -7,6 +7,7 @@ import TokenManager from './components/TokenManager'
 import Settings from './components/Settings'
 import About from './components/About'
 import Login from './components/Login'
+import WebOAuthLogin from './components/WebOAuthLogin'
 import AuthCallback from './components/AuthCallback'
 import UpdateChecker from './components/UpdateChecker'
 import { useTheme } from './contexts/ThemeContext'
@@ -65,6 +66,7 @@ function App() {
       case 'home': return <Home onNavigate={setActiveMenu} />
       case 'token': return <TokenManager />
       case 'login': return <Login onLogin={(user) => { handleLogin(user); setActiveMenu('token'); }} />
+      case 'web-oauth': return <WebOAuthLogin onLogin={(user) => { handleLogin(user); setActiveMenu('token'); }} />
       case 'callback': return <AuthCallback />
       case 'settings': return <Settings />
       case 'about': return <About />

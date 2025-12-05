@@ -1,0 +1,17 @@
+GET /oauth2/authorize?client_id=59bd15eh40ee7pc20h0bkcu7id&response_type=code&scope=email+openid&redirect_uri=kiro%3A%2F%2Fkiro.kiroAgent%2Fauthenticate-success&state=6b47bcbe-466d-4174-a6b9-d9919a3ef067&code_challenge=W-DfVdLyuo_EFrGhEWQjAxywXJxzQ4Br-FEvyk40SSA&code_challenge_method=S256&identity_provider=Github h2
+host: kiro-prod-us-east-1.auth.us-east-1.amazoncognito.com
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 YaBrowser/25.10.0.0 Safari/537.36
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: none
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+sec-ch-ua: "Chromium";v="140", "Not=A?Brand";v="24", "YaBrowser";v="25.10", "Yowser";v="2.5"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+accept-encoding: gzip, deflate, br, zstd
+accept-language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7
+priority: u=0, i
+
