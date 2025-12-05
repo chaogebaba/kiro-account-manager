@@ -8,9 +8,7 @@ use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use crate::state::AppState;
 use crate::auth::User;
-use crate::providers::web_oauth::{WebOAuthProvider, WebOAuthInitResult};
-use crate::providers::AuthProvider;
-use crate::codewhisperer_client::CodeWhispererClient;
+use crate::providers::web_oauth::{WebOAuthProvider, WebOAuthInitResult, GetUserUsageAndLimitsResponse};
 
 // 保存 pending 的登录状态
 static PENDING_LOGIN: OnceLock<Mutex<Option<WebOAuthInitResult>>> = OnceLock::new();
@@ -76,58 +74,39 @@ pub async fn web_oauth_complete(
     state: State<'_, AppState>,
     callback_url: String,
 ) -> Result<String, String> {
-    println!("\n========== web_oauth_complete START ==========");
-    println!("Callback URL: {}", callback_url);
+    println!("[WebOAuth] web_oauth_complete: {}", serde_json::json!({
+        "callbackUrl": format!("{}...", &callback_url[..80.min(callback_url.len())])
+    }));
     
     // 解析 URL 获取 code 和 state
     let url = url::Url::parse(&callback_url)
-        .map_err(|e| {
-            let err = format!("Invalid callback URL: {}", e);
-            println!("ERROR: {}", err);
-            err
-        })?;
+        .map_err(|e| format!("Invalid callback URL: {}", e))?;
     
     let code = url.query_pairs()
         .find(|(k, _)| k == "code")
         .map(|(_, v)| v.to_string())
-        .ok_or_else(|| {
-            let err = "No 'code' parameter in callback URL".to_string();
-            println!("ERROR: {}", err);
-            err
-        })?;
-    println!("Extracted code: {}...{}", &code[..10.min(code.len())], if code.len() > 20 { &code[code.len()-10..] } else { "" });
+        .ok_or("No 'code' parameter in callback URL")?;
     
     let returned_state = url.query_pairs()
         .find(|(k, _)| k == "state")
         .map(|(_, v)| v.to_string())
-        .ok_or_else(|| {
-            let err = "No 'state' parameter in callback URL".to_string();
-            println!("ERROR: {}", err);
-            err
-        })?;
-    println!("Extracted state: {}", returned_state);
+        .ok_or("No 'state' parameter in callback URL")?;
     
-    // 获取 pending 的登录状态（使用 take 原子操作，防止重复调用）
-    println!("Attempting to read PENDING_LOGIN...");
+    println!("[WebOAuth] Parsed callback: {}", serde_json::json!({
+        "code": format!("{}...{}", &code[..10.min(code.len())], if code.len() > 20 { &code[code.len()-10..] } else { "" }),
+        "state": format!("{}...", &returned_state[..40.min(returned_state.len())])
+    }));
+    
+    // 获取 pending 的登录状态
     let init_result = {
         let mut pending_guard = get_pending_login().lock().unwrap();
-        let has_pending = pending_guard.is_some();
-        println!("PENDING_LOGIN has data: {}", has_pending);
-        pending_guard.take()  // 原子操作：获取并清除
-    };
+        pending_guard.take()
+    }.ok_or("No pending authentication state found")?;
     
-    let init_result = init_result.ok_or_else(|| {
-        let err = "No pending authentication state found. Please call web_oauth_initiate first.".to_string();
-        println!("ERROR: {}\n(This may happen if login was already completed by another call)", err);
-        println!("========== web_oauth_complete FAILED ==========\n");
-        err
-    })?;
-    
-    println!("Retrieved PENDING_LOGIN, state: {}", init_result.state);
-    
-    // 验证 state (使用 URL 中的 state，它是服务端编码后的值)
-    // 注意：Kiro 返回的 state 和我们发送的 state 可能格式不同，所以跳过验证
-    println!("State verified, proceeding with login...");
+    println!("[WebOAuth] PENDING_LOGIN: {}", serde_json::json!({
+        "provider": init_result.provider_id,
+        "state": init_result.state
+    }));
     
     // 完成登录
     let web_provider = WebOAuthProvider::new(&init_result.provider_id);
@@ -138,10 +117,36 @@ pub async fn web_oauth_complete(
         &init_result.state,
     ).await?;
 
-    // 获取用户配额信息
-    let machine_id = "web_oauth_client";
-    let cw_client = CodeWhispererClient::new(machine_id);
-    let usage = cw_client.get_usage_limits(&auth_result.access_token).await.ok();
+    // 立即刷新一次 token，验证 csrfToken 可用并获取最新 token
+    let csrf_token = auth_result.csrf_token.as_ref()
+        .ok_or("No csrf_token from ExchangeToken")?;
+    let session_token = auth_result.session_token.as_ref()
+        .ok_or("No session_token from ExchangeToken")?;
+    let refresh_result = web_provider.refresh_token_impl(
+        &auth_result.access_token,
+        csrf_token,
+        session_token,
+    ).await?;
+    
+    println!("[WebOAuth] RefreshToken after login: {}", serde_json::json!({
+        "success": true,
+        "newCsrfToken": refresh_result.csrf_token
+    }));
+
+    // 用刷新后的 token 获取用户配额信息 (使用 KiroWebPortalService)
+    let portal_client = crate::providers::web_oauth::KiroWebPortalClient::new();
+    let usage = portal_client.get_user_usage_and_limits(
+        &refresh_result.access_token,
+        refresh_result.csrf_token.as_deref().unwrap_or(""),
+        session_token,
+        &init_result.idp,
+    ).await.ok();
+
+    if let Some(ref u) = usage {
+        println!("[WebOAuth] GetUserUsageAndLimits Response: {}", serde_json::to_string_pretty(u).unwrap_or_default());
+    } else {
+        println!("[WebOAuth] GetUserUsageAndLimits: null");
+    }
 
     let provider = &init_result.provider_id;
     let email = usage.as_ref()
@@ -161,24 +166,25 @@ pub async fn web_oauth_complete(
         .map(|b| (b.usage_limit.unwrap_or(50), b.current_usage.unwrap_or(0)))
         .unwrap_or((50, 0));
 
-    // 保存 Token
+    // 保存 Token（使用刷新后的 token）
     let (mut token, _is_new) = state.store.lock().unwrap().add_with_tokens(
         email.clone(),
         format!("Kiro {} (Web OAuth)", provider),
         quota,
-        auth_result.access_token.clone(),
-        auth_result.refresh_token.clone(),
+        refresh_result.access_token.clone(),
+        refresh_result.refresh_token.clone(),
         provider.clone(),
         user_id,
         subscription_type,
     );
 
     token.used = used;
-    token.expires_at = Some(auth_result.expires_at.clone());
-    token.profile_arn = auth_result.profile_arn;
-    token.csrf_token = auth_result.csrf_token;
+    token.expires_at = Some(refresh_result.expires_at.clone());
+    token.profile_arn = auth_result.profile_arn.clone();
+    token.csrf_token = refresh_result.csrf_token;
+    token.session_token = auth_result.session_token.clone();  // 保存 SessionToken
     token.auth_method = Some("web_oauth".to_string());
-    extract_usage_fields_web(&mut token, &usage);
+    extract_usage_fields_web_portal(&mut token, &usage);
 
     {
         let mut store = state.store.lock().unwrap();
@@ -197,7 +203,15 @@ pub async fn web_oauth_complete(
         *pending_guard = None;
     }
 
-    println!("\n[WebOAuth] LOGIN SUCCESS: {} - {}/{}", token.email, token.used, token.quota);
+    println!("[WebOAuth] LOGIN SUCCESS: {}", serde_json::json!({
+        "email": token.email,
+        "provider": provider,
+        "quota": token.quota,
+        "used": token.used,
+        "csrfToken": token.csrf_token,
+        "authMethod": token.auth_method,
+        "expiresAt": token.expires_at
+    }));
 
     let _ = app_handle.emit("login-success", token.id.clone());
     Ok(format!("Web OAuth login completed for {}", provider))
@@ -221,30 +235,43 @@ pub async fn web_oauth_refresh(
         return Err("This token is not a Web OAuth token".to_string());
     }
 
+    let access_token = token.access_token.as_ref()
+        .ok_or("No access_token found")?;
     let csrf_token = token.csrf_token.as_ref()
-        .or(token.refresh_token.as_ref())
         .ok_or("No csrf_token found")?;
+    let session_token = token.session_token.as_ref()
+        .ok_or("No session_token found")?;
 
     let provider = token.provider.as_ref().ok_or("No provider found")?;
     let web_provider = WebOAuthProvider::new(provider);
-    let auth_result = web_provider.refresh_token(csrf_token, Default::default()).await?;
+    let auth_result = web_provider.refresh_token_impl(access_token, csrf_token, session_token).await?;
 
+    let new_csrf = auth_result.csrf_token.clone();
     let mut updated_token = token.clone();
     updated_token.access_token = Some(auth_result.access_token.clone());
     updated_token.refresh_token = Some(auth_result.refresh_token.clone());
     updated_token.csrf_token = auth_result.csrf_token;
     updated_token.expires_at = Some(auth_result.expires_at);
 
-    let machine_id = "web_oauth_client";
-    let cw_client = CodeWhispererClient::new(machine_id);
-    if let Ok(usage) = cw_client.get_usage_limits(&auth_result.access_token).await {
+    // 获取用量 (使用 KiroWebPortalService)
+    let portal_client = crate::providers::web_oauth::KiroWebPortalClient::new();
+    let idp = match provider.as_str() {
+        "GitHub" => "Github",
+        other => other,
+    };
+    if let Ok(usage) = portal_client.get_user_usage_and_limits(
+        &auth_result.access_token,
+        new_csrf.as_deref().unwrap_or(""),
+        session_token,
+        idp,
+    ).await {
         if let Some(list) = &usage.usage_breakdown_list {
             if let Some(b) = list.first() {
                 updated_token.quota = b.usage_limit.unwrap_or(updated_token.quota);
                 updated_token.used = b.current_usage.unwrap_or(updated_token.used);
             }
         }
-        extract_usage_fields_web(&mut updated_token, &Some(usage));
+        extract_usage_fields_web_portal(&mut updated_token, &Some(usage));
     }
 
     {
@@ -282,17 +309,18 @@ fn update_auth_state_web(
     *state.auth.refresh_token.lock().unwrap() = Some(refresh_token.to_string());
 }
 
-fn extract_usage_fields_web(
+fn extract_usage_fields_web_portal(
     token: &mut crate::token::Token,
-    usage: &Option<crate::codewhisperer_client::CodeWhispererUsageResponse>,
+    usage: &Option<GetUserUsageAndLimitsResponse>,
 ) {
     if let Some(u) = usage {
         if let Some(si) = &u.subscription_info {
             token.subscription_plan = si.subscription_title.clone();
+            token.subscription_type = si.subscription_type.clone();
         }
         token.days_until_reset = u.days_until_reset;
         if let Some(reset_ts) = u.next_date_reset {
-            if let Some(dt) = chrono::DateTime::from_timestamp(reset_ts as i64, 0) {
+            if let Some(dt) = chrono::DateTime::from_timestamp(reset_ts, 0) {
                 token.reset_date = Some(dt.format("%Y/%m/%d").to_string());
             }
         }
@@ -308,7 +336,7 @@ fn extract_usage_fields_web(
                         token.free_trial_quota = ft.usage_limit;
                         token.free_trial_used = ft.current_usage;
                         if let Some(exp_ts) = ft.free_trial_expiry {
-                            if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts as i64, 0) {
+                            if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts, 0) {
                                 token.free_trial_expiry = Some(dt.format("%Y/%m/%d").to_string());
                             }
                         }
@@ -324,7 +352,7 @@ fn extract_usage_fields_web(
                         token.bonus_name = first.display_name.clone();
                         token.bonus_status = first.status.clone();
                         if let Some(exp_ts) = first.expires_at {
-                            if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts as i64, 0) {
+                            if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts, 0) {
                                 token.bonus_expiry = Some(dt.format("%Y/%m/%d").to_string());
                             }
                         }
@@ -336,7 +364,7 @@ fn extract_usage_fields_web(
                         usage_limit: b.usage_limit,
                         current_usage: b.current_usage,
                         expires_at: b.expires_at.map(|ts| {
-                            chrono::DateTime::from_timestamp(ts as i64, 0)
+                            chrono::DateTime::from_timestamp(ts, 0)
                                 .map(|dt| dt.format("%Y/%m/%d %H:%M").to_string())
                                 .unwrap_or_default()
                         }),

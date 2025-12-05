@@ -70,9 +70,9 @@ struct ExchangeTokenRequest {
     state: String,
 }
 
-/// ExchangeToken 响应
+/// ExchangeToken 响应 (CBOR body)
 #[derive(Debug, Deserialize)]
-pub struct ExchangeTokenResponse {
+pub struct ExchangeTokenCborResponse {
     #[serde(rename = "accessToken")]
     access_token: Option<String>,
     #[serde(rename = "csrfToken")]
@@ -81,6 +81,16 @@ pub struct ExchangeTokenResponse {
     expires_in: Option<i64>,
     #[serde(rename = "profileArn")]
     profile_arn: Option<String>,
+}
+
+/// ExchangeToken 完整响应 (包含 Set-Cookie)
+#[derive(Debug)]
+pub struct ExchangeTokenResponse {
+    pub access_token: Option<String>,
+    pub csrf_token: Option<String>,
+    pub expires_in: Option<i64>,
+    pub profile_arn: Option<String>,
+    pub session_token: Option<String>,  // 从 Set-Cookie 提取
 }
 
 /// RefreshToken 请求
@@ -99,6 +109,101 @@ pub struct RefreshTokenResponse {
     csrf_token: Option<String>,
     #[serde(rename = "expiresIn")]
     expires_in: Option<i64>,
+    #[serde(rename = "profileArn")]
+    profile_arn: Option<String>,
+}
+
+/// GetUserInfo 响应
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetUserInfoResponse {
+    pub email: Option<String>,
+    #[serde(rename = "userId")]
+    pub user_id: Option<String>,
+    pub idp: Option<String>,
+    pub status: Option<String>,
+    #[serde(rename = "featureFlags")]
+    pub feature_flags: Option<serde_json::Value>,
+}
+
+/// GetUserUsageAndLimits 请求
+#[derive(Debug, Serialize)]
+struct GetUserUsageAndLimitsRequest {
+    #[serde(rename = "isEmailRequired")]
+    is_email_required: bool,
+    origin: String,
+}
+
+/// GetUserUsageAndLimits 响应 - 用量信息
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UsageBreakdown {
+    #[serde(rename = "resourceType")]
+    pub resource_type: Option<String>,
+    #[serde(rename = "usageLimit")]
+    pub usage_limit: Option<i32>,
+    #[serde(rename = "currentUsage")]
+    pub current_usage: Option<i32>,
+    #[serde(rename = "usageLimitWithPrecision")]
+    pub usage_limit_with_precision: Option<f64>,
+    #[serde(rename = "currentUsageWithPrecision")]
+    pub current_usage_with_precision: Option<f64>,
+    #[serde(rename = "overageRate")]
+    pub overage_rate: Option<f64>,
+    #[serde(rename = "overageCap")]
+    pub overage_cap: Option<i32>,
+    pub currency: Option<String>,
+    #[serde(rename = "freeTrialInfo")]
+    pub free_trial_info: Option<FreeTrialInfo>,
+    pub bonuses: Option<Vec<BonusInfo>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct FreeTrialInfo {
+    #[serde(rename = "freeTrialStatus")]
+    pub free_trial_status: Option<String>,
+    #[serde(rename = "usageLimit")]
+    pub usage_limit: Option<i32>,
+    #[serde(rename = "currentUsage")]
+    pub current_usage: Option<i32>,
+    #[serde(rename = "freeTrialExpiry")]
+    pub free_trial_expiry: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BonusInfo {
+    #[serde(rename = "bonusCode")]
+    pub bonus_code: Option<String>,
+    #[serde(rename = "displayName")]
+    pub display_name: Option<String>,
+    #[serde(rename = "usageLimit")]
+    pub usage_limit: Option<f64>,
+    #[serde(rename = "currentUsage")]
+    pub current_usage: Option<f64>,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: Option<i64>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SubscriptionInfo {
+    #[serde(rename = "subscriptionType")]
+    pub subscription_type: Option<String>,
+    #[serde(rename = "subscriptionTitle")]
+    pub subscription_title: Option<String>,
+}
+
+/// GetUserUsageAndLimits 响应
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetUserUsageAndLimitsResponse {
+    #[serde(rename = "usageBreakdownList")]
+    pub usage_breakdown_list: Option<Vec<UsageBreakdown>>,
+    #[serde(rename = "subscriptionInfo")]
+    pub subscription_info: Option<SubscriptionInfo>,
+    #[serde(rename = "daysUntilReset")]
+    pub days_until_reset: Option<i32>,
+    #[serde(rename = "nextDateReset")]
+    pub next_date_reset: Option<i64>,
+    #[serde(rename = "userInfo")]
+    pub user_info: Option<GetUserInfoResponse>,
 }
 
 // ============================================================
@@ -202,14 +307,6 @@ impl KiroWebPortalClient {
             self.endpoint
         );
 
-        println!("\n[WebOAuth] ExchangeToken Request:");
-        println!("  URL: {}", url);
-        println!("  idp: {}", idp);
-        println!("  code: {}...{}", &code[..20.min(code.len())], if code.len() > 30 { &code[code.len()-10..] } else { "" });
-        println!("  code_verifier: {}", code_verifier);
-        println!("  redirect_uri: {}", redirect_uri);
-        println!("  state: {}...", &state[..20.min(state.len())]);
-
         let request = ExchangeTokenRequest {
             idp: idp.to_string(),
             code: code.to_string(),
@@ -218,8 +315,16 @@ impl KiroWebPortalClient {
             state: state.to_string(),
         };
 
+        println!("[WebOAuth] ExchangeToken Request: {}", serde_json::json!({
+            "url": url,
+            "idp": idp,
+            "code": format!("{}...{}", &code[..20.min(code.len())], if code.len() > 30 { &code[code.len()-10..] } else { "" }),
+            "codeVerifier": code_verifier,
+            "redirectUri": redirect_uri,
+            "state": format!("{}...", &state[..40.min(state.len())])
+        }));
+
         let body = cbor_encode(&request)?;
-        println!("  body size: {} bytes", body.len());
 
         let response = self.client
             .post(&url)
@@ -232,44 +337,84 @@ impl KiroWebPortalClient {
             .map_err(|e| format!("ExchangeToken request failed: {}", e))?;
 
         let status = response.status();
-        println!("  Status: {}", status);
+        
+        // 从 Set-Cookie 提取 SessionToken
+        let mut session_token: Option<String> = None;
+        for cookie in response.cookies() {
+            if cookie.name() == "SessionToken" {
+                session_token = Some(cookie.value().to_string());
+            }
+        }
         
         let bytes = response.bytes().await
             .map_err(|e| format!("Failed to read response: {}", e))?;
 
         if !status.is_success() {
-            // 尝试解析 CBOR 错误响应
             let error_msg = if let Ok(error) = cbor_decode::<serde_json::Value>(&bytes) {
-                format!("{:?}", error)
+                serde_json::to_string(&error).unwrap_or_default()
             } else {
                 String::from_utf8_lossy(&bytes).to_string()
             };
-            println!("  Error: {}", error_msg);
+            println!("[WebOAuth] ExchangeToken Error: {}", serde_json::json!({"status": status.to_string(), "error": error_msg}));
             return Err(format!("ExchangeToken failed ({}): {}", status, error_msg));
         }
 
-        println!("  Response size: {} bytes", bytes.len());
-        cbor_decode(&bytes)
+        println!("[WebOAuth] ExchangeToken Status: {} ({} bytes), sessionToken: {}", 
+            status, bytes.len(), session_token.is_some());
+        
+        let cbor_resp: ExchangeTokenCborResponse = cbor_decode(&bytes)?;
+        
+        Ok(ExchangeTokenResponse {
+            access_token: cbor_resp.access_token,
+            csrf_token: cbor_resp.csrf_token,
+            expires_in: cbor_resp.expires_in,
+            profile_arn: cbor_resp.profile_arn,
+            session_token,
+        })
     }
 
     /// 调用 RefreshToken 接口
-    pub async fn refresh_token(&self, csrf_token: &str) -> Result<RefreshTokenResponse, String> {
+    /// access_token: AccessToken cookie
+    /// csrf_token: csrfToken (body 和 x-csrf-token header)
+    /// session_token: SessionToken cookie
+    /// idp: Idp cookie (Google/Github/BuilderId)
+    pub async fn refresh_token_with_cookies(
+        &self,
+        access_token: &str,
+        csrf_token: &str,
+        session_token: &str,
+        idp: &str,
+    ) -> Result<RefreshTokenResponse, String> {
         let url = format!(
             "{}/service/KiroWebPortalService/operation/RefreshToken",
             self.endpoint
         );
 
+        // body 里传 csrfToken 值
         let request = RefreshTokenRequest {
             csrf_token: csrf_token.to_string(),
         };
 
         let body = cbor_encode(&request)?;
+        
+        // Cookie: AccessToken=xxx; SessionToken=xxx; Idp=xxx
+        let cookie = format!("AccessToken={}; SessionToken={}; Idp={}", access_token, session_token, idp);
+
+        println!("[WebOAuth] RefreshToken Request: {}", serde_json::json!({
+            "url": url,
+            "idp": idp,
+            "accessToken": format!("{}...", &access_token[..20.min(access_token.len())]),
+            "sessionToken": format!("{}...", &session_token[..20.min(session_token.len())]),
+            "csrfToken": csrf_token
+        }));
 
         let response = self.client
             .post(&url)
             .header("Content-Type", "application/cbor")
             .header("Accept", "application/cbor")
             .header("smithy-protocol", "rpc-v2-cbor")
+            .header("x-csrf-token", csrf_token)
+            .header("Cookie", cookie)
             .body(body)
             .send()
             .await
@@ -280,10 +425,81 @@ impl KiroWebPortalClient {
             .map_err(|e| format!("Failed to read response: {}", e))?;
 
         if !status.is_success() {
-            return Err(format!("RefreshToken failed ({}): {:?}", status, bytes));
+            let error_msg = if let Ok(error) = cbor_decode::<serde_json::Value>(&bytes) {
+                serde_json::to_string(&error).unwrap_or_default()
+            } else {
+                String::from_utf8_lossy(&bytes).to_string()
+            };
+            println!("[WebOAuth] RefreshToken Error: {}", serde_json::json!({"status": status.to_string(), "error": error_msg}));
+            return Err(format!("RefreshToken failed ({}): {}", status, error_msg));
         }
 
+        println!("[WebOAuth] RefreshToken Status: {} ({} bytes)", status, bytes.len());
         cbor_decode(&bytes)
+    }
+
+    /// 调用 GetUserUsageAndLimits 接口 (KiroWebPortalService)
+    /// 使用 Cookie 认证: AccessToken, SessionToken, Idp
+    pub async fn get_user_usage_and_limits(
+        &self,
+        access_token: &str,
+        csrf_token: &str,
+        session_token: &str,
+        idp: &str,
+    ) -> Result<GetUserUsageAndLimitsResponse, String> {
+        let url = format!(
+            "{}/service/KiroWebPortalService/operation/GetUserUsageAndLimits",
+            self.endpoint
+        );
+
+        let request = GetUserUsageAndLimitsRequest {
+            is_email_required: true,
+            origin: "KIRO_IDE".to_string(),
+        };
+
+        let body = cbor_encode(&request)?;
+        let cookie = format!("AccessToken={}; SessionToken={}; Idp={}", access_token, session_token, idp);
+
+        println!("[WebOAuth] GetUserUsageAndLimits Request: {}", serde_json::json!({
+            "url": url,
+            "idp": idp
+        }));
+
+        let response = self.client
+            .post(&url)
+            .header("Content-Type", "application/cbor")
+            .header("Accept", "application/cbor")
+            .header("smithy-protocol", "rpc-v2-cbor")
+            .header("authorization", format!("Bearer {}", access_token))
+            .header("x-csrf-token", csrf_token)
+            .header("Cookie", cookie)
+            .body(body)
+            .send()
+            .await
+            .map_err(|e| format!("GetUserUsageAndLimits request failed: {}", e))?;
+
+        let status = response.status();
+        let bytes = response.bytes().await
+            .map_err(|e| format!("Failed to read response: {}", e))?;
+
+        if !status.is_success() {
+            let error_msg = if let Ok(error) = cbor_decode::<serde_json::Value>(&bytes) {
+                serde_json::to_string(&error).unwrap_or_default()
+            } else {
+                String::from_utf8_lossy(&bytes).to_string()
+            };
+            println!("[WebOAuth] GetUserUsageAndLimits Error: {}", serde_json::json!({"status": status.to_string(), "error": error_msg}));
+            return Err(format!("GetUserUsageAndLimits failed ({}): {}", status, error_msg));
+        }
+
+        println!("[WebOAuth] GetUserUsageAndLimits Status: {} ({} bytes)", status, bytes.len());
+        let resp: GetUserUsageAndLimitsResponse = cbor_decode(&bytes)?;
+        println!("[WebOAuth] GetUserUsageAndLimits Response: {}", serde_json::json!({
+            "email": resp.user_info.as_ref().and_then(|u| u.email.clone()),
+            "daysUntilReset": resp.days_until_reset,
+            "usageBreakdown": resp.usage_breakdown_list.as_ref().map(|l| l.len())
+        }));
+        Ok(resp)
     }
 }
 
@@ -321,8 +537,10 @@ impl AuthProvider for WebOAuthProvider {
         Err("Web OAuth requires two-step flow: use initiate_login() and complete_login()".to_string())
     }
 
-    async fn refresh_token(&self, refresh_token: &str, _metadata: RefreshMetadata) -> Result<AuthResult, String> {
-        self.refresh_token_impl(refresh_token).await
+    async fn refresh_token(&self, _refresh_token: &str, _metadata: RefreshMetadata) -> Result<AuthResult, String> {
+        // Web OAuth 刷新需要 access_token 和 csrf_token，不能用这个方法
+        // 请使用 refresh_token_impl(access_token, csrf_token)
+        Err("Web OAuth refresh requires access_token and csrf_token. Use refresh_token_impl() instead.".to_string())
     }
 
     fn get_provider_id(&self) -> &str {
@@ -343,13 +561,15 @@ impl WebOAuthProvider {
         let redirect_uri = KIRO_REDIRECT_URI.to_string();
 
         let idp = self.get_idp_name();
-        println!("\n[WebOAuth] Starting {} authentication...", self.provider_id);
-        println!("IDP: {}", idp);
-        println!("Redirect URI: {}", redirect_uri);
-        println!("State: {}", state);
+        
+        println!("[WebOAuth] InitiateLogin Request: {}", serde_json::json!({
+            "provider": self.provider_id,
+            "idp": idp,
+            "redirectUri": redirect_uri,
+            "state": state,
+            "codeChallenge": code_challenge
+        }));
 
-        // 调用 InitiateLogin 获取 redirectUrl
-        println!("[WebOAuth] Calling InitiateLogin...");
         let client = KiroWebPortalClient::new();
         let initiate_response = client
             .initiate_login(idp, &redirect_uri, &code_challenge, &state)
@@ -358,7 +578,9 @@ impl WebOAuthProvider {
         let authorize_url = initiate_response.redirect_url
             .ok_or("No redirectUrl in InitiateLogin response")?;
         
-        println!("[WebOAuth] Got redirect URL: {}", authorize_url);
+        println!("[WebOAuth] InitiateLogin Response: {}", serde_json::json!({
+            "redirectUrl": &authorize_url[..100.min(authorize_url.len())]
+        }));
 
         Ok(WebOAuthInitResult {
             authorize_url,
@@ -378,12 +600,18 @@ impl WebOAuthProvider {
         let idp = self.get_idp_name();
         let redirect_uri = KIRO_REDIRECT_URI;
 
-        // 调用 ExchangeToken
-        println!("[WebOAuth] Exchanging code for tokens via CBOR API...");
         let client = KiroWebPortalClient::new();
         let token_response = client
             .exchange_token(idp, code, code_verifier, redirect_uri, returned_state)
             .await?;
+
+        println!("[WebOAuth] ExchangeToken Response: {:?}", serde_json::json!({
+            "accessToken": token_response.access_token.as_ref().map(|s| format!("{}...{}", &s[..20.min(s.len())], if s.len() > 30 { &s[s.len()-10..] } else { "" })),
+            "csrfToken": token_response.csrf_token,
+            "expiresIn": token_response.expires_in,
+            "profileArn": token_response.profile_arn,
+            "sessionToken": token_response.session_token.as_ref().map(|s| format!("{}...", &s[..20.min(s.len())]))
+        }));
 
         // 构建 AuthResult
         let access_token = token_response.access_token
@@ -393,7 +621,12 @@ impl WebOAuthProvider {
         let expires_in = token_response.expires_in.unwrap_or(3600);
         let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
 
-        println!("[WebOAuth] {} login successful!", self.provider_id);
+        println!("[WebOAuth] Login Success: {}", serde_json::json!({
+            "provider": self.provider_id,
+            "expiresIn": expires_in,
+            "expiresAt": expires_at.format("%Y/%m/%d %H:%M:%S").to_string(),
+            "hasSessionToken": token_response.session_token.is_some()
+        }));
 
         Ok(AuthResult {
             access_token,
@@ -411,14 +644,27 @@ impl WebOAuthProvider {
             sso_session_id: None,
             profile_arn: token_response.profile_arn,
             csrf_token: Some(csrf_token),
+            session_token: token_response.session_token,
         })
     }
 
-    pub async fn refresh_token_impl(&self, csrf_token: &str) -> Result<AuthResult, String> {
+    /// 刷新 token
+    /// access_token: 当前的 AccessToken
+    /// csrf_token: 当前的 csrfToken
+    /// session_token: 当前的 SessionToken
+    pub async fn refresh_token_impl(&self, access_token: &str, csrf_token: &str, session_token: &str) -> Result<AuthResult, String> {
+        let idp = self.get_idp_name();
         let client = KiroWebPortalClient::new();
-        let token_response = client.refresh_token(csrf_token).await?;
+        let token_response = client.refresh_token_with_cookies(access_token, csrf_token, session_token, idp).await?;
 
-        let access_token = token_response.access_token
+        println!("[WebOAuth] RefreshToken Response: {}", serde_json::json!({
+            "accessToken": token_response.access_token.as_ref().map(|s| format!("{}...", &s[..20.min(s.len())])),
+            "csrfToken": token_response.csrf_token,
+            "expiresIn": token_response.expires_in,
+            "profileArn": token_response.profile_arn
+        }));
+
+        let new_access_token = token_response.access_token
             .ok_or("No access_token in response")?;
         let new_csrf_token = token_response.csrf_token
             .ok_or("No csrf_token in response")?;
@@ -426,7 +672,7 @@ impl WebOAuthProvider {
         let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
 
         Ok(AuthResult {
-            access_token,
+            access_token: new_access_token,
             refresh_token: new_csrf_token.clone(),
             expires_at: expires_at.format("%Y/%m/%d %H:%M:%S").to_string(),
             provider: self.provider_id.clone(),
@@ -439,8 +685,9 @@ impl WebOAuthProvider {
             client_secret: None,
             client_id_hash: None,
             sso_session_id: None,
-            profile_arn: None,
+            profile_arn: token_response.profile_arn,
             csrf_token: Some(new_csrf_token),
+            session_token: None,
         })
     }
 }

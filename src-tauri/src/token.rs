@@ -128,9 +128,12 @@ pub struct Token {
     // Social 登录专用
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile_arn: Option<String>,
-    // 认证方式: social / IdC
+    // 认证方式: social / IdC / web_oauth
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth_method: Option<String>,
+    // Web OAuth 专用 - SessionToken (从 Set-Cookie 获取)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_token: Option<String>,
 }
 
 impl Token {
@@ -201,6 +204,7 @@ impl Token {
             sso_region: None,
             profile_arn: None,
             auth_method: None,
+            session_token: None,
         }
     }
 }

@@ -81,10 +81,23 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
 
     let refresh_token_str = token.refresh_token.as_ref().ok_or("No refresh token")?;
     let provider_str = token.provider.as_deref().unwrap_or("Google");
+    let auth_method = token.auth_method.as_deref().unwrap_or("social");
     
-    // 根据 provider 选择刷新方式
-    let (new_access_token, new_refresh_token, expires_in, new_csrf_token) = if provider_str == "BuilderId" {
-        // BuilderId 使用 IdcProvider 刷新
+    // 根据 auth_method 和 provider 选择刷新方式
+    let (new_access_token, new_refresh_token, expires_in, new_csrf_token) = if auth_method == "web_oauth" {
+        // Web OAuth 登录的账号（Google/GitHub/BuilderId）使用 WebOAuthProvider 刷新
+        let access_token = token.access_token.as_ref()
+            .ok_or("No access_token found for web_oauth refresh")?;
+        let csrf_token = token.csrf_token.as_ref()
+            .ok_or("No csrf_token found for web_oauth refresh")?;
+        let session_token = token.session_token.as_ref()
+            .ok_or("No session_token found for web_oauth refresh")?;
+        
+        let web_provider = crate::providers::web_oauth::WebOAuthProvider::new(provider_str);
+        let auth_result = web_provider.refresh_token_impl(access_token, csrf_token, session_token).await?;
+        (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in, auth_result.csrf_token)
+    } else if provider_str == "BuilderId" {
+        // Desktop OAuth (IdC) 登录的 BuilderId 使用 IdcProvider 刷新
         let metadata = RefreshMetadata {
             client_id: token.sso_client_id.clone(),
             client_secret: token.sso_client_secret.clone(),
@@ -96,7 +109,7 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         let auth_result = idc_provider.refresh_token(refresh_token_str, metadata).await?;
         (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in, auth_result.csrf_token)
     } else {
-        // Google/GitHub 使用 SocialProvider 刷新
+        // Desktop OAuth (Social) 登录的 Google/GitHub 使用 SocialProvider 刷新
         let metadata = RefreshMetadata {
             profile_arn: token.profile_arn.clone(),
             ..Default::default()

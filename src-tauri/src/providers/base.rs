@@ -37,6 +37,10 @@ pub struct AuthResult {
     pub profile_arn: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub csrf_token: Option<String>,
+    
+    // Web OAuth 专用
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_token: Option<String>,
 }
 
 /// 刷新 Token 所需的元数据

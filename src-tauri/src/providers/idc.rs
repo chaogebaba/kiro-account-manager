@@ -136,6 +136,7 @@ impl AuthProvider for IdcProvider {
             sso_session_id: token_response.aws_sso_app_session_id,
             profile_arn: None,
             csrf_token: None,
+            session_token: None,
         })
     }
 
@@ -167,6 +168,7 @@ impl AuthProvider for IdcProvider {
             sso_session_id: token_response.aws_sso_app_session_id,
             profile_arn: None,
             csrf_token: None,
+            session_token: None,
         })
     }
 

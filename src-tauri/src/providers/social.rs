@@ -120,6 +120,7 @@ impl AuthProvider for SocialProvider {
             sso_session_id: None,
             profile_arn: token_response.profile_arn,
             csrf_token: token_response.csrf_token,
+            session_token: None,
         })
     }
 
@@ -145,6 +146,7 @@ impl AuthProvider for SocialProvider {
             sso_session_id: None,
             profile_arn: metadata.profile_arn.or(token_response.profile_arn),
             csrf_token: token_response.csrf_token,
+            session_token: None,
         })
     }
 
