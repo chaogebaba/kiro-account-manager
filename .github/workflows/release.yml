@@ -46,3 +46,28 @@ jobs:
           releaseBody: '请查看 CHANGELOG 了解更新内容。'
           releaseDraft: false
           prerelease: false
+
+  sync-to-public:
+    needs: release
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Wait for all builds
+        run: sleep 60
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release_assets
+          gh release download ${{ github.ref_name }} --repo ${{ github.repository }} --dir release_assets
+
+      - name: Upload to public repo
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --repo hj01857655/kiro-token-manager \
+            --title "Kiro Token Manager ${{ github.ref_name }}" \
+            --notes "请查看 CHANGELOG 了解更新内容。" \
+            release_assets/* || echo "Release may already exist"
