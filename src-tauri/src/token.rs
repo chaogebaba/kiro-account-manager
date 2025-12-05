@@ -31,11 +31,19 @@ pub struct Token {
     pub reset_date: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub days_until_reset: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quota_with_precision: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub used_with_precision: Option<f64>,
     // 免费试用
     #[serde(skip_serializing_if = "Option::is_none")]
     pub free_trial_quota: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub free_trial_used: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub free_trial_quota_with_precision: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub free_trial_used_with_precision: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub free_trial_expiry: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -53,18 +61,46 @@ pub struct Token {
     pub bonus_code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bonus_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bonus_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bonus_redeemed_at: Option<String>,
     // 超额相关
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overage_rate: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overage_cap: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub overage_cap_with_precision: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub overage_capable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_overages: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_overages_with_precision: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overage_charges: Option<f64>,
     // 订阅详情
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subscription_plan: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upgrade_capable: Option<bool>,
+    // 配额显示信息
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name_plural: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    // 订阅管理
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subscription_management_target: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overage_status: Option<String>,
     // AWS SSO OIDC (BuilderId) 专用
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_client_id: Option<String>,
@@ -108,8 +144,12 @@ impl Token {
             csrf_token: None,
             reset_date: None,
             days_until_reset: None,
+            quota_with_precision: None,
+            used_with_precision: None,
             free_trial_quota: None,
             free_trial_used: None,
+            free_trial_quota_with_precision: None,
+            free_trial_used_with_precision: None,
             free_trial_expiry: None,
             free_trial_status: None,
             bonus_quota: None,
@@ -118,11 +158,24 @@ impl Token {
             bonus_name: None,
             bonus_code: None,
             bonus_status: None,
+            bonus_description: None,
+            bonus_redeemed_at: None,
             overage_rate: None,
             overage_cap: None,
+            overage_cap_with_precision: None,
             overage_capable: None,
+            current_overages: None,
+            current_overages_with_precision: None,
+            overage_charges: None,
             subscription_plan: None,
             upgrade_capable: None,
+            display_name: None,
+            display_name_plural: None,
+            resource_type: None,
+            unit: None,
+            currency: None,
+            subscription_management_target: None,
+            overage_status: None,
             sso_client_id: None,
             sso_client_secret: None,
             sso_region: None,

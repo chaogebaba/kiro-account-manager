@@ -108,9 +108,12 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
     };
     
     // 根据 provider 类型选择获取限额的 API
-    let (quota, used, reset_date, days_until_reset, free_trial_quota, free_trial_used, free_trial_expiry, free_trial_status,
-         bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status,
-         overage_rate, overage_cap, subscription_type, subscription_plan, overage_capable, upgrade_capable) = 
+    let (quota, used, quota_with_precision, used_with_precision, reset_date, days_until_reset,
+         free_trial_quota, free_trial_used, free_trial_quota_with_precision, free_trial_used_with_precision, free_trial_expiry, free_trial_status,
+         bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status, bonus_description, bonus_redeemed_at,
+         overage_rate, overage_cap, overage_cap_with_precision, subscription_type, subscription_plan, overage_capable, upgrade_capable,
+         current_overages, current_overages_with_precision, overage_charges, display_name, display_name_plural, resource_type, unit, currency,
+         subscription_management_target, overage_status) = 
     if provider_str == "BuilderId" {
         // BuilderId 使用 CodeWhisperer API
         let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
@@ -120,6 +123,8 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         let breakdown = usage.as_ref().and_then(|u| u.usage_breakdown_list.as_ref()).and_then(|list| list.first());
         let quota = breakdown.and_then(|b| b.usage_limit).unwrap_or(50);
         let used = breakdown.and_then(|b| b.current_usage).unwrap_or(0);
+        let quota_with_precision = breakdown.and_then(|b| b.usage_limit_with_precision);
+        let used_with_precision = breakdown.and_then(|b| b.current_usage_with_precision);
         
         let (reset_date, days_until_reset) = usage.as_ref().and_then(|u| u.next_date_reset).map(|ts| {
             let reset_dt = chrono::DateTime::from_timestamp(ts as i64, 0);
@@ -129,16 +134,22 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         }).map(|(d, days)| (Some(d), Some(days))).unwrap_or((None, None));
         
         let free_trial = breakdown.and_then(|b| b.free_trial_info.as_ref());
-        let free_trial_quota = free_trial.and_then(|f| f.usage_limit);
-        let free_trial_used = free_trial.and_then(|f| f.current_usage);
-        let free_trial_expiry = free_trial.and_then(|f| f.free_trial_expiry).map(|ts| {
-            chrono::DateTime::from_timestamp(ts as i64, 0)
-                .map(|dt| dt.format("%Y/%m/%d").to_string())
-                .unwrap_or_default()
-        });
         let free_trial_status = free_trial.and_then(|f| f.free_trial_status.clone());
+        // 只有 freeTrialStatus === "ACTIVE" 时才使用 freeTrialInfo
+        let is_free_trial_active = free_trial_status.as_ref().map(|s| s == "ACTIVE").unwrap_or(false);
+        let free_trial_quota = if is_free_trial_active { free_trial.and_then(|f| f.usage_limit) } else { None };
+        let free_trial_used = if is_free_trial_active { free_trial.and_then(|f| f.current_usage) } else { None };
+        let free_trial_quota_with_precision = if is_free_trial_active { free_trial.and_then(|f| f.usage_limit_with_precision) } else { None };
+        let free_trial_used_with_precision = if is_free_trial_active { free_trial.and_then(|f| f.current_usage_with_precision) } else { None };
+        let free_trial_expiry = if is_free_trial_active {
+            free_trial.and_then(|f| f.free_trial_expiry).map(|ts| {
+                chrono::DateTime::from_timestamp(ts as i64, 0)
+                    .map(|dt| dt.format("%Y/%m/%d").to_string())
+                    .unwrap_or_default()
+            })
+        } else { None };
         
-        let (bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status) = breakdown
+        let (bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status, bonus_description, bonus_redeemed_at) = breakdown
             .and_then(|b| b.bonuses.as_ref())
             .map(|bonuses| {
                 let total_quota: i32 = bonuses.iter().filter_map(|b| b.usage_limit.map(|v| v as i32)).sum();
@@ -152,12 +163,24 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
                 let name = first.and_then(|b| b.display_name.clone());
                 let code = first.and_then(|b| b.bonus_code.clone());
                 let status = first.and_then(|b| b.status.clone());
-                (total_quota, total_used, expiry, name, code, status)
+                // IdC BonusInfo 没有 description 和 redeemed_at
+                let description: Option<String> = None;
+                let redeemed_at: Option<String> = None;
+                (total_quota, total_used, expiry, name, code, status, description, redeemed_at)
             })
-            .unwrap_or((0, 0, None, None, None, None));
+            .unwrap_or((0, 0, None, None, None, None, None, None));
         
         let overage_rate = breakdown.and_then(|b| b.overage_rate);
         let overage_cap = breakdown.and_then(|b| b.overage_cap);
+        let overage_cap_with_precision = breakdown.and_then(|b| b.overage_cap_with_precision);
+        let current_overages = breakdown.and_then(|b| b.current_overages);
+        let current_overages_with_precision = breakdown.and_then(|b| b.current_overages_with_precision);
+        let overage_charges = breakdown.and_then(|b| b.overage_charges);
+        let display_name = breakdown.and_then(|b| b.display_name.clone());
+        let display_name_plural = breakdown.and_then(|b| b.display_name_plural.clone());
+        let resource_type = breakdown.and_then(|b| b.resource_type.clone());
+        let unit = breakdown.and_then(|b| b.unit.clone());
+        let currency = breakdown.and_then(|b| b.currency.clone());
         
         let subscription_info = usage.as_ref().and_then(|u| u.subscription_info.as_ref());
         let subscription_type = subscription_info.and_then(|s| s.subscription_type.clone());
@@ -166,10 +189,18 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
             .map(|c| c == "OVERAGE_CAPABLE");
         let upgrade_capable = subscription_info.and_then(|s| s.upgrade_capability.as_ref())
             .map(|c| c == "UPGRADE_CAPABLE");
+        let subscription_management_target = subscription_info.and_then(|s| s.subscription_management_target.clone());
         
-        (quota, used, reset_date, days_until_reset, free_trial_quota, free_trial_used, free_trial_expiry, free_trial_status,
-         bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status,
-         overage_rate, overage_cap, subscription_type, subscription_plan, overage_capable, upgrade_capable)
+        let overage_status = usage.as_ref()
+            .and_then(|u| u.overage_configuration.as_ref())
+            .and_then(|c| c.overage_status.clone());
+        
+        (quota, used, quota_with_precision, used_with_precision, reset_date, days_until_reset,
+         free_trial_quota, free_trial_used, free_trial_quota_with_precision, free_trial_used_with_precision, free_trial_expiry, free_trial_status,
+         bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status, bonus_description, bonus_redeemed_at,
+         overage_rate, overage_cap, overage_cap_with_precision, subscription_type, subscription_plan, overage_capable, upgrade_capable,
+         current_overages, current_overages_with_precision, overage_charges, display_name, display_name_plural, resource_type, unit, currency,
+         subscription_management_target, overage_status)
     } else {
         // Social 使用 Desktop API
         let usage = get_usage_limits_desktop(&new_access_token).await?;
@@ -177,6 +208,9 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         let breakdown = usage.usage_breakdown_list.as_ref().and_then(|list| list.first());
         let quota = breakdown.and_then(|b| b.usage_limit).unwrap_or(50);
         let used = breakdown.and_then(|b| b.current_usage).unwrap_or(0);
+        // Social API 没有精度字段
+        let quota_with_precision: Option<f64> = None;
+        let used_with_precision: Option<f64> = None;
         
         let (reset_date, days_until_reset) = breakdown.and_then(|b| b.next_date_reset).map(|ts| {
             let reset_dt = chrono::DateTime::from_timestamp(ts as i64, 0);
@@ -190,16 +224,22 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         }).map(|(d, days)| (Some(d), Some(days))).unwrap_or((None, None));
         
         let free_trial = breakdown.and_then(|b| b.free_trial_info.as_ref());
-        let free_trial_quota = free_trial.and_then(|f| f.usage_limit);
-        let free_trial_used = free_trial.and_then(|f| f.current_usage);
-        let free_trial_expiry = free_trial.and_then(|f| f.free_trial_expiry).map(|ts| {
-            chrono::DateTime::from_timestamp(ts as i64, 0)
-                .map(|dt| dt.format("%Y/%m/%d").to_string())
-                .unwrap_or_default()
-        });
         let free_trial_status = free_trial.and_then(|f| f.free_trial_status.clone());
+        // 只有 freeTrialStatus === "ACTIVE" 时才使用 freeTrialInfo
+        let is_free_trial_active = free_trial_status.as_ref().map(|s| s == "ACTIVE").unwrap_or(false);
+        let free_trial_quota = if is_free_trial_active { free_trial.and_then(|f| f.usage_limit) } else { None };
+        let free_trial_used = if is_free_trial_active { free_trial.and_then(|f| f.current_usage) } else { None };
+        let free_trial_quota_with_precision: Option<f64> = None;
+        let free_trial_used_with_precision: Option<f64> = None;
+        let free_trial_expiry = if is_free_trial_active {
+            free_trial.and_then(|f| f.free_trial_expiry).map(|ts| {
+                chrono::DateTime::from_timestamp(ts as i64, 0)
+                    .map(|dt| dt.format("%Y/%m/%d").to_string())
+                    .unwrap_or_default()
+            })
+        } else { None };
         
-        let (bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status) = breakdown
+        let (bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status, bonus_description, bonus_redeemed_at) = breakdown
             .and_then(|b| b.bonuses.as_ref())
             .map(|bonuses| {
                 let total_quota: i32 = bonuses.iter().filter_map(|b| b.usage_limit.map(|v| v as i32)).sum();
@@ -213,12 +253,30 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
                 let name = first.and_then(|b| b.display_name.clone());
                 let code = first.and_then(|b| b.bonus_code.clone());
                 let status = first.and_then(|b| b.status.clone());
-                (total_quota, total_used, expiry, name, code, status)
+                let description = first.and_then(|b| b.description.clone());
+                let redeemed_at = first.and_then(|b| b.redeemed_at).map(|ts| {
+                    chrono::DateTime::from_timestamp(ts as i64, 0)
+                        .map(|dt| dt.format("%Y/%m/%d").to_string())
+                        .unwrap_or_default()
+                });
+                (total_quota, total_used, expiry, name, code, status, description, redeemed_at)
             })
-            .unwrap_or((0, 0, None, None, None, None));
+            .unwrap_or((0, 0, None, None, None, None, None, None));
         
         let overage_rate = breakdown.and_then(|b| b.overage_rate);
         let overage_cap = breakdown.and_then(|b| b.overage_cap);
+        let overage_cap_with_precision: Option<f64> = None;
+        // Social API 没有这些字段
+        let current_overages: Option<i32> = None;
+        let current_overages_with_precision: Option<f64> = None;
+        let overage_charges: Option<f64> = None;
+        let display_name: Option<String> = None;
+        let display_name_plural: Option<String> = None;
+        let resource_type: Option<String> = None;
+        let unit: Option<String> = None;
+        let currency = breakdown.and_then(|b| b.currency.clone());
+        let subscription_management_target: Option<String> = None;
+        let overage_status: Option<String> = None;
         
         let subscription_info = usage.subscription_info.as_ref();
         let subscription_type = subscription_info.and_then(|s| s.subscription_type.clone());
@@ -228,9 +286,12 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         let upgrade_capable = subscription_info.and_then(|s| s.upgrade_capability.as_ref())
             .map(|c| c == "UPGRADE_CAPABLE");
         
-        (quota, used, reset_date, days_until_reset, free_trial_quota, free_trial_used, free_trial_expiry, free_trial_status,
-         bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status,
-         overage_rate, overage_cap, subscription_type, subscription_plan, overage_capable, upgrade_capable)
+        (quota, used, quota_with_precision, used_with_precision, reset_date, days_until_reset,
+         free_trial_quota, free_trial_used, free_trial_quota_with_precision, free_trial_used_with_precision, free_trial_expiry, free_trial_status,
+         bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status, bonus_description, bonus_redeemed_at,
+         overage_rate, overage_cap, overage_cap_with_precision, subscription_type, subscription_plan, overage_capable, upgrade_capable,
+         current_overages, current_overages_with_precision, overage_charges, display_name, display_name_plural, resource_type, unit, currency,
+         subscription_management_target, overage_status)
     };
 
     let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
@@ -242,6 +303,8 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
     if let Some(idx) = token_idx {
         store.tokens[idx].quota = quota;
         store.tokens[idx].used = used;
+        store.tokens[idx].quota_with_precision = quota_with_precision;
+        store.tokens[idx].used_with_precision = used_with_precision;
         store.tokens[idx].access_token = Some(new_access_token);
         if let Some(rt) = new_refresh_token {
             store.tokens[idx].refresh_token = Some(rt);
@@ -252,6 +315,8 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         
         store.tokens[idx].free_trial_quota = free_trial_quota;
         store.tokens[idx].free_trial_used = free_trial_used;
+        store.tokens[idx].free_trial_quota_with_precision = free_trial_quota_with_precision;
+        store.tokens[idx].free_trial_used_with_precision = free_trial_used_with_precision;
         store.tokens[idx].free_trial_expiry = free_trial_expiry;
         store.tokens[idx].free_trial_status = free_trial_status;
         
@@ -261,16 +326,29 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         store.tokens[idx].bonus_name = bonus_name;
         store.tokens[idx].bonus_code = bonus_code;
         store.tokens[idx].bonus_status = bonus_status;
+        store.tokens[idx].bonus_description = bonus_description;
+        store.tokens[idx].bonus_redeemed_at = bonus_redeemed_at;
         
         store.tokens[idx].overage_rate = overage_rate;
         store.tokens[idx].overage_cap = overage_cap;
+        store.tokens[idx].overage_cap_with_precision = overage_cap_with_precision;
         store.tokens[idx].overage_capable = overage_capable;
+        store.tokens[idx].current_overages = current_overages;
+        store.tokens[idx].current_overages_with_precision = current_overages_with_precision;
+        store.tokens[idx].overage_charges = overage_charges;
         
         if subscription_type.is_some() {
             store.tokens[idx].subscription_type = subscription_type;
         }
         store.tokens[idx].subscription_plan = subscription_plan;
         store.tokens[idx].upgrade_capable = upgrade_capable;
+        store.tokens[idx].display_name = display_name;
+        store.tokens[idx].display_name_plural = display_name_plural;
+        store.tokens[idx].resource_type = resource_type;
+        store.tokens[idx].unit = unit;
+        store.tokens[idx].currency = currency;
+        store.tokens[idx].subscription_management_target = subscription_management_target;
+        store.tokens[idx].overage_status = overage_status;
         
         if store.tokens[idx].used >= store.tokens[idx].quota {
             store.tokens[idx].status = "已失效".to_string();

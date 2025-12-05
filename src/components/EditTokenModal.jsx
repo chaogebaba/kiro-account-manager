@@ -124,7 +124,7 @@ function EditTokenModal({ token, onClose, onSuccess }) {
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                     <span className={`text-xs ${colors.textMuted}`}>主配额</span>
                   </div>
-                  <div className={`text-lg font-semibold ${colors.text}`}>{form.used} / {form.quota}</div>
+                  <div className={`text-lg font-semibold ${colors.text}`} title={token.used_with_precision != null ? `精确: ${token.used_with_precision} / ${token.quota_with_precision}` : undefined}>{form.used} / {form.quota}</div>
                   {token.reset_date && <div className={`text-xs ${colors.textMuted} mt-1`}>{token.reset_date} 重置{token.days_until_reset > 0 && ` (${token.days_until_reset}天)`}</div>}
                 </div>
                 
@@ -132,18 +132,19 @@ function EditTokenModal({ token, onClose, onSuccess }) {
                   <div className="flex items-center gap-1.5 mb-1">
                     <div className={`w-2 h-2 rounded-full ${token.free_trial_status === 'ACTIVE' ? 'bg-cyan-500' : 'bg-gray-300'}`}></div>
                     <span className={`text-xs ${colors.textMuted}`}>免费试用</span>
+                    {token.free_trial_status && <span className={`text-xs ${token.free_trial_status === 'ACTIVE' ? 'text-cyan-500' : colors.textMuted}`}>({token.free_trial_status})</span>}
                   </div>
-                  <div className={`text-lg font-semibold ${colors.text}`}>{token.free_trial_quota ? `${token.free_trial_used || 0} / ${token.free_trial_quota}` : '-'}</div>
+                  <div className={`text-lg font-semibold ${colors.text}`} title={token.free_trial_used_with_precision != null ? `精确: ${token.free_trial_used_with_precision} / ${token.free_trial_quota_with_precision}` : undefined}>{token.free_trial_quota ? `${token.free_trial_used || 0} / ${token.free_trial_quota}` : '-'}</div>
                   {token.free_trial_expiry && <div className={`text-xs ${colors.textMuted} mt-1`}>{token.free_trial_expiry} 过期</div>}
                 </div>
                 
                 <div className={`rounded-lg p-3 ${token.bonus_quota && token.bonus_status === 'ACTIVE' ? (isDark ? 'bg-purple-500/20' : 'bg-purple-50') : (isDark ? 'bg-white/5' : 'bg-gray-50')}`}>
                   <div className="flex items-center gap-1.5 mb-1">
                     <div className={`w-2 h-2 rounded-full ${token.bonus_status === 'ACTIVE' ? 'bg-purple-500' : 'bg-gray-300'}`}></div>
-                    <span className={`text-xs ${colors.textMuted} truncate`}>{token.bonus_name || '奖励'}</span>
+                    <span className={`text-xs ${colors.textMuted} truncate`} title={token.bonus_description || token.bonus_code}>{token.bonus_name || '奖励'}{token.bonus_code && ` (${token.bonus_code})`}</span>
                   </div>
                   <div className={`text-lg font-semibold ${colors.text}`}>{token.bonus_quota ? `${token.bonus_used || 0} / ${token.bonus_quota}` : '-'}</div>
-                  {token.bonus_expiry && <div className={`text-xs ${colors.textMuted} mt-1`}>{token.bonus_expiry} 过期</div>}
+                  {token.bonus_expiry && <div className={`text-xs ${colors.textMuted} mt-1`}>{token.bonus_expiry} 过期{token.bonus_redeemed_at && ` · ${token.bonus_redeemed_at} 兑换`}</div>}
                 </div>
               </div>
             </div>
@@ -209,11 +210,24 @@ function EditTokenModal({ token, onClose, onSuccess }) {
                 <div className={`px-5 pb-5 space-y-4 border-t ${colors.cardBorder} pt-4`}>
                   <div className={`grid grid-cols-2 gap-x-6 gap-y-2 text-sm pb-4 border-b ${colors.cardBorder}`}>
                     <div className="flex justify-between"><span className={colors.textMuted}>订阅计划</span><span className={`${colors.text} font-mono text-xs`}>{token.subscription_plan || '-'}</span></div>
+                    <div className="flex justify-between"><span className={colors.textMuted}>订阅类型</span><span className={`${colors.text} font-mono text-xs truncate max-w-[180px]`} title={token.subscription_type}>{token.subscription_type || '-'}</span></div>
                     <div className="flex justify-between"><span className={colors.textMuted}>用户 ID</span><span className={`${colors.text} font-mono text-xs truncate max-w-[150px]`} title={token.user_id}>{token.user_id?.slice(-12) || '-'}</span></div>
+                    <div className="flex justify-between"><span className={colors.textMuted}>可升级</span><span className={colors.text}>{token.upgrade_capable ? '是' : '否'}</span></div>
                     {token.overage_capable && (
                       <>
-                        <div className="flex justify-between"><span className={colors.textMuted}>超额费率</span><span className={colors.text}>${token.overage_rate}/次</span></div>
-                        <div className="flex justify-between"><span className={colors.textMuted}>超额上限</span><span className={colors.text}>{token.overage_cap}</span></div>
+                        <div className="flex justify-between"><span className={colors.textMuted}>超额费率</span><span className={colors.text}>${token.overage_rate}/{token.unit || '次'}</span></div>
+                        <div className="flex justify-between"><span className={colors.textMuted}>超额上限</span><span className={colors.text} title={token.overage_cap_with_precision != null ? `精确: ${token.overage_cap_with_precision}` : undefined}>{token.overage_cap}</span></div>
+                        {(token.current_overages > 0 || token.current_overages_with_precision > 0) && <div className="flex justify-between"><span className={colors.textMuted}>当前超额</span><span className={colors.text} title={token.current_overages_with_precision != null ? `精确: ${token.current_overages_with_precision}` : undefined}>{token.current_overages}</span></div>}
+                        {token.overage_charges > 0 && <div className="flex justify-between"><span className={colors.textMuted}>超额费用</span><span className={colors.text}>${token.overage_charges?.toFixed(2)}</span></div>}
+                      </>
+                    )}
+                    {token.provider === 'BuilderId' && (
+                      <>
+                        {token.display_name && <div className="flex justify-between"><span className={colors.textMuted}>资源名称</span><span className={colors.text}>{token.display_name}{token.display_name_plural && ` (${token.display_name_plural})`}</span></div>}
+                        {token.resource_type && <div className="flex justify-between"><span className={colors.textMuted}>资源类型</span><span className={`${colors.text} font-mono text-xs`}>{token.resource_type}</span></div>}
+                        {token.currency && <div className="flex justify-between"><span className={colors.textMuted}>货币</span><span className={colors.text}>{token.currency}</span></div>}
+                        {token.overage_status && <div className="flex justify-between"><span className={colors.textMuted}>超额状态</span><span className={`${colors.text} ${token.overage_status === 'ENABLED' ? 'text-green-500' : ''}`}>{token.overage_status}</span></div>}
+                        {token.subscription_management_target && <div className="flex justify-between"><span className={colors.textMuted}>订阅管理</span><span className={colors.text}>{token.subscription_management_target}</span></div>}
                       </>
                     )}
                   </div>
@@ -279,15 +293,30 @@ function EditTokenModal({ token, onClose, onSuccess }) {
                     )}
                     
                     {/* Social 专用字段 */}
-                    {(token.provider === 'Google' || token.provider === 'Github') && token.profile_arn && (
-                      <div className={`pt-3 border-t ${colors.cardBorder}`}>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className={`text-xs ${colors.textMuted}`}>Profile ARN</label>
-                          <button type="button" onClick={() => handleCopy(token.profile_arn, 'profile_arn')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
-                            {copied === 'profile_arn' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-                          </button>
-                        </div>
-                        <input type="text" value={token.profile_arn} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                    {(token.provider === 'Google' || token.provider === 'Github') && (
+                      <div className={`pt-3 border-t ${colors.cardBorder} space-y-3`}>
+                        {token.profile_arn && (
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className={`text-xs ${colors.textMuted}`}>Profile ARN</label>
+                              <button type="button" onClick={() => handleCopy(token.profile_arn, 'profile_arn')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                                {copied === 'profile_arn' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                              </button>
+                            </div>
+                            <input type="text" value={token.profile_arn} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                          </div>
+                        )}
+                        {token.csrf_token && (
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className={`text-xs ${colors.textMuted}`}>CSRF Token</label>
+                              <button type="button" onClick={() => handleCopy(token.csrf_token, 'csrf_token')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                                {copied === 'csrf_token' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                              </button>
+                            </div>
+                            <input type="text" value={token.csrf_token} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
