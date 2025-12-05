@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event'
 import { Search, Download, RefreshCw, Edit2, Trash2, Plus, Copy, Check, X, Loader, Users, Zap, Clock, Shield, Repeat, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react'
 import EditTokenModal from './EditTokenModal'
 import { useTheme } from '../contexts/ThemeContext'
+import { calcTokenStats, getUsagePercent } from '../utils/tokenStats'
 
 function TokenManager() {
   const { theme, colors } = useTheme()
@@ -126,15 +127,7 @@ function TokenManager() {
   const filteredTokens = tokens.filter(t => t.email.toLowerCase().includes(searchTerm.toLowerCase()) || t.label.toLowerCase().includes(searchTerm.toLowerCase()))
   const totalPages = Math.ceil(filteredTokens.length / pageSize) || 1
   const paginatedTokens = filteredTokens.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-  const getUsagePercent = (used, quota) => quota === 0 ? 0 : Math.min(100, (used / quota) * 100)
-
-  // 统计
-  const stats = {
-    total: tokens.length,
-    active: tokens.filter(t => t.status === '正常' || t.status === '有效').length,
-    totalQuota: tokens.reduce((sum, t) => sum + (t.quota || 0), 0),
-    totalUsed: tokens.reduce((sum, t) => sum + (t.used || 0), 0),
-  }
+  const stats = calcTokenStats(tokens)
 
   return (
     <div className={`h-full flex flex-col ${colors.main}`}>

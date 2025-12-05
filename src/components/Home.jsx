@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { RefreshCw, Users, Zap, Shield, Clock, TrendingUp, ArrowRight, Sparkles } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { calcTokenStats } from '../utils/tokenStats'
 
 function Home({ onNavigate }) {
   const { theme, colors } = useTheme()
@@ -24,15 +25,7 @@ function Home({ onNavigate }) {
     setLoading(false)
   }
 
-  const stats = {
-    total: tokens.length,
-    active: tokens.filter(t => t.status === '正常' || t.status === '有效').length,
-    totalQuota: tokens.reduce((sum, t) => sum + (t.quota || 0), 0),
-    totalUsed: tokens.reduce((sum, t) => sum + (t.used || 0), 0),
-    proPlus: tokens.filter(t => t.subscription_type?.includes('PRO+')).length,
-    pro: tokens.filter(t => t.subscription_type?.includes('PRO') && !t.subscription_type?.includes('PRO+')).length,
-  }
-  const usagePercent = stats.totalQuota > 0 ? (stats.totalUsed / stats.totalQuota * 100).toFixed(1) : 0
+  const stats = calcTokenStats(tokens)
 
   const isDark = theme === 'dark'
 
@@ -98,7 +91,7 @@ function Home({ onNavigate }) {
               <div className={`w-12 h-12 ${isDark ? 'bg-orange-500/20' : 'bg-orange-100'} rounded-xl flex items-center justify-center`}>
                 <TrendingUp size={22} className="text-orange-600" />
               </div>
-              <span className={`text-3xl font-bold ${colors.text}`}>{usagePercent}%</span>
+              <span className={`text-3xl font-bold ${colors.text}`}>{stats.usagePercent}%</span>
             </div>
             <div className={`text-sm ${colors.textMuted}`}>配额使用率</div>
           </div>
@@ -205,23 +198,23 @@ function Home({ onNavigate }) {
                     <span className={`${colors.textMuted} ml-2 text-lg`}>/ {stats.totalQuota}</span>
                   </div>
                   <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
-                    usagePercent > 80 
+                    stats.usagePercent > 80 
                       ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600') 
-                      : usagePercent > 50 
+                      : stats.usagePercent > 50 
                         ? (isDark ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-700') 
                         : (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600')
                   }`}>
-                    {usagePercent}%
+                    {stats.usagePercent}%
                   </span>
                 </div>
                 <div className={`h-4 ${isDark ? 'bg-white/10' : 'bg-gray-100'} rounded-full overflow-hidden`}>
                   <div 
                     className={`h-full rounded-full transition-all ${
-                      usagePercent > 80 ? 'bg-gradient-to-r from-red-400 to-red-500' : 
-                      usagePercent > 50 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 
+                      stats.usagePercent > 80 ? 'bg-gradient-to-r from-red-400 to-red-500' : 
+                      stats.usagePercent > 50 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 
                       'bg-gradient-to-r from-green-400 to-emerald-500'
                     }`}
-                    style={{ width: `${usagePercent}%` }}
+                    style={{ width: `${stats.usagePercent}%` }}
                   />
                 </div>
               </div>
