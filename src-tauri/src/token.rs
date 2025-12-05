@@ -4,6 +4,18 @@ use uuid::Uuid;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BonusItem {
+    pub bonus_code: Option<String>,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub usage_limit: Option<f64>,
+    pub current_usage: Option<f64>,
+    pub expires_at: Option<String>,
+    pub redeemed_at: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Token {
     pub id: String,
     pub email: String,
@@ -48,7 +60,7 @@ pub struct Token {
     pub free_trial_expiry: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub free_trial_status: Option<String>,
-    // 奖励额度
+    // 奖励额度（汇总）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bonus_quota: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -65,6 +77,9 @@ pub struct Token {
     pub bonus_description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bonus_redeemed_at: Option<String>,
+    // 奖励额度（完整数组）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bonuses: Option<Vec<BonusItem>>,
     // 超额相关
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overage_rate: Option<f64>,
@@ -160,6 +175,7 @@ impl Token {
             bonus_status: None,
             bonus_description: None,
             bonus_redeemed_at: None,
+            bonuses: None,
             overage_rate: None,
             overage_cap: None,
             overage_cap_with_precision: None,

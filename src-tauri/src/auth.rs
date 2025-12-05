@@ -56,6 +56,8 @@ pub struct DesktopRefreshResponse {
     pub expires_in: i64,
     #[serde(rename = "profileArn")]
     pub profile_arn: String,
+    #[serde(rename = "csrfToken")]
+    pub csrf_token: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -174,6 +176,19 @@ pub async fn refresh_token_desktop(refresh_token: &str) -> Result<DesktopRefresh
                 let status = response.status();
                 let text = response.text().await.unwrap_or_default();
                 
+                println!("\n[Desktop] RefreshToken Response:");
+                println!("Status: {}", status);
+                // 格式化打印 JSON
+                match serde_json::from_str::<serde_json::Value>(&text) {
+                    Ok(json) => {
+                        match serde_json::to_string_pretty(&json) {
+                            Ok(pretty) => println!("{}", pretty),
+                            Err(_) => println!("{}", text),
+                        }
+                    }
+                    Err(_) => println!("{}", text),
+                }
+                
                 if !status.is_success() {
                     if status.as_u16() == 401 {
                         return Err("RefreshToken 已过期或无效".to_string());
@@ -229,20 +244,19 @@ pub async fn get_usage_limits_desktop(access_token: &str) -> Result<DesktopUsage
                 let status = response.status();
                 let text = response.text().await.unwrap_or_default();
                 
-                // println!("\n[7] USAGE LIMITS RESPONSE");
-                // println!("Status: {}", status);
-                
-                // // 完整格式化打印 JSON
-                // match serde_json::from_str::<serde_json::Value>(&text) {
-                //     Ok(json) => {
-                //         match serde_json::to_string_pretty(&json) {
-                //             Ok(pretty) => println!("{}", pretty),
-                //             Err(_) => println!("{}", text),
-                //         }
-                //     }
-                //     Err(_) => println!("{}", text),
-                // }
-                // println!();
+                println!("\n[Social] GET USAGE LIMITS RESPONSE");
+                println!("Status: {}", status);
+                // 格式化打印 JSON
+                match serde_json::from_str::<serde_json::Value>(&text) {
+                    Ok(json) => {
+                        match serde_json::to_string_pretty(&json) {
+                            Ok(pretty) => println!("{}", pretty),
+                            Err(_) => println!("{}", text),
+                        }
+                    }
+                    Err(_) => println!("{}", text),
+                }
+                println!();
                 
                 if !status.is_success() {
                     return Err(format!("GetUsageLimits failed ({})", status));

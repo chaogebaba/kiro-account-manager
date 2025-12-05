@@ -24,6 +24,7 @@ function TokenManager() {
   const [refreshingId, setRefreshingId] = useState(null)
   const [switchingId, setSwitchingId] = useState(null)
 
+
   const isExpiringSoon = (token) => {
     if (!token.expires_at) return true
     const expiresAt = new Date(token.expires_at.replace(/\//g, '-'))
@@ -167,6 +168,7 @@ function TokenManager() {
               <input type="text" placeholder="搜索..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }} className={`pl-9 pr-4 py-2 ${isDark ? 'bg-white/5' : 'bg-gray-50'} border-0 rounded-xl text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} />
             </div>
             {selectedIds.length > 0 && <button onClick={handleBatchDelete} className="px-3 py-2 bg-red-500 text-white rounded-xl text-sm hover:bg-red-600 flex items-center gap-1"><Trash2 size={14} />删除 ({selectedIds.length})</button>}
+
             <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 flex items-center gap-1.5 shadow-sm"><Plus size={16} />添加</button>
             <button onClick={handleExport} className={`p-2 ${colors.card} border ${colors.cardBorder} rounded-xl ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`} title="导出"><Download size={18} className={colors.textMuted} /></button>
             <button onClick={() => autoRefreshAll(tokens, true)} disabled={autoRefreshing} className={`p-2 ${colors.card} border ${colors.cardBorder} rounded-xl ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-50`} title="刷新全部"><RefreshCw size={18} className={`${colors.textMuted} ${autoRefreshing ? 'animate-spin' : ''}`} /></button>
@@ -245,7 +247,7 @@ function TokenManager() {
                             {token.reset_date} 重置{token.days_until_reset > 0 && <span className="ml-1">({token.days_until_reset}天后)</span>}
                           </div>
                         )}
-                        {(token.free_trial_quota || token.bonus_quota) && (
+                        {(token.free_trial_quota || token.bonuses?.length > 0 || token.bonus_quota) && (
                           <div className="flex flex-col gap-1 pt-0.5">
                             {token.free_trial_quota && (
                               <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full w-fit ${token.free_trial_status === 'ACTIVE' ? (isDark ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-cyan-50 text-cyan-600 border border-cyan-200') : (isDark ? 'bg-gray-700/50 text-gray-500' : 'bg-gray-100 text-gray-400')}`} title={`过期: ${token.free_trial_expiry || '未知'}`}>
@@ -253,7 +255,14 @@ function TokenManager() {
                                 试用 {token.free_trial_used || 0}/{token.free_trial_quota}
                               </span>
                             )}
-                            {token.bonus_quota && (
+                            {token.bonuses?.length > 0 ? (
+                              token.bonuses.map((bonus, idx) => (
+                                <span key={idx} className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full w-fit ${bonus.status === 'ACTIVE' ? (isDark ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-purple-50 text-purple-600 border border-purple-200') : (isDark ? 'bg-gray-700/50 text-gray-500' : 'bg-gray-100 text-gray-400')}`} title={`${bonus.description || bonus.bonus_code} 过期: ${bonus.expires_at || '未知'}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${bonus.status === 'ACTIVE' ? 'bg-purple-500' : 'bg-gray-400'}`}></span>
+                                  {bonus.display_name || '奖励'} {bonus.current_usage || 0}/{bonus.usage_limit || 0}
+                                </span>
+                              ))
+                            ) : token.bonus_quota && (
                               <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full w-fit ${token.bonus_status === 'ACTIVE' ? (isDark ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-purple-50 text-purple-600 border border-purple-200') : (isDark ? 'bg-gray-700/50 text-gray-500' : 'bg-gray-100 text-gray-400')}`} title={`${token.bonus_name || '奖励'} 过期: ${token.bonus_expiry || '未知'}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${token.bonus_status === 'ACTIVE' ? 'bg-purple-500' : 'bg-gray-400'}`}></span>
                                 {token.bonus_name || '奖励'} {token.bonus_used || 0}/{token.bonus_quota}
@@ -414,6 +423,8 @@ function TokenManager() {
           </div>
         </div>
       )}
+
+
     </div>
   )
 }

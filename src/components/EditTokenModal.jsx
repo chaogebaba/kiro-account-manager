@@ -138,15 +138,43 @@ function EditTokenModal({ token, onClose, onSuccess }) {
                   {token.free_trial_expiry && <div className={`text-xs ${colors.textMuted} mt-1`}>{token.free_trial_expiry} 过期</div>}
                 </div>
                 
-                <div className={`rounded-lg p-3 ${token.bonus_quota && token.bonus_status === 'ACTIVE' ? (isDark ? 'bg-purple-500/20' : 'bg-purple-50') : (isDark ? 'bg-white/5' : 'bg-gray-50')}`}>
+                <div className={`rounded-lg p-3 ${token.bonus_quota ? (isDark ? 'bg-purple-500/20' : 'bg-purple-50') : (isDark ? 'bg-white/5' : 'bg-gray-50')}`}>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <div className={`w-2 h-2 rounded-full ${token.bonus_status === 'ACTIVE' ? 'bg-purple-500' : 'bg-gray-300'}`}></div>
-                    <span className={`text-xs ${colors.textMuted} truncate`} title={token.bonus_description || token.bonus_code}>{token.bonus_name || '奖励'}{token.bonus_code && ` (${token.bonus_code})`}</span>
+                    <div className={`w-2 h-2 rounded-full ${token.bonus_quota ? 'bg-purple-500' : 'bg-gray-300'}`}></div>
+                    <span className={`text-xs ${colors.textMuted}`}>奖励总计</span>
                   </div>
                   <div className={`text-lg font-semibold ${colors.text}`}>{token.bonus_quota ? `${token.bonus_used || 0} / ${token.bonus_quota}` : '-'}</div>
-                  {token.bonus_expiry && <div className={`text-xs ${colors.textMuted} mt-1`}>{token.bonus_expiry} 过期{token.bonus_redeemed_at && ` · ${token.bonus_redeemed_at} 兑换`}</div>}
+                  {token.bonuses?.length > 0 && <div className={`text-xs ${colors.textMuted} mt-1`}>{token.bonuses.length} 个奖励</div>}
                 </div>
               </div>
+              
+              {/* Bonuses 列表 */}
+              {token.bonuses?.length > 0 && (
+                <div className={`mt-4 pt-4 border-t ${colors.cardBorder}`}>
+                  <div className={`text-xs font-medium ${colors.textMuted} mb-2`}>奖励详情</div>
+                  <div className="space-y-2">
+                    {token.bonuses.map((bonus, idx) => (
+                      <div key={idx} className={`flex items-center justify-between p-2.5 rounded-lg ${bonus.status === 'ACTIVE' ? (isDark ? 'bg-purple-500/10' : 'bg-purple-50') : bonus.status === 'EXHAUSTED' ? (isDark ? 'bg-gray-500/10' : 'bg-gray-100') : (isDark ? 'bg-white/5' : 'bg-gray-50')}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm font-medium ${colors.text}`}>{bonus.display_name || bonus.bonus_code}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${bonus.status === 'ACTIVE' ? 'bg-green-500/20 text-green-500' : bonus.status === 'EXHAUSTED' ? 'bg-gray-500/20 text-gray-500' : 'bg-yellow-500/20 text-yellow-600'}`}>{bonus.status}</span>
+                          </div>
+                          <div className={`text-xs ${colors.textMuted} mt-0.5`}>
+                            {bonus.description && <span>{bonus.description} · </span>}
+                            {bonus.redeemed_at && <span>兑换: {bonus.redeemed_at} · </span>}
+                            {bonus.expires_at && <span>过期: {bonus.expires_at}</span>}
+                          </div>
+                        </div>
+                        <div className="text-right ml-3">
+                          <div className={`text-sm font-semibold ${colors.text}`}>{bonus.current_usage || 0} / {bonus.usage_limit || 0}</div>
+                          <div className={`text-xs ${colors.textMuted}`}>{bonus.bonus_code}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 基本信息 */}

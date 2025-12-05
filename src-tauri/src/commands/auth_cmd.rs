@@ -92,6 +92,7 @@ async fn login_social(
     token.used = used;
     token.expires_at = Some(auth_result.expires_at.clone());
     token.profile_arn = auth_result.profile_arn;
+    token.csrf_token = auth_result.csrf_token;
     extract_usage_fields(&mut token, &usage);
 
     {
@@ -203,29 +204,63 @@ fn extract_usage_fields(token: &mut crate::token::Token, usage: &Option<crate::a
             if let Some(b) = list.first() {
                 token.overage_rate = b.overage_rate;
                 token.overage_cap = b.overage_cap;
+                token.currency = b.currency.clone();
                 if let Some(ft) = &b.free_trial_info {
-                    token.free_trial_quota = ft.usage_limit;
-                    token.free_trial_used = ft.current_usage;
+                    let is_active = ft.free_trial_status.as_ref().map(|s| s == "ACTIVE").unwrap_or(false);
                     token.free_trial_status = ft.free_trial_status.clone();
-                    if let Some(exp_ts) = ft.free_trial_expiry {
-                        if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts as i64, 0) {
-                            token.free_trial_expiry = Some(dt.format("%Y/%m/%d").to_string());
+                    if is_active {
+                        token.free_trial_quota = ft.usage_limit;
+                        token.free_trial_used = ft.current_usage;
+                        if let Some(exp_ts) = ft.free_trial_expiry {
+                            if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts as i64, 0) {
+                                token.free_trial_expiry = Some(dt.format("%Y/%m/%d").to_string());
+                            }
                         }
                     }
                 }
-                if let Some(bonuses) = &b.bonuses {
-                    if let Some(bonus) = bonuses.iter().find(|b| b.status.as_deref() == Some("ACTIVE")) {
-                        token.bonus_code = bonus.bonus_code.clone();
-                        token.bonus_name = bonus.display_name.clone();
-                        token.bonus_quota = bonus.usage_limit.map(|v| v as i32);
-                        token.bonus_used = bonus.current_usage.map(|v| v as i32);
-                        token.bonus_status = bonus.status.clone();
-                        if let Some(exp_ts) = bonus.expires_at {
+                // 处理 bonuses 数组
+                if let Some(bonus_list) = &b.bonuses {
+                    // 汇总
+                    let total_quota: i32 = bonus_list.iter().filter_map(|b| b.usage_limit.map(|v| v as i32)).sum();
+                    let total_used: i32 = bonus_list.iter().filter_map(|b| b.current_usage.map(|v| v as i32)).sum();
+                    token.bonus_quota = if total_quota > 0 { Some(total_quota) } else { None };
+                    token.bonus_used = if total_quota > 0 { Some(total_used) } else { None };
+                    // 第一个 bonus 的信息
+                    if let Some(first) = bonus_list.first() {
+                        token.bonus_code = first.bonus_code.clone();
+                        token.bonus_name = first.display_name.clone();
+                        token.bonus_status = first.status.clone();
+                        token.bonus_description = first.description.clone();
+                        if let Some(exp_ts) = first.expires_at {
                             if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts as i64, 0) {
                                 token.bonus_expiry = Some(dt.format("%Y/%m/%d").to_string());
                             }
                         }
+                        if let Some(red_ts) = first.redeemed_at {
+                            if let Some(dt) = chrono::DateTime::from_timestamp(red_ts as i64, 0) {
+                                token.bonus_redeemed_at = Some(dt.format("%Y/%m/%d").to_string());
+                            }
+                        }
                     }
+                    // 完整数组
+                    token.bonuses = Some(bonus_list.iter().map(|b| crate::token::BonusItem {
+                        bonus_code: b.bonus_code.clone(),
+                        display_name: b.display_name.clone(),
+                        description: b.description.clone(),
+                        usage_limit: b.usage_limit,
+                        current_usage: b.current_usage,
+                        expires_at: b.expires_at.map(|ts| {
+                            chrono::DateTime::from_timestamp(ts as i64, 0)
+                                .map(|dt| dt.format("%Y/%m/%d %H:%M").to_string())
+                                .unwrap_or_default()
+                        }),
+                        redeemed_at: b.redeemed_at.map(|ts| {
+                            chrono::DateTime::from_timestamp(ts as i64, 0)
+                                .map(|dt| dt.format("%Y/%m/%d %H:%M").to_string())
+                                .unwrap_or_default()
+                        }),
+                        status: b.status.clone(),
+                    }).collect());
                 }
             }
         }
@@ -248,29 +283,66 @@ fn extract_usage_fields_cw(token: &mut crate::token::Token, usage: &Option<crate
             if let Some(b) = list.first() {
                 token.overage_rate = b.overage_rate;
                 token.overage_cap = b.overage_cap;
+                token.overage_cap_with_precision = b.overage_cap_with_precision;
+                token.current_overages = b.current_overages;
+                token.current_overages_with_precision = b.current_overages_with_precision;
+                token.overage_charges = b.overage_charges;
+                token.display_name = b.display_name.clone();
+                token.display_name_plural = b.display_name_plural.clone();
+                token.resource_type = b.resource_type.clone();
+                token.unit = b.unit.clone();
+                token.currency = b.currency.clone();
+                token.quota_with_precision = b.usage_limit_with_precision;
+                token.used_with_precision = b.current_usage_with_precision;
+                
                 if let Some(ft) = &b.free_trial_info {
-                    token.free_trial_quota = ft.usage_limit;
-                    token.free_trial_used = ft.current_usage;
+                    let is_active = ft.free_trial_status.as_ref().map(|s| s == "ACTIVE").unwrap_or(false);
                     token.free_trial_status = ft.free_trial_status.clone();
-                    if let Some(exp_ts) = ft.free_trial_expiry {
-                        if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts as i64, 0) {
-                            token.free_trial_expiry = Some(dt.format("%Y/%m/%d").to_string());
+                    if is_active {
+                        token.free_trial_quota = ft.usage_limit;
+                        token.free_trial_used = ft.current_usage;
+                        token.free_trial_quota_with_precision = ft.usage_limit_with_precision;
+                        token.free_trial_used_with_precision = ft.current_usage_with_precision;
+                        if let Some(exp_ts) = ft.free_trial_expiry {
+                            if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts as i64, 0) {
+                                token.free_trial_expiry = Some(dt.format("%Y/%m/%d").to_string());
+                            }
                         }
                     }
                 }
-                if let Some(bonuses) = &b.bonuses {
-                    if let Some(bonus) = bonuses.iter().find(|b| b.status.as_deref() == Some("ACTIVE")) {
-                        token.bonus_code = bonus.bonus_code.clone();
-                        token.bonus_name = bonus.display_name.clone();
-                        token.bonus_quota = bonus.usage_limit.map(|v| v as i32);
-                        token.bonus_used = bonus.current_usage.map(|v| v as i32);
-                        token.bonus_status = bonus.status.clone();
-                        if let Some(exp_ts) = bonus.expires_at {
+                // 处理 bonuses 数组
+                if let Some(bonus_list) = &b.bonuses {
+                    // 汇总
+                    let total_quota: i32 = bonus_list.iter().filter_map(|b| b.usage_limit.map(|v| v as i32)).sum();
+                    let total_used: i32 = bonus_list.iter().filter_map(|b| b.current_usage.map(|v| v as i32)).sum();
+                    token.bonus_quota = if total_quota > 0 { Some(total_quota) } else { None };
+                    token.bonus_used = if total_quota > 0 { Some(total_used) } else { None };
+                    // 第一个 bonus 的信息
+                    if let Some(first) = bonus_list.first() {
+                        token.bonus_code = first.bonus_code.clone();
+                        token.bonus_name = first.display_name.clone();
+                        token.bonus_status = first.status.clone();
+                        if let Some(exp_ts) = first.expires_at {
                             if let Some(dt) = chrono::DateTime::from_timestamp(exp_ts as i64, 0) {
                                 token.bonus_expiry = Some(dt.format("%Y/%m/%d").to_string());
                             }
                         }
                     }
+                    // 完整数组 (IdC BonusInfo 没有 description 和 redeemed_at)
+                    token.bonuses = Some(bonus_list.iter().map(|b| crate::token::BonusItem {
+                        bonus_code: b.bonus_code.clone(),
+                        display_name: b.display_name.clone(),
+                        description: None,
+                        usage_limit: b.usage_limit,
+                        current_usage: b.current_usage,
+                        expires_at: b.expires_at.map(|ts| {
+                            chrono::DateTime::from_timestamp(ts as i64, 0)
+                                .map(|dt| dt.format("%Y/%m/%d %H:%M").to_string())
+                                .unwrap_or_default()
+                        }),
+                        redeemed_at: None,
+                        status: b.status.clone(),
+                    }).collect());
                 }
             }
         }
@@ -341,11 +413,12 @@ pub async fn handle_kiro_social_callback(
         pending.provider.clone(), user_id, subscription_type,
     );
     token.used = used;
+    extract_usage_fields(&mut token, &usage);
     
     {
         let mut store = state.store.lock().unwrap();
         if let Some(t) = store.tokens.iter_mut().find(|t| t.id == token.id) {
-            t.used = used;
+            *t = token.clone();
         }
         store.save_to_file();
     }
@@ -415,13 +488,13 @@ pub async fn add_kiro_token(
         access_token, refresh_token, idp, user_id, subscription_type,
     );
     token.used = used;
-    token.csrf_token = Some(csrf_token);
+    token.csrf_token = Some(csrf_token.clone());
+    extract_usage_fields(&mut token, &usage);
     
     {
         let mut store = state.store.lock().unwrap();
         if let Some(t) = store.tokens.iter_mut().find(|t| t.id == token.id) {
-            t.used = used;
-            t.csrf_token = token.csrf_token.clone();
+            *t = token.clone();
         }
         store.save_to_file();
     }
