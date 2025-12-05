@@ -1,0 +1,61 @@
+import { RefreshCw } from 'lucide-react'
+import { useTheme } from '../../contexts/ThemeContext'
+
+function RefreshProgressModal({ refreshProgress }) {
+  const { theme, colors } = useTheme()
+  const isDark = theme === 'dark'
+
+  if (!refreshProgress || refreshProgress.total === 0) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className={`${colors.card} rounded-2xl w-[400px] shadow-2xl overflow-hidden`}>
+        <div className={`px-5 py-4 border-b ${colors.cardBorder} ${isDark ? 'bg-blue-500/20' : 'bg-blue-50'} flex items-center gap-2`}>
+          <RefreshCw size={18} className="text-blue-500 animate-spin" />
+          <h2 className={`font-semibold ${colors.text}`}>刷新账号</h2>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <div className={`flex justify-between text-sm mb-2`}>
+              <span className={colors.textMuted}>进度</span>
+              <span className="text-blue-500 font-medium">{refreshProgress.current}/{refreshProgress.total}</span>
+            </div>
+            <div className={`h-2 ${isDark ? 'bg-white/10' : 'bg-gray-200'} rounded-full overflow-hidden`}>
+              <div
+                className="h-full bg-blue-500 rounded-full transition-all"
+                style={{ width: `${(refreshProgress.current / refreshProgress.total) * 100}%` }}
+              />
+            </div>
+          </div>
+          {refreshProgress.currentEmail && (
+            <div className={`text-sm ${colors.textMuted}`}>
+              正在刷新: <span className={colors.text}>{refreshProgress.currentEmail}</span>
+            </div>
+          )}
+          {refreshProgress.results.length > 0 && (
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {refreshProgress.results.map((r, i) => (
+                <div
+                  key={i}
+                  className={`text-xs px-3 py-2 rounded-xl flex justify-between ${
+                    r.success
+                      ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-700')
+                      : (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600')
+                  }`}
+                >
+                  <span className="truncate">{r.email}</span>
+                  <span>{r.success ? `✓ ${r.message}` : `✗ ${r.message}`}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {refreshProgress.current === refreshProgress.total && (
+            <div className="text-center text-green-500 font-medium">刷新完成！</div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default RefreshProgressModal
