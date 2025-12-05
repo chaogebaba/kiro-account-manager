@@ -4,6 +4,7 @@ use tauri::State;
 use crate::state::AppState;
 use crate::token::Token;
 use crate::auth::{User, refresh_token_desktop, get_usage_limits_desktop};
+use crate::codewhisperer_client::CodeWhispererClient;
 use crate::providers::{AuthProvider, SocialProvider, IdcProvider, RefreshMetadata};
 use serde::{Deserialize, Serialize};
 
@@ -106,62 +107,131 @@ pub async fn refresh_token_from_api(state: State<'_, AppState>, id: String) -> R
         (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in)
     };
     
-    let new_access_token = new_access_token;
-    let usage = get_usage_limits_desktop(&new_access_token).await?;
-    
-    let breakdown = usage.usage_breakdown_list.as_ref().and_then(|list| list.first());
-    let quota = breakdown.and_then(|b| b.usage_limit).unwrap_or(50);
-    let used = breakdown.and_then(|b| b.current_usage).unwrap_or(0);
-    
-    let (reset_date, days_until_reset) = breakdown.and_then(|b| b.next_date_reset).map(|ts| {
-        let reset_dt = chrono::DateTime::from_timestamp(ts as i64, 0);
-        let date_str = reset_dt.map(|dt| dt.format("%Y/%m/%d").to_string()).unwrap_or_default();
-        let days = reset_dt.map(|dt| {
-            let now = chrono::Utc::now();
-            let diff = dt.signed_duration_since(now);
-            diff.num_days() as i32
-        }).unwrap_or(0);
-        (date_str, days)
-    }).map(|(d, days)| (Some(d), Some(days))).unwrap_or((None, None));
-    
-    let free_trial = breakdown.and_then(|b| b.free_trial_info.as_ref());
-    let free_trial_quota = free_trial.and_then(|f| f.usage_limit);
-    let free_trial_used = free_trial.and_then(|f| f.current_usage);
-    let free_trial_expiry = free_trial.and_then(|f| f.free_trial_expiry).map(|ts| {
-        chrono::DateTime::from_timestamp(ts as i64, 0)
-            .map(|dt| dt.format("%Y/%m/%d").to_string())
-            .unwrap_or_default()
-    });
-    let free_trial_status = free_trial.and_then(|f| f.free_trial_status.clone());
-    
-    let (bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status) = breakdown
-        .and_then(|b| b.bonuses.as_ref())
-        .map(|bonuses| {
-            let total_quota: i32 = bonuses.iter().filter_map(|b| b.usage_limit.map(|v| v as i32)).sum();
-            let total_used: i32 = bonuses.iter().filter_map(|b| b.current_usage.map(|v| v as i32)).sum();
-            let first = bonuses.first();
-            let expiry = first.and_then(|b| b.expires_at).map(|ts| {
-                chrono::DateTime::from_timestamp(ts as i64, 0)
-                    .map(|dt| dt.format("%Y/%m/%d").to_string())
-                    .unwrap_or_default()
-            });
-            let name = first.and_then(|b| b.display_name.clone());
-            let code = first.and_then(|b| b.bonus_code.clone());
-            let status = first.and_then(|b| b.status.clone());
-            (total_quota, total_used, expiry, name, code, status)
-        })
-        .unwrap_or((0, 0, None, None, None, None));
-    
-    let overage_rate = breakdown.and_then(|b| b.overage_rate);
-    let overage_cap = breakdown.and_then(|b| b.overage_cap);
-    
-    let subscription_info = usage.subscription_info.as_ref();
-    let subscription_type = subscription_info.and_then(|s| s.subscription_type.clone());
-    let subscription_plan = subscription_info.and_then(|s| s.subscription_title.clone());
-    let overage_capable = subscription_info.and_then(|s| s.overage_capability.as_ref())
-        .map(|c| c == "OVERAGE_CAPABLE");
-    let upgrade_capable = subscription_info.and_then(|s| s.upgrade_capability.as_ref())
-        .map(|c| c == "UPGRADE_CAPABLE");
+    // 根据 provider 类型选择获取限额的 API
+    let (quota, used, reset_date, days_until_reset, free_trial_quota, free_trial_used, free_trial_expiry, free_trial_status,
+         bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status,
+         overage_rate, overage_cap, subscription_type, subscription_plan, overage_capable, upgrade_capable) = 
+    if provider_str == "BuilderId" {
+        // BuilderId 使用 CodeWhisperer API
+        let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
+        let cw_client = CodeWhispererClient::new(machine_id);
+        let usage = cw_client.get_usage_limits(&new_access_token).await.ok();
+        
+        let breakdown = usage.as_ref().and_then(|u| u.usage_breakdown_list.as_ref()).and_then(|list| list.first());
+        let quota = breakdown.and_then(|b| b.usage_limit).unwrap_or(50);
+        let used = breakdown.and_then(|b| b.current_usage).unwrap_or(0);
+        
+        let (reset_date, days_until_reset) = usage.as_ref().and_then(|u| u.next_date_reset).map(|ts| {
+            let reset_dt = chrono::DateTime::from_timestamp(ts as i64, 0);
+            let date_str = reset_dt.map(|dt| dt.format("%Y/%m/%d").to_string()).unwrap_or_default();
+            let days = usage.as_ref().and_then(|u| u.days_until_reset).unwrap_or(0);
+            (date_str, days)
+        }).map(|(d, days)| (Some(d), Some(days))).unwrap_or((None, None));
+        
+        let free_trial = breakdown.and_then(|b| b.free_trial_info.as_ref());
+        let free_trial_quota = free_trial.and_then(|f| f.usage_limit);
+        let free_trial_used = free_trial.and_then(|f| f.current_usage);
+        let free_trial_expiry = free_trial.and_then(|f| f.free_trial_expiry).map(|ts| {
+            chrono::DateTime::from_timestamp(ts as i64, 0)
+                .map(|dt| dt.format("%Y/%m/%d").to_string())
+                .unwrap_or_default()
+        });
+        let free_trial_status = free_trial.and_then(|f| f.free_trial_status.clone());
+        
+        let (bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status) = breakdown
+            .and_then(|b| b.bonuses.as_ref())
+            .map(|bonuses| {
+                let total_quota: i32 = bonuses.iter().filter_map(|b| b.usage_limit.map(|v| v as i32)).sum();
+                let total_used: i32 = bonuses.iter().filter_map(|b| b.current_usage.map(|v| v as i32)).sum();
+                let first = bonuses.first();
+                let expiry = first.and_then(|b| b.expires_at).map(|ts| {
+                    chrono::DateTime::from_timestamp(ts as i64, 0)
+                        .map(|dt| dt.format("%Y/%m/%d").to_string())
+                        .unwrap_or_default()
+                });
+                let name = first.and_then(|b| b.display_name.clone());
+                let code = first.and_then(|b| b.bonus_code.clone());
+                let status = first.and_then(|b| b.status.clone());
+                (total_quota, total_used, expiry, name, code, status)
+            })
+            .unwrap_or((0, 0, None, None, None, None));
+        
+        let overage_rate = breakdown.and_then(|b| b.overage_rate);
+        let overage_cap = breakdown.and_then(|b| b.overage_cap);
+        
+        let subscription_info = usage.as_ref().and_then(|u| u.subscription_info.as_ref());
+        let subscription_type = subscription_info.and_then(|s| s.subscription_type.clone());
+        let subscription_plan = subscription_info.and_then(|s| s.subscription_title.clone());
+        let overage_capable = subscription_info.and_then(|s| s.overage_capability.as_ref())
+            .map(|c| c == "OVERAGE_CAPABLE");
+        let upgrade_capable = subscription_info.and_then(|s| s.upgrade_capability.as_ref())
+            .map(|c| c == "UPGRADE_CAPABLE");
+        
+        (quota, used, reset_date, days_until_reset, free_trial_quota, free_trial_used, free_trial_expiry, free_trial_status,
+         bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status,
+         overage_rate, overage_cap, subscription_type, subscription_plan, overage_capable, upgrade_capable)
+    } else {
+        // Social 使用 Desktop API
+        let usage = get_usage_limits_desktop(&new_access_token).await?;
+        
+        let breakdown = usage.usage_breakdown_list.as_ref().and_then(|list| list.first());
+        let quota = breakdown.and_then(|b| b.usage_limit).unwrap_or(50);
+        let used = breakdown.and_then(|b| b.current_usage).unwrap_or(0);
+        
+        let (reset_date, days_until_reset) = breakdown.and_then(|b| b.next_date_reset).map(|ts| {
+            let reset_dt = chrono::DateTime::from_timestamp(ts as i64, 0);
+            let date_str = reset_dt.map(|dt| dt.format("%Y/%m/%d").to_string()).unwrap_or_default();
+            let days = reset_dt.map(|dt| {
+                let now = chrono::Utc::now();
+                let diff = dt.signed_duration_since(now);
+                diff.num_days() as i32
+            }).unwrap_or(0);
+            (date_str, days)
+        }).map(|(d, days)| (Some(d), Some(days))).unwrap_or((None, None));
+        
+        let free_trial = breakdown.and_then(|b| b.free_trial_info.as_ref());
+        let free_trial_quota = free_trial.and_then(|f| f.usage_limit);
+        let free_trial_used = free_trial.and_then(|f| f.current_usage);
+        let free_trial_expiry = free_trial.and_then(|f| f.free_trial_expiry).map(|ts| {
+            chrono::DateTime::from_timestamp(ts as i64, 0)
+                .map(|dt| dt.format("%Y/%m/%d").to_string())
+                .unwrap_or_default()
+        });
+        let free_trial_status = free_trial.and_then(|f| f.free_trial_status.clone());
+        
+        let (bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status) = breakdown
+            .and_then(|b| b.bonuses.as_ref())
+            .map(|bonuses| {
+                let total_quota: i32 = bonuses.iter().filter_map(|b| b.usage_limit.map(|v| v as i32)).sum();
+                let total_used: i32 = bonuses.iter().filter_map(|b| b.current_usage.map(|v| v as i32)).sum();
+                let first = bonuses.first();
+                let expiry = first.and_then(|b| b.expires_at).map(|ts| {
+                    chrono::DateTime::from_timestamp(ts as i64, 0)
+                        .map(|dt| dt.format("%Y/%m/%d").to_string())
+                        .unwrap_or_default()
+                });
+                let name = first.and_then(|b| b.display_name.clone());
+                let code = first.and_then(|b| b.bonus_code.clone());
+                let status = first.and_then(|b| b.status.clone());
+                (total_quota, total_used, expiry, name, code, status)
+            })
+            .unwrap_or((0, 0, None, None, None, None));
+        
+        let overage_rate = breakdown.and_then(|b| b.overage_rate);
+        let overage_cap = breakdown.and_then(|b| b.overage_cap);
+        
+        let subscription_info = usage.subscription_info.as_ref();
+        let subscription_type = subscription_info.and_then(|s| s.subscription_type.clone());
+        let subscription_plan = subscription_info.and_then(|s| s.subscription_title.clone());
+        let overage_capable = subscription_info.and_then(|s| s.overage_capability.as_ref())
+            .map(|c| c == "OVERAGE_CAPABLE");
+        let upgrade_capable = subscription_info.and_then(|s| s.upgrade_capability.as_ref())
+            .map(|c| c == "UPGRADE_CAPABLE");
+        
+        (quota, used, reset_date, days_until_reset, free_trial_quota, free_trial_used, free_trial_expiry, free_trial_status,
+         bonus_quota, bonus_used, bonus_expiry, bonus_name, bonus_code, bonus_status,
+         overage_rate, overage_cap, subscription_type, subscription_plan, overage_capable, upgrade_capable)
+    };
 
     let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
     let expires_at_str = expires_at.format("%Y/%m/%d %H:%M:%S").to_string();
