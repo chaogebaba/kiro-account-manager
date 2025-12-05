@@ -13,7 +13,7 @@ const menuItems = [
   { id: 'about', label: '关于', icon: Info },
 ]
 
-function Sidebar({ activeMenu, onMenuChange, user }) {
+function Sidebar({ activeMenu, onMenuChange }) {
   const [localToken, setLocalToken] = useState(null)
   const [showThemeMenu, setShowThemeMenu] = useState(false)
   const [version, setVersion] = useState('')
@@ -67,21 +67,21 @@ function Sidebar({ activeMenu, onMenuChange, user }) {
         })}
       </nav>
 
-      {/* 当前账号状态 - 合并显示 */}
-      {(user?.email?.includes('@') || localToken) && (
+      {/* Kiro IDE 本地连接状态 */}
+      {localToken && (
         <div className={`mx-3 mb-3 ${colors.sidebarCard} rounded-xl p-3`}>
           <div className={`text-xs ${colors.sidebarMuted} mb-2 flex items-center gap-1.5`}>
             <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
-            {localToken ? 'Kiro IDE 已连接' : '已登录'}
+            Kiro IDE 已连接
           </div>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center text-sm font-medium text-green-300">
-              {user?.email?.[0]?.toUpperCase() || <User size={14} />}
+              <User size={14} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium truncate">{user?.email || localToken?.provider}</div>
+              <div className="text-xs font-medium truncate">{localToken.provider || 'Local'}</div>
               <div className={`text-xs ${colors.sidebarMuted}`}>
-                {user?.provider || (localToken?.expiresAt ? new Date(localToken.expiresAt).toLocaleTimeString() : '')}
+                {localToken.expiresAt ? new Date(localToken.expiresAt).toLocaleTimeString() : ''}
               </div>
             </div>
           </div>
