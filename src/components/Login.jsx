@@ -12,6 +12,7 @@ function Login({ onLogin }) {
   useEffect(() => {
     const unlistenSuccess = listen('login-success', (event) => {
       console.log('Login success event:', event.payload)
+      setLoadingProvider(null)
       onLogin?.(event.payload)
     })
     return () => { unlistenSuccess.then(fn => fn()) }
@@ -25,9 +26,13 @@ function Login({ onLogin }) {
     } catch (e) {
       console.error('Login error:', e)
       setError(typeof e === 'string' ? e : e.message || '登录失败')
-    } finally {
       setLoadingProvider(null)
     }
+  }
+
+  const handleCancel = () => {
+    setLoadingProvider(null)
+    setError('')
   }
 
   return (
@@ -103,6 +108,16 @@ function Login({ onLogin }) {
           <span className={`${colors.text} font-medium`}>Builder ID</span>
           <span className={`absolute right-6 ${colors.text} opacity-0 group-hover:opacity-100 transition-opacity`}>Sign in →</span>
         </button>
+
+        {/* 取消按钮 */}
+        {loadingProvider && (
+          <button
+            onClick={handleCancel}
+            className={`w-full px-6 py-3 ${colors.loginBtn} border rounded-lg hover:border-gray-400 transition-all text-sm ${colors.text}`}
+          >
+            取消
+          </button>
+        )}
       </div>
 
       {/* Footer */}
