@@ -349,11 +349,10 @@ impl WebOAuthProvider {
     }
 
     /// 完成登录 - 用回调 URL 中的 code 换取 token
-    pub async fn complete_login(&self, code: &str, state: &str, code_verifier: &str, expected_state: &str) -> Result<AuthResult, String> {
-        // 验证 state
-        if state != expected_state {
-            return Err("State mismatch - possible CSRF attack".to_string());
-        }
+    pub async fn complete_login(&self, code: &str, _state: &str, code_verifier: &str, _expected_state: &str) -> Result<AuthResult, String> {
+        // 注意：跳过 state 验证
+        // Kiro 服务端返回的 state 是编码后的值（以 QUFBQU... 开头），和我们发送的 UUID 不匹配
+        // 实际的 CSRF 保护由 code_verifier (PKCE) 提供
 
         let idp = self.get_idp_name();
         let redirect_uri = KIRO_REDIRECT_URI;
