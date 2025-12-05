@@ -107,16 +107,14 @@ pub async fn web_oauth_complete(
         })?;
     println!("Extracted state: {}", returned_state);
     
-    // 获取 pending 的登录状态
+    // 获取 pending 的登录状态（先 clone，验证 state 后再清空）
     println!("Attempting to read PENDING_LOGIN...");
     let init_result = {
-        let mut pending_guard = get_pending_login().lock().unwrap();
+        let pending_guard = get_pending_login().lock().unwrap();
         let has_pending = pending_guard.is_some();
         println!("PENDING_LOGIN has data: {}", has_pending);
-        
-        // 取出并清空 pending 状态（在锁内完成）
-        pending_guard.take()
-    }; // MutexGuard 在这里被释放
+        pending_guard.clone()
+    };
     
     let init_result = init_result.ok_or_else(|| {
         let err = "No pending authentication state found. Please call web_oauth_initiate first.".to_string();
@@ -125,7 +123,12 @@ pub async fn web_oauth_complete(
         err
     })?;
     
-    println!("Retrieved and cleared PENDING_LOGIN");
+    // 验证 state
+    if init_result.state != returned_state {
+        return Err(format!("State mismatch: expected {}, got {}", init_result.state, returned_state));
+    }
+    
+    println!("State verified, proceeding with login...");
     
     // 完成登录
     let web_provider = WebOAuthProvider::new(&init_result.provider_id);
@@ -188,6 +191,12 @@ pub async fn web_oauth_complete(
 
     // 更新认证状态
     update_auth_state_web(&state, &email, provider, &auth_result.access_token, &auth_result.refresh_token);
+
+    // 登录成功后清空 pending 状态
+    {
+        let mut pending_guard = get_pending_login().lock().unwrap();
+        *pending_guard = None;
+    }
 
     println!("\n[WebOAuth] LOGIN SUCCESS: {} - {}/{}", token.email, token.used, token.quota);
 

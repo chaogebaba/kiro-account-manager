@@ -280,9 +280,10 @@ impl WebOAuthProvider {
         }
     }
 
-    /// 获取 API 使用的 idp 名称 (GitHub -> Github, BuilderId -> BuilderId)
+    /// 获取 API 使用的 idp 名称
     fn get_idp_name(&self) -> &str {
         match self.provider_id.as_str() {
+            "Google" => "Google",
             "GitHub" => "Github",
             "BuilderId" => "BuilderId",
             other => other,
