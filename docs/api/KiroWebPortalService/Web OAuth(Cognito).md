@@ -251,3 +251,49 @@ function base64UrlEncode(buffer) {
 
 - **Google** - `identity_provider=Google`
 - **GitHub** - `identity_provider=GitHub`
+
+
+---
+
+## Token 刷新
+
+登录成功后，AccessToken 有效期为 3600 秒（1小时）。过期前需要调用 RefreshToken 刷新。
+
+### RefreshToken 请求
+
+**端点**: `POST /service/KiroWebPortalService/operation/RefreshToken`
+
+**请求头**:
+```http
+Content-Type: application/cbor
+Accept: application/cbor
+smithy-protocol: rpc-v2-cbor
+Cookie: AccessToken=...; SessionToken=...; Idp=Google
+```
+
+**请求体 (CBOR)**:
+```json
+{
+  "isEmailRequired": true,
+  "origin": "KIRO_IDE"
+}
+```
+
+### RefreshToken 响应
+
+**响应头**:
+```http
+Set-Cookie: AccessToken=<new_token>; HttpOnly; Secure; SameSite=Lax; Max-Age=604800; Path=/
+Set-Cookie: SessionToken=<new_session>; HttpOnly; Secure; SameSite=Lax; Max-Age=604800; Path=/
+```
+
+**响应体 (CBOR)**:
+```json
+{
+  "accessToken": "aoaAAAAA...",
+  "csrfToken": "xxx=",
+  "expiresIn": 3600
+}
+```
+
+> 详细文档见 [RefreshToken.md](./3.RefreshToken.md)

@@ -1,4 +1,4 @@
-# Desktop API 文档
+# AuthDesktopService (桌面端认证)
 
 Kiro 桌面端使用两套不同的认证系统：
 

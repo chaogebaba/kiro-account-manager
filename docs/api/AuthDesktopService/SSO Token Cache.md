@@ -42,8 +42,30 @@
 | authMethod | `social` | `IdC` |
 | provider | `Google` / `GitHub` | `BuilderId` / `Enterprise` |
 
+## 客户端缓存
+
+**文件位置**: `~/.aws/sso/cache/{clientIdHash}.json`
+
+```json
+{
+  "clientId": "xxx",
+  "clientSecret": "xxx",
+  "expiresAt": "2025-03-01T00:00:00.000Z"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| clientId | string | OIDC 客户端 ID |
+| clientSecret | string | OIDC 客户端密钥 |
+| expiresAt | string | 客户端过期时间 (约 90 天) |
+
+> 刷新 Token 时需要从此文件读取 clientId/clientSecret
+
+---
+
 ## 注意
 
-- IdC 账号没有 `clientId` 和 `clientSecret`，只有 `clientIdHash`
-- 刷新 Token 时需要从本地缓存读取对应的 clientId/clientSecret
-- 缓存位置: `~/.aws/sso/cache/{clientIdHash}.json`
+- Token 文件 (`kiro-auth-token.json`) 和客户端文件 (`{clientIdHash}.json`) 是分开的
+- `clientIdHash` = SHA1(startUrl)
+- 客户端过期后需要重新调用 RegisterClient
