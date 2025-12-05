@@ -331,8 +331,15 @@ impl WebOAuthProvider {
             .initiate_login(idp, &redirect_uri, &code_challenge, &state)
             .await?;
 
-        let authorize_url = initiate_response.redirect_url
+        let mut authorize_url = initiate_response.redirect_url
             .ok_or("No redirectUrl in InitiateLogin response")?;
+        
+        // 添加 prompt=select_account 强制显示账号选择器
+        if authorize_url.contains("?") {
+            authorize_url = format!("{}&prompt=select_account", authorize_url);
+        } else {
+            authorize_url = format!("{}?prompt=select_account", authorize_url);
+        }
         
         println!("[WebOAuth] Got redirect URL: {}", authorize_url);
 
