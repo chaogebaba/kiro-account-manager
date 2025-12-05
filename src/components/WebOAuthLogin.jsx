@@ -14,6 +14,7 @@ function WebOAuthLogin({ onLogin }) {
   const [windowLabel, setWindowLabel] = useState(null)
 
   useEffect(() => {
+    // 监听登录成功事件
     const unlistenSuccess = listen('login-success', (event) => {
       console.log('Web OAuth login success:', event.payload)
       setStep('idle')
@@ -22,7 +23,28 @@ function WebOAuthLogin({ onLogin }) {
       setWindowLabel(null)
       onLogin?.(event.payload)
     })
-    return () => { unlistenSuccess.then(fn => fn()) }
+
+    // 监听 WebView 自动捕获的回调 URL (Tauri v2 on_navigation)
+    const unlistenCallback = listen('web-oauth-callback', async (event) => {
+      console.log('========== web-oauth-callback EVENT ==========')
+      console.log('Callback URL:', event.payload)
+      
+      setStep('completing')
+      try {
+        await invoke('web_oauth_complete', { callbackUrl: event.payload })
+        // login-success 事件会处理后续
+      } catch (e) {
+        console.error('Auto complete failed:', e)
+        setError(typeof e === 'string' ? e : e.message || '自动登录失败')
+        setCallbackUrl(event.payload) // 填入 URL 让用户手动重试
+        setStep('webview')
+      }
+    })
+
+    return () => {
+      unlistenSuccess.then(fn => fn())
+      unlistenCallback.then(fn => fn())
+    }
   }, [onLogin])
 
   // 一键登录：使用 WebView 窗口
