@@ -7,8 +7,8 @@ import { useTheme, themes } from '../contexts/ThemeContext'
 const menuItems = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'token', label: '账号管理', icon: Key },
-  { id: 'login', label: 'IdC 登录', icon: LogIn, desc: 'Builder ID / SSO' },
-  { id: 'web-oauth', label: 'Web 登录', icon: Globe, desc: 'Google / GitHub' },
+  { id: 'login', label: '桌面登录', icon: LogIn, desc: '使用 kiro:// 协议' },
+  { id: 'web-oauth', label: 'Web 登录', icon: Globe, desc: '使用 WebView 窗口' },
   { id: 'settings', label: '设置', icon: Settings },
   { id: 'about', label: '关于', icon: Info },
 ]
