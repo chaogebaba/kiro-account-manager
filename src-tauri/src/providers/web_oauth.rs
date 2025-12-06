@@ -338,11 +338,25 @@ impl KiroWebPortalClient {
 
         let status = response.status();
         
-        // 从 Set-Cookie 提取 SessionToken
+        // 打印所有响应头
+        println!("[WebOAuth] ExchangeToken Response Headers:");
+        for (name, value) in response.headers().iter() {
+            println!("  {}: {:?}", name, value);
+        }
+        
+        // 从 Set-Cookie 响应头手动提取 SessionToken
         let mut session_token: Option<String> = None;
-        for cookie in response.cookies() {
-            if cookie.name() == "SessionToken" {
-                session_token = Some(cookie.value().to_string());
+        for value in response.headers().get_all("set-cookie") {
+            if let Ok(cookie_str) = value.to_str() {
+                println!("[WebOAuth] Set-Cookie: {}", cookie_str);
+                // 解析 "SessionToken=xxx; Path=/; ..." 格式
+                if cookie_str.starts_with("SessionToken=") {
+                    if let Some(end) = cookie_str.find(';') {
+                        session_token = Some(cookie_str[13..end].to_string());
+                    } else {
+                        session_token = Some(cookie_str[13..].to_string());
+                    }
+                }
             }
         }
         
