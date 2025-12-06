@@ -6,7 +6,7 @@ Kiro 桌面端使用两套不同的认证系统：
 
 ```
 desktop/
-├── social/     # Social 登录 (Google/GitHub)
+├── social/     # Social 登录 (Google/Github)
 │   ├── login.md           # 打开登录页面
 │   ├── create_token.md    # 授权码换 Token
 │   ├── refresh_token.md   # 刷新 Token
@@ -24,7 +24,7 @@ desktop/
 
 | | Social | IdC |
 |---|---|---|
-| 登录方式 | Google / GitHub | AWS Builder ID / Enterprise |
+| 登录方式 | Google / Github | AWS Builder ID / Enterprise |
 | 认证服务 | Desktop Auth API | AWS SSO OIDC |
 | 端点 | `prod.us-east-1.auth.desktop.kiro.dev` | `oidc.{region}.amazonaws.com` |
 | 需要注册客户端 | ❌ 不需要 | ✅ 需要 |

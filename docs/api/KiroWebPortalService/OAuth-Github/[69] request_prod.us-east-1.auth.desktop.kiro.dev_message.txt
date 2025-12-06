@@ -1,0 +1,27 @@
+GET /github/authorize?client_id=Ov23lilbEuhqkZak4Bfh&redirect_uri=https%3A%2F%2Fkiro-prod-us-east-1.auth.us-east-1.amazoncognito.com%2Foauth2%2Fidpresponse&scope=read%3Auser+user%3Aemail+openid&response_type=code&state=H4sIAAAAAAAAAE2RSXPiMBCF_4vOCORFXrgNNg4YU5CQZcJUipK1YINtGSyTxFPz36e5TM3tvdL3Wl39fiOGpqjvsGSdwdYhfaGnuOObNzRCObw8lKboczAcDA1zYVFZuERKv-U2KUh-5r1fCgAEAIUxbTedTFjbjs_lVY-FvE268tiUzUSz3hTASeC4FhKkArlZxhHII5r-QrJmZQVGt7KBmR8jVABB4FfHpi4mynexK3OFmW0H2AkDz3XyMFBBAKHyjtbMS_2kqNbJdl7E5Vt1CbNgWFVzJjdZnjXlrUq463qOC4kTJHY29UCeQf5cM5V06XO4Nc3WJNdGZP4mfToSxuX8WVwsQ17XvXUIButqLibTp6dmP9MdWQyzRC2sRcBXyh48pR_az684inbh4_F79yMK5HFJV2LF8zJ1tvt1quer2GQvWUX4sOhlzj4v_oy73m3vs-W5dr-HISoEO5hm9v4YF1n4Wr_zqGgOxqcBy3EHG1ew8f3EuL1qgf8VOL5fefyfrdmgG66hAqPHXNcQrdHU8j1K4IihP0ItmipWdXKErjBTSVs4hFvYsgnFrvItzKgXYmqFofKUIILeq7tBXx9__gLBkrlUPgIAAA.H4sIAAAAAAAAAHsiJnyjXfbglpiPMUxGDZxrrj5hUuhZ6sRsyNosqpTALAcAdw2ogSAAAAA.4 h2
+host: prod.us-east-1.auth.desktop.kiro.dev
+pragma: no-cache
+cache-control: no-cache
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0 80592
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: cross-site
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+referer: https://app.kiro.dev/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiYzlkNTkxZDEtYTM3OC00NzY3LTg2YzItOThjY2JkNTlmMzE5IiwidiI6IjEifQ==
+cookie: AMCVS_7742037254C95E840A4C98A6%40AdobeOrg=1
+cookie: s_cc=true
+cookie: AMCV_7742037254C95E840A4C98A6%40AdobeOrg=1585540135%7CMCIDTS%7C20429%7CMCMID%7C04542209388087034713592716695836348839%7CMCAAMLH-1765626986%7C11%7CMCAAMB-1765626986%7C6G1ynYcLPuiQxYZrsz_pkqfLG9yMXBpb2zX5dvJdYQJzPXImdj0y%7CMCOPTOUT-1765029386s%7CNONE%7CMCAID%7CNONE%7CMCSYNCSOP%7C411-20436%7CvVersion%7C4.4.0
+cookie: aws-token-a-c=eyJraWQiOiJiOTgzZmQ4Yy02NTA1LTRjNDEtOTgyNy1hOTQwNTE1YWNhZTMiLCJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJzX3AiLCJleHAiOjE3NjUwMjI5ODAsImFpZCI6IjQyY2Q3OWM0LTE4OTgtYzk5OC02MmY0LTdlOWYzMjNiMjc0MiJ9.MEUCIA4-xTjlvyjks8sLTxwfCCQEv7sYE0u5FfClYb_K8rAzAiEAiRqnwPUHb84l7QZejVfZWuCoeI22sgAbPf3czR0lWqU
+cookie: awsd2c-token-c=eyJraWQiOiJlNTM3YTcxNy1iMjg4LTQ5YjMtODY4MS0zNDllMmJkZGE2MDAiLCJhbGciOiJFUzI1NiJ9.eyJ2aWQiOiIwOGNkNzljNC0xODk4LWQwYTktMWYxMy02MjliZDJmODlmODEiLCJpc3MiOiJzX3AiLCJleHAiOjE3NjUwMjI5ODB9.MEQCIHehkAfXHcBXfHHxR-hA1qSTwAnfFV80S49VcHOXkbo-AiA-ScR_BcbwDoNKNKJSUPw-GdehGsNY0PTmfdzd72mwGA
+cookie: s_sq=%5B%5BB%5D%5D
+priority: u=0, i
+

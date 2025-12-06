@@ -6,6 +6,7 @@ use async_trait::async_trait;
 
 /// 认证结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AuthResult {
     // 通用字段
     pub access_token: String,
@@ -14,31 +15,21 @@ pub struct AuthResult {
     pub expires_in: i64,
     pub provider: String,
     pub auth_method: String,  // "social" / "IdC" / "web_oauth"
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub token_type: Option<String>,
     
     // IdC (BuilderId) 专用
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub id_token: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub client_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub client_secret: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub client_id_hash: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_session_id: Option<String>,
     
     // Social (Google/Github) 专用
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub profile_arn: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub csrf_token: Option<String>,
     
     // Web OAuth 专用
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub session_token: Option<String>,
 }
 

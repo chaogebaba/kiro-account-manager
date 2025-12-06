@@ -44,35 +44,38 @@ pub async fn sync_account(state: State<'_, AppState>, id: String) -> Result<Acco
         store.accounts.iter().find(|a| a.id == id).cloned()
     }.ok_or("Account not found")?;
 
-    let refresh_token_str = account.refresh_token.as_ref().ok_or("No refresh token")?;
     let provider_str = account.provider.as_deref().unwrap_or("Google");
+    let refresh_token_str = account.refresh_token.as_ref().ok_or("No refresh token")?;
     
-    // 刷新 token (Desktop 两种接口)
-    let (new_access_token, new_refresh_token, expires_in, new_profile_arn, new_id_token, new_sso_session_id) = if provider_str == "BuilderId" {
-        // BuilderId -> AWS OIDC
-        let metadata = RefreshMetadata {
-            client_id: account.sso_client_id.clone(),
-            client_secret: account.sso_client_secret.clone(),
-            region: account.sso_region.clone(),
-            ..Default::default()
-        };
-        let idc_provider = IdcProvider::new("BuilderId", metadata.region.as_deref().unwrap_or("us-east-1"), None);
-        let auth_result = idc_provider.refresh_token(refresh_token_str, metadata).await?;
-        (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in, None, auth_result.id_token, auth_result.sso_session_id)
-    } else if provider_str == "Google" || provider_str == "Github" {
-        // Social (Google/Github) -> Desktop API
-        let metadata = RefreshMetadata {
-            profile_arn: account.profile_arn.clone(),
-            ..Default::default()
-        };
-        let social_provider = SocialProvider::new(provider_str);
-        let auth_result = social_provider.refresh_token(refresh_token_str, metadata).await?;
-        (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in, auth_result.profile_arn, None, None)
-    } else {
-        return Err(format!("不支持的 provider: {}", provider_str));
-    };
+    println!("[sync_account] Refreshing {} account", provider_str);
     
-    // 获取 usage 数据并直接存储原始 JSON
+    // 根据 provider 选择刷新接口
+    // 注意：Web OAuth 的 refresh_token 也是 aor 开头的 RefreshToken Cookie，可以用 Desktop API
+    let (new_access_token, new_refresh_token, expires_in, new_profile_arn, new_id_token, new_sso_session_id) = 
+        if provider_str == "BuilderId" {
+            // BuilderId -> AWS OIDC
+            let metadata = RefreshMetadata {
+                client_id: account.sso_client_id.clone(),
+                client_secret: account.sso_client_secret.clone(),
+                region: account.sso_region.clone(),
+                ..Default::default()
+            };
+            let idc_provider = IdcProvider::new("BuilderId", metadata.region.as_deref().unwrap_or("us-east-1"), None);
+            let auth_result = idc_provider.refresh_token(refresh_token_str, metadata).await?;
+            (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in, None, auth_result.id_token, auth_result.sso_session_id)
+        } else {
+            // Google/Github (Desktop OAuth 或 Web OAuth) -> Desktop API
+            // Web OAuth 的 refresh_token 是 RefreshToken Cookie (aor开头)，跟 Desktop OAuth 相同
+            let metadata = RefreshMetadata {
+                profile_arn: account.profile_arn.clone(),
+                ..Default::default()
+            };
+            let social_provider = SocialProvider::new(provider_str);
+            let auth_result = social_provider.refresh_token(refresh_token_str, metadata).await?;
+            (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in, auth_result.profile_arn, None, None)
+        };
+    
+    // 获取 usage 数据
     let usage_data: serde_json::Value = if provider_str == "BuilderId" {
         let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
         let cw_client = CodeWhispererClient::new(machine_id);
@@ -113,6 +116,8 @@ pub async fn sync_account(state: State<'_, AppState>, id: String) -> Result<Acco
 
     Err("Account not found after update".to_string())
 }
+
+
 
 #[tauri::command]
 pub async fn verify_account(
@@ -166,26 +171,29 @@ pub async fn add_account_by_social(
         else { "Google".to_string() }
     });
     
-    // 检查是否已存在
-    {
-        let store = state.store.lock().unwrap();
-        if store.accounts.iter().any(|a| a.email == email) {
-            return Err(format!("账号 {} 已存在", email));
-        }
-    }
+    let mut store = state.store.lock().unwrap();
     
-    let mut account = Account::new(email.clone(), format!("Kiro {} 账号", idp));
-    account.access_token = Some(access_token.clone());
-    account.refresh_token = Some(new_refresh_token);
-    account.provider = Some(idp.clone());
-    account.user_id = user_id;
-    account.usage_data = Some(usage_data);
-    
-    {
-        let mut store = state.store.lock().unwrap();
+    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
+        existing.access_token = Some(access_token.clone());
+        existing.refresh_token = Some(new_refresh_token);
+        existing.provider = Some(idp.clone());
+        existing.user_id = user_id;
+        existing.usage_data = Some(usage_data);
+        existing.status = "正常".to_string();
+        existing.clone()
+    } else {
+        let mut account = Account::new(email.clone(), format!("Kiro {} 账号", idp));
+        account.access_token = Some(access_token.clone());
+        account.refresh_token = Some(new_refresh_token);
+        account.provider = Some(idp.clone());
+        account.user_id = user_id;
+        account.usage_data = Some(usage_data);
         store.accounts.insert(0, account.clone());
-        store.save_to_file();
-    }
+        account
+    };
+    
+    store.save_to_file();
+    drop(store);
     
     let user = User {
         id: uuid::Uuid::new_v4().to_string(),
@@ -258,35 +266,62 @@ pub async fn add_local_kiro_account(state: State<'_, AppState>) -> Result<Accoun
              None, None, None, None)
         };
     
-    // 获取 usage 数据
-    let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
-    let cw_client = CodeWhispererClient::new(machine_id);
-    let usage = cw_client.get_usage_limits(&access_token).await
-        .map_err(|e| format!("获取配额失败: {}", e))?;
-    let usage_data = serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null);
-    
-    let email = usage.user_info.as_ref()
-        .and_then(|u| u.email.clone())
-        .unwrap_or_else(|| format!("{}@kiro.dev", provider.to_lowercase()));
-    let user_id = usage.user_info.as_ref()
-        .and_then(|u| u.user_id.clone());
-    
-    // 检查是否已存在
-    {
-        let store = state.store.lock().unwrap();
-        if store.accounts.iter().any(|a| a.email == email) {
-            return Err(format!("账号 {} 已存在", email));
-        }
-    }
+    // 获取 usage 数据（根据 auth_method 选择不同的 API）
+    let (usage_data, email, user_id) = if auth_method == "IdC" {
+        let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
+        let cw_client = CodeWhispererClient::new(machine_id);
+        let usage = cw_client.get_usage_limits(&access_token).await
+            .map_err(|e| format!("获取配额失败: {}", e))?;
+        let data = serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null);
+        let email = usage.user_info.as_ref()
+            .and_then(|u| u.email.clone())
+            .unwrap_or_else(|| format!("{}@kiro.dev", provider.to_lowercase()));
+        let user_id = usage.user_info.as_ref()
+            .and_then(|u| u.user_id.clone());
+        (data, email, user_id)
+    } else {
+        let usage = get_usage_limits_desktop(&access_token).await
+            .map_err(|e| format!("获取配额失败: {}", e))?;
+        let data = serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null);
+        let email = usage.user_info.as_ref()
+            .and_then(|u| u.email.clone())
+            .unwrap_or_else(|| format!("{}@kiro.dev", provider.to_lowercase()));
+        let user_id = usage.user_info.as_ref()
+            .and_then(|u| u.user_id.clone());
+        (data, email, user_id)
+    };
     
     let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
     
+    // 检查是否已存在，存在则更新，不存在则新建
+    let mut store = state.store.lock().unwrap();
+    
+    if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
+        // 更新现有账号
+        existing.access_token = Some(access_token);
+        existing.refresh_token = Some(new_refresh_token);
+        existing.provider = Some(provider);
+        existing.user_id = user_id;
+        existing.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
+        existing.sso_client_id = client_id;
+        existing.sso_client_secret = client_secret;
+        existing.sso_region = region;
+        existing.client_id_hash = client_id_hash;
+        existing.profile_arn = local_token.profile_arn;
+        existing.usage_data = Some(usage_data);
+        existing.status = "正常".to_string();
+        
+        let result = existing.clone();
+        store.save_to_file();
+        return Ok(result);
+    }
+    
+    // 新建账号
     let mut account = Account::new(email.clone(), format!("Kiro {} 账号", provider));
     account.access_token = Some(access_token);
     account.refresh_token = Some(new_refresh_token);
     account.provider = Some(provider);
     account.user_id = user_id;
-    account.auth_method = Some(auth_method.to_string());
     account.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
     account.sso_client_id = client_id;
     account.sso_client_secret = client_secret;
@@ -295,11 +330,8 @@ pub async fn add_local_kiro_account(state: State<'_, AppState>) -> Result<Accoun
     account.profile_arn = local_token.profile_arn;
     account.usage_data = Some(usage_data);
     
-    {
-        let mut store = state.store.lock().unwrap();
-        store.accounts.insert(0, account.clone());
-        store.save_to_file();
-    }
+    store.accounts.insert(0, account.clone());
+    store.save_to_file();
     
     Ok(account)
 }
@@ -336,14 +368,6 @@ pub async fn add_account_by_idc(
     let user_id = usage.user_info.as_ref()
         .and_then(|u| u.user_id.clone());
     
-    // 检查是否已存在
-    {
-        let store = state.store.lock().unwrap();
-        if store.accounts.iter().any(|a| a.email == email) {
-            return Err(format!("账号 {} 已存在", email));
-        }
-    }
-    
     use sha2::{Digest, Sha256};
     let start_url = "https://view.awsapps.com/start";
     let mut hasher = Sha256::new();
@@ -352,26 +376,42 @@ pub async fn add_account_by_idc(
     
     let expires_at = chrono::Local::now() + chrono::Duration::seconds(auth_result.expires_in);
     
-    let mut account = Account::new(email.clone(), "Kiro BuilderId 账号".to_string());
-    account.access_token = Some(auth_result.access_token);
-    account.refresh_token = Some(auth_result.refresh_token);
-    account.provider = Some("BuilderId".to_string());
-    account.user_id = user_id;
-    account.auth_method = Some(auth_result.auth_method.clone());
-    account.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
-    account.sso_client_id = Some(client_id);
-    account.sso_client_secret = Some(client_secret);
-    account.sso_region = Some(region);
-    account.client_id_hash = Some(client_id_hash);
-    account.id_token = auth_result.id_token;
-    account.sso_session_id = auth_result.sso_session_id;
-    account.usage_data = Some(usage_data);
+    let mut store = state.store.lock().unwrap();
     
-    {
-        let mut store = state.store.lock().unwrap();
+    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
+        existing.access_token = Some(auth_result.access_token);
+        existing.refresh_token = Some(auth_result.refresh_token);
+        existing.provider = Some("BuilderId".to_string());
+        existing.user_id = user_id;
+        existing.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
+        existing.sso_client_id = Some(client_id);
+        existing.sso_client_secret = Some(client_secret);
+        existing.sso_region = Some(region);
+        existing.client_id_hash = Some(client_id_hash);
+        existing.id_token = auth_result.id_token;
+        existing.sso_session_id = auth_result.sso_session_id;
+        existing.usage_data = Some(usage_data);
+        existing.status = "正常".to_string();
+        existing.clone()
+    } else {
+        let mut account = Account::new(email.clone(), "Kiro BuilderId 账号".to_string());
+        account.access_token = Some(auth_result.access_token);
+        account.refresh_token = Some(auth_result.refresh_token);
+        account.provider = Some("BuilderId".to_string());
+        account.user_id = user_id;
+        account.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
+        account.sso_client_id = Some(client_id);
+        account.sso_client_secret = Some(client_secret);
+        account.sso_region = Some(region);
+        account.client_id_hash = Some(client_id_hash);
+        account.id_token = auth_result.id_token;
+        account.sso_session_id = auth_result.sso_session_id;
+        account.usage_data = Some(usage_data);
         store.accounts.insert(0, account.clone());
-        store.save_to_file();
-    }
+        account
+    };
+    
+    store.save_to_file();
     
     Ok(account)
 }

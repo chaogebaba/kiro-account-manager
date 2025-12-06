@@ -54,29 +54,37 @@ async fn login_social(
     let user_id = usage.user_info.as_ref()
         .and_then(|ui| ui.user_id.clone());
 
-    {
-        let store = state.store.lock().unwrap();
-        if store.accounts.iter().any(|a| a.email == email) {
-            return Err(format!("账号 {} 已存在", email));
-        }
-    }
-
-    let mut account = Account::new(email.clone(), format!("Kiro {} 账号", provider_id));
-    account.access_token = Some(auth_result.access_token.clone());
-    account.refresh_token = Some(auth_result.refresh_token.clone());
-    account.provider = Some(provider_id.clone());
-    account.user_id = user_id;
-    account.auth_method = Some(auth_result.auth_method.clone());
-    account.expires_at = Some(auth_result.expires_at.clone());
-    account.profile_arn = auth_result.profile_arn;
-    account.csrf_token = auth_result.csrf_token;
-    account.usage_data = Some(usage_data);
-
-    {
-        let mut store = state.store.lock().unwrap();
+    let mut store = state.store.lock().unwrap();
+    
+    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
+        // 更新现有账号
+        existing.access_token = Some(auth_result.access_token.clone());
+        existing.refresh_token = Some(auth_result.refresh_token.clone());
+        existing.provider = Some(provider_id.clone());
+        existing.user_id = user_id;
+        existing.expires_at = Some(auth_result.expires_at.clone());
+        existing.profile_arn = auth_result.profile_arn;
+        // 不覆盖 csrfToken，保留 Web OAuth 的
+        existing.usage_data = Some(usage_data);
+        existing.status = "正常".to_string();
+        existing.clone()
+    } else {
+        // 新建账号
+        let mut account = Account::new(email.clone(), format!("Kiro {} 账号", provider_id));
+        account.access_token = Some(auth_result.access_token.clone());
+        account.refresh_token = Some(auth_result.refresh_token.clone());
+        account.provider = Some(provider_id.clone());
+        account.user_id = user_id;
+        account.expires_at = Some(auth_result.expires_at.clone());
+        account.profile_arn = auth_result.profile_arn;
+        account.csrf_token = auth_result.csrf_token;
+        account.usage_data = Some(usage_data);
         store.accounts.insert(0, account.clone());
-        store.save_to_file();
-    }
+        account
+    };
+    
+    store.save_to_file();
+    drop(store);
 
     update_auth_state(&state, &email, &provider_id, &auth_result.access_token, &auth_result.refresh_token);
     println!("\n[{}] LOGIN SUCCESS: {}", auth_method, account.email);
@@ -109,34 +117,45 @@ async fn login_idc(
         .and_then(|u| u.user_info.as_ref())
         .and_then(|ui| ui.user_id.clone());
 
-    {
-        let store = state.store.lock().unwrap();
-        if store.accounts.iter().any(|a| a.email == email) {
-            return Err(format!("账号 {} 已存在", email));
-        }
-    }
-
-    let mut account = Account::new(email.clone(), format!("Kiro {} 账号", provider_id));
-    account.access_token = Some(auth_result.access_token.clone());
-    account.refresh_token = Some(auth_result.refresh_token.clone());
-    account.provider = Some(provider_id.clone());
-    account.user_id = user_id;
-    account.auth_method = Some(auth_result.auth_method.clone());
-    account.expires_at = Some(auth_result.expires_at.clone());
-    account.client_id_hash = auth_result.client_id_hash;
-    account.sso_client_id = auth_result.client_id;
-    account.sso_client_secret = auth_result.client_secret;
-    account.sso_region = auth_result.region;
-    account.sso_session_id = auth_result.sso_session_id;
-    account.id_token = auth_result.id_token;
-    account.profile_arn = auth_result.profile_arn;
-    account.usage_data = Some(usage_data);
-
-    {
-        let mut store = state.store.lock().unwrap();
+    let mut store = state.store.lock().unwrap();
+    
+    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
+        existing.access_token = Some(auth_result.access_token.clone());
+        existing.refresh_token = Some(auth_result.refresh_token.clone());
+        existing.provider = Some(provider_id.clone());
+        existing.user_id = user_id;
+        existing.expires_at = Some(auth_result.expires_at.clone());
+        existing.client_id_hash = auth_result.client_id_hash;
+        existing.sso_client_id = auth_result.client_id;
+        existing.sso_client_secret = auth_result.client_secret;
+        existing.sso_region = auth_result.region;
+        existing.sso_session_id = auth_result.sso_session_id;
+        existing.id_token = auth_result.id_token;
+        existing.profile_arn = auth_result.profile_arn;
+        existing.usage_data = Some(usage_data);
+        existing.status = "正常".to_string();
+        existing.clone()
+    } else {
+        let mut account = Account::new(email.clone(), format!("Kiro {} 账号", provider_id));
+        account.access_token = Some(auth_result.access_token.clone());
+        account.refresh_token = Some(auth_result.refresh_token.clone());
+        account.provider = Some(provider_id.clone());
+        account.user_id = user_id;
+        account.expires_at = Some(auth_result.expires_at.clone());
+        account.client_id_hash = auth_result.client_id_hash;
+        account.sso_client_id = auth_result.client_id;
+        account.sso_client_secret = auth_result.client_secret;
+        account.sso_region = auth_result.region;
+        account.sso_session_id = auth_result.sso_session_id;
+        account.id_token = auth_result.id_token;
+        account.profile_arn = auth_result.profile_arn;
+        account.usage_data = Some(usage_data);
         store.accounts.insert(0, account.clone());
-        store.save_to_file();
-    }
+        account
+    };
+    
+    store.save_to_file();
+    drop(store);
 
     update_auth_state(&state, &email, &provider_id, &auth_result.access_token, &auth_result.refresh_token);
     println!("\n[{}] LOGIN SUCCESS: {}", auth_method, account.email);
@@ -191,25 +210,29 @@ pub async fn handle_kiro_social_callback(
         .and_then(|u| u.user_info.as_ref())
         .and_then(|ui| ui.user_id.clone());
 
-    {
-        let store = state.store.lock().unwrap();
-        if store.accounts.iter().any(|a| a.email == email) {
-            return Err(format!("账号 {} 已存在", email));
-        }
-    }
-
-    let mut account = Account::new(email.clone(), format!("Kiro {} 账号", pending.provider));
-    account.access_token = Some(token_response.access_token.clone());
-    account.refresh_token = Some(token_response.refresh_token.clone());
-    account.provider = Some(pending.provider.clone());
-    account.user_id = user_id;
-    account.usage_data = Some(usage_data);
-
-    {
-        let mut store = state.store.lock().unwrap();
+    let mut store = state.store.lock().unwrap();
+    
+    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
+        existing.access_token = Some(token_response.access_token.clone());
+        existing.refresh_token = Some(token_response.refresh_token.clone());
+        existing.provider = Some(pending.provider.clone());
+        existing.user_id = user_id;
+        existing.usage_data = Some(usage_data);
+        existing.status = "正常".to_string();
+        existing.clone()
+    } else {
+        let mut account = Account::new(email.clone(), format!("Kiro {} 账号", pending.provider));
+        account.access_token = Some(token_response.access_token.clone());
+        account.refresh_token = Some(token_response.refresh_token.clone());
+        account.provider = Some(pending.provider.clone());
+        account.user_id = user_id;
+        account.usage_data = Some(usage_data);
         store.accounts.insert(0, account.clone());
-        store.save_to_file();
-    }
+        account
+    };
+    
+    store.save_to_file();
+    drop(store);
     
     update_auth_state(&state, &email, &pending.provider, &token_response.access_token, &token_response.refresh_token);
     let _ = app_handle.emit("login-success", account.id);
@@ -245,13 +268,6 @@ pub async fn add_kiro_account(
         .and_then(|u| u.user_info.as_ref())
         .and_then(|ui| ui.user_id.clone());
 
-    {
-        let store = state.store.lock().unwrap();
-        if store.accounts.iter().any(|a| a.email == final_email) {
-            return Err(format!("账号 {} 已存在", final_email));
-        }
-    }
-    
     *state.auth.access_token.lock().unwrap() = Some(access_token.clone());
     *state.auth.refresh_token.lock().unwrap() = Some(refresh_token.clone());
     *state.auth.csrf_token.lock().unwrap() = Some(csrf_token.clone());
@@ -266,19 +282,30 @@ pub async fn add_kiro_account(
     *state.auth.user.lock().unwrap() = Some(user);
     *state.pending_login.lock().unwrap() = None;
     
-    let mut account = Account::new(final_email.clone(), format!("Kiro {} 账号", idp));
-    account.access_token = Some(access_token);
-    account.refresh_token = Some(refresh_token);
-    account.provider = Some(idp);
-    account.user_id = user_id;
-    account.csrf_token = Some(csrf_token);
-    account.usage_data = Some(usage_data);
-
-    {
-        let mut store = state.store.lock().unwrap();
+    let mut store = state.store.lock().unwrap();
+    
+    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == final_email) {
+        existing.access_token = Some(access_token);
+        existing.refresh_token = Some(refresh_token);
+        existing.provider = Some(idp);
+        existing.user_id = user_id;
+        existing.csrf_token = Some(csrf_token);
+        existing.usage_data = Some(usage_data);
+        existing.status = "正常".to_string();
+        existing.clone()
+    } else {
+        let mut account = Account::new(final_email.clone(), format!("Kiro {} 账号", idp));
+        account.access_token = Some(access_token);
+        account.refresh_token = Some(refresh_token);
+        account.provider = Some(idp);
+        account.user_id = user_id;
+        account.csrf_token = Some(csrf_token);
+        account.usage_data = Some(usage_data);
         store.accounts.insert(0, account.clone());
-        store.save_to_file();
-    }
+        account
+    };
+    
+    store.save_to_file();
     
     Ok(account)
 }

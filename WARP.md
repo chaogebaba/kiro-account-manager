@@ -4,9 +4,9 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Project overview
 
-Kiro Token Manager is a cross‑platform desktop app (Windows/macOS) for managing Kiro IDE access tokens: multi‑account login (Google/GitHub/Builder ID + Web OAuth), quota monitoring, one‑click account switching (including machine ID reset), and syncing IDE settings. The UI is built with React 18 + Vite + TailwindCSS and packaged as a Tauri (Rust) desktop app. See `README.md` for user‑facing feature details and download links.
+Kiro Token Manager is a cross‑platform desktop app (Windows/macOS) for managing Kiro IDE access tokens: multi‑account login (Google/Github/Builder ID + Web OAuth), quota monitoring, one‑click account switching (including machine ID reset), and syncing IDE settings. The UI is built with React 18 + Vite + TailwindCSS and packaged as a Tauri (Rust) desktop app. See `README.md` for user‑facing feature details and download links.
 
-The `docs/api/desktop` folder documents the underlying Kiro desktop authentication APIs. It distinguishes Social (Google/GitHub) vs IdC (BuilderId/Enterprise) login flows and shows how both obtain quota info via the CodeWhisperer `getUsageLimits` API.
+The `docs/api/desktop` folder documents the underlying Kiro desktop authentication APIs. It distinguishes Social (Google/Github) vs IdC (BuilderId/Enterprise) login flows and shows how both obtain quota info via the CodeWhisperer `getUsageLimits` API.
 
 ## Development environment & common commands
 
@@ -37,7 +37,7 @@ Install dependencies (Node modules; Rust is managed by `cargo`/Tauri):
 
 - Build desktop installers (Tauri bundle):
   - `npm run tauri build`
-  - Produces platform‑specific installers using the configuration under `src-tauri/tauri.conf.json` (icons, updater endpoints, bundle targets, etc.). This matches the GitHub Actions workflow in `.github/workflows/release.yml`.
+  - Produces platform‑specific installers using the configuration under `src-tauri/tauri.conf.json` (icons, updater endpoints, bundle targets, etc.). This matches the Github Actions workflow in `.github/workflows/release.yml`.
 
 ### Preview
 
@@ -124,11 +124,11 @@ All cross‑process calls use `@tauri-apps/api/tauri.invoke` and `@tauri-apps/ap
 
 - `src/components/UpdateChecker.jsx` and `src/components/About.jsx`
   - `UpdateChecker`:
-    - On mount, calls `checkUpdate()` from `@tauri-apps/api/updater`, using the `updater` configuration in `tauri.conf.json` (GitHub releases) and offers an "update & relaunch" flow via `installUpdate()` and `relaunch()`.
+    - On mount, calls `checkUpdate()` from `@tauri-apps/api/updater`, using the `updater` configuration in `tauri.conf.json` (Github releases) and offers an "update & relaunch" flow via `installUpdate()` and `relaunch()`.
     - Renders a dismissible floating card; it is always mounted by `App.jsx`.
   - `About`:
     - Shows app info and tech stack.
-    - Uses Tauri `getVersion()` and also calls the GitHub Releases API directly to check for newer versions, offering external links opened via `@tauri-apps/api/shell.open`.
+    - Uses Tauri `getVersion()` and also calls the Github Releases API directly to check for newer versions, offering external links opened via `@tauri-apps/api/shell.open`.
 
 ## Backend architecture (Tauri + Rust)
 
@@ -168,7 +168,7 @@ All command modules live under `src-tauri/src/commands` and are re‑exported by
   - Implements token management commands exposed to the UI:
     - Basic CRUD: `get_tokens`, `update_token`, `delete_token`, `delete_tokens`.
     - `refresh_token_from_api`: refreshes a single token’s access/refresh tokens and quota info.
-      - Chooses either `IdcProvider` (for `BuilderId`) or `SocialProvider` (for Google/GitHub) from the `providers` module.
+      - Chooses either `IdcProvider` (for `BuilderId`) or `SocialProvider` (for Google/Github) from the `providers` module.
       - Uses `CodeWhispererClient` to fetch usage/quota, then updates quota, usage, reset date, free‑trial info, bonus info, and overage details on the `Token`.
   - This logic must stay in sync with how the frontend displays token statistics.
 
@@ -194,7 +194,7 @@ All command modules live under `src-tauri/src/commands` and are re‑exported by
 - `commands/web_oauth_cmd.rs`
   - Implements the browser‑based Web OAuth flow as two commands:
     - `web_oauth_initiate(provider)`:
-      - Validates provider (`Google` or `GitHub`).
+      - Validates provider (`Google` or `Github`).
       - Uses `WebOAuthProvider` (`providers::web_oauth`) to start login and open the browser.
       - Stores the returned `WebOAuthInitResult` (provider ID, code verifier, state) in a global `OnceLock<Mutex<...>>` and returns the `state` string.
     - `web_oauth_complete(callback_url)`:

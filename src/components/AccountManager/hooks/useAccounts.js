@@ -12,8 +12,8 @@ export function useAccounts() {
   const [switchingId, setSwitchingId] = useState(null)
 
   const isExpiringSoon = useCallback((account) => {
-    if (!account.expires_at) return true
-    const expiresAt = new Date(account.expires_at.replace(/\//g, '-'))
+    if (!account.expiresAt) return true
+    const expiresAt = new Date(account.expiresAt.replace(/\//g, '-'))
     return expiresAt.getTime() - Date.now() < 5 * 60 * 1000
   }, [])
 
@@ -98,7 +98,7 @@ export function useAccounts() {
   }, [])
 
   const handleSwitchAccount = useCallback(async (account) => {
-    if (!account.access_token || !account.refresh_token) {
+    if (!account.accessToken || !account.refreshToken) {
       alert('缺少认证信息')
       return
     }
@@ -106,20 +106,20 @@ export function useAccounts() {
     setSwitchingId(account.id)
     try {
       const usage = await invoke('verify_account', {
-        accessToken: account.access_token,
-        refreshToken: account.refresh_token,
-        csrfToken: account.csrf_token || null,
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        csrfToken: account.csrfToken || null,
         provider: account.provider || 'Google'
       })
       await invoke('switch_kiro_account', {
         params: {
-          accessToken: account.access_token,
-          refreshToken: account.refresh_token,
+          accessToken: account.accessToken,
+          refreshToken: account.refreshToken,
           provider: account.provider || 'Google',
           resetMachineId: true
         }
       })
-      alert(`切换成功！配额: ${usage.current_usage || 0}/${usage.usage_limit || 50}\n\n请重启 Kiro IDE`)
+      alert(`切换成功！配额: ${usage.currentUsage || 0}/${usage.usageLimit || 50}\n\n请重启 Kiro IDE`)
     } catch (e) {
       alert('切换失败: ' + e)
     } finally {

@@ -7,9 +7,9 @@ Kiro 桌面端支持通过第三方社交账号登录。
 | Provider | idp 参数 | 说明 |
 |----------|----------|------|
 | **Google** | `Google` | Google 账号登录 |
-| **GitHub** | `Github` | GitHub 账号登录 (注意小写 h) |
+| **Github** | `Github` | Github 账号登录 (注意小写 h) |
 
-> **注意**: GitHub 的 idp 参数是 `Github` (小写 h)，不是 `GitHub`。
+> **注意**: Github 的 idp 参数是 `Github` (小写 h)，不是 `Github`。
 
 ---
 
@@ -30,7 +30,7 @@ Kiro 桌面端支持通过第三方社交账号登录。
 
 **请求参数 (Query)**:
 ```
-idp=Google | GitHub
+idp=Google | Github
 redirect_uri=http://localhost:{port}/oauth/callback
 code_challenge={base64url(sha256(code_verifier))}
 code_challenge_method=S256

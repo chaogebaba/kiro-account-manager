@@ -107,7 +107,6 @@ impl KiroAuthServiceClient {
             code: &'a str,
             code_verifier: &'a str,
             redirect_uri: &'a str,
-            #[serde(skip_serializing_if = "Option::is_none")]
             invitation_code: Option<&'a str>,
         }
 

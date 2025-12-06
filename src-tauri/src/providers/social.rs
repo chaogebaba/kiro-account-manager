@@ -1,4 +1,4 @@
-// Social Provider - Google/GitHub 登录
+// Social Provider - Google/Github 登录
 // 参考 kiro-batch-login/src/providers/social-provider.js
 
 use crate::kiro_auth_client::KiroAuthServiceClient;

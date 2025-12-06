@@ -130,7 +130,7 @@ function About() {
             className={`flex items-center justify-center gap-3 ${isDark ? 'bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600' : 'bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700'} rounded-xl p-3 transition-all group hover:scale-[1.02] hover:shadow-lg opacity-0 animate-fade-in-up delay-400`}
           >
             <Github size={18} className="text-white transition-transform group-hover:scale-110" />
-            <span className="text-white font-medium text-sm">GitHub</span>
+            <span className="text-white font-medium text-sm">Github</span>
             <ExternalLink size={14} className="text-white/60 group-hover:text-white transition-colors" />
           </a>
           <a 

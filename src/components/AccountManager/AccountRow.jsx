@@ -20,14 +20,14 @@ function AccountRow({
   const { theme, colors } = useTheme()
   const isDark = theme === 'dark'
   
-  // 从 usage_data 读取配额信息
+  // 从 usageData 读取配额信息
   const quota = getQuota(account)
   const used = getUsed(account)
   const subType = getSubType(account)
   const subPlan = getSubPlan(account)
-  const breakdown = account.usage_data?.usageBreakdownList?.[0]
+  const breakdown = account.usageData?.usageBreakdownList?.[0]
   const percent = getUsagePercent(used, quota)
-  const isExpired = account.expires_at && new Date(account.expires_at.replace(/\//g, '-')) < new Date()
+  const isExpired = account.expiresAt && new Date(account.expiresAt.replace(/\//g, '-')) < new Date()
 
   return (
     <tr 
@@ -106,10 +106,10 @@ function AccountRow({
         }`}>{account.status}</span>
       </td>
       <td className="px-4 py-3">
-        {account.expires_at ? (
+        {account.expiresAt ? (
           <div className={`text-xs ${isExpired ? 'text-red-500' : colors.textMuted}`}>
-            <div className="flex items-center gap-1"><Clock size={12} />{account.expires_at.split(' ')[1]}</div>
-            <div className={`${isDark ? 'text-gray-500' : 'text-gray-400'} mt-0.5`}>{account.expires_at.split(' ')[0]}</div>
+            <div className="flex items-center gap-1"><Clock size={12} />{account.expiresAt.split(' ')[1]}</div>
+            <div className={`${isDark ? 'text-gray-500' : 'text-gray-400'} mt-0.5`}>{account.expiresAt.split(' ')[0]}</div>
           </div>
         ) : <span className={`text-xs ${colors.textMuted}`}>-</span>}
       </td>

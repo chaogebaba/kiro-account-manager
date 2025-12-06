@@ -29,12 +29,12 @@ function Settings() {
       setTelemetryInfo(telemetry)
       // 从 Kiro IDE 设置读取
       if (kiroSettings) {
-        setHttpProxy(kiroSettings.http_proxy || '')
-        setAiModel(kiroSettings.model_selection || 'claude-sonnet-4.5')
+        setHttpProxy(kiroSettings.httpProxy || '')
+        setAiModel(kiroSettings.modelSelection || 'claude-sonnet-4.5')
       }
       // 从应用设置读取锁定模型
       if (appSettings) {
-        setLockModel(appSettings.lock_model ?? true)
+        setLockModel(appSettings.lockModel ?? true)
       }
     } catch (err) {
       console.error('Failed to load settings:', err)

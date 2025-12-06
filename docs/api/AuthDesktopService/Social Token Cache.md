@@ -1,4 +1,4 @@
-# Social 本地账号格式 (Google/GitHub)
+# Social 本地账号格式 (Google/Github)
 
 ## 文件位置
 
@@ -28,7 +28,7 @@
 | profileArn | string | ✅ | AWS Profile ARN |
 | expiresAt | string | ✅ | 过期时间 (ISO 8601) |
 | authMethod | string | ✅ | 固定 `social` |
-| provider | string | ✅ | `Google` 或 `GitHub` |
+| provider | string | ✅ | `Google` 或 `Github` |
 
 ## 与 IdC 的区别
 
@@ -38,7 +38,7 @@
 | clientIdHash | ❌ 无 | ✅ 有 |
 | region | ❌ 无 | ✅ 有 |
 | authMethod | `social` | `IdC` |
-| provider | `Google` / `GitHub` | `BuilderId` / `Enterprise` |
+| provider | `Google` / `Github` | `BuilderId` / `Enterprise` |
 
 ## 注意
 

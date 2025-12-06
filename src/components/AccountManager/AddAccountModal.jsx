@@ -85,8 +85,8 @@ function AddAccountModal({ onClose, onSuccess }) {
             <div className={`flex-1 h-px ${colors.cardBorder}`}></div>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={() => setAddType('social')} className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${addType === 'social' ? 'bg-blue-500 text-white' : `${colors.loginBtn} ${colors.text}`}`}>Social</button>
-            <button type="button" onClick={() => setAddType('idc')} className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${addType === 'idc' ? 'bg-blue-500 text-white' : `${colors.loginBtn} ${colors.text}`}`}>BuilderId</button>
+            <button type="button" onClick={() => setAddType('social')} className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${addType === 'social' ? 'bg-blue-500 text-white' : `${colors.loginBtn} ${colors.text}`}`}>SSO Token</button>
+            <button type="button" onClick={() => setAddType('idc')} className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${addType === 'idc' ? 'bg-blue-500 text-white' : `${colors.loginBtn} ${colors.text}`}`}>OIDC 凭证</button>
           </div>
           <div className="space-y-3">
             <input type="text" placeholder="Refresh Token (aor 开头)" value={refreshToken} onChange={(e) => setRefreshToken(e.target.value)} className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${colors.input} focus:outline-none focus:ring-2 ${colors.inputFocus}`} />

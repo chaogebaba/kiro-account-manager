@@ -6,16 +6,16 @@ import { useTheme } from '../contexts/ThemeContext'
 function EditAccountModal({ account, onClose, onSuccess }) {
   const { theme, colors } = useTheme()
   const isDark = theme === 'dark'
-  const initQuota = account.usage_data?.usageBreakdownList?.[0]?.usageLimit ?? account.quota ?? 50
-  const initUsed = account.usage_data?.usageBreakdownList?.[0]?.currentUsage ?? account.used ?? 0
+  const initQuota = account.usageData?.usageBreakdownList?.[0]?.usageLimit ?? account.quota ?? 50
+  const initUsed = account.usageData?.usageBreakdownList?.[0]?.currentUsage ?? account.used ?? 0
   const [form, setForm] = useState({
     email: account.email,
     label: account.label,
     quota: initQuota,
     used: initUsed,
     status: account.status,
-    access_token: account.access_token || '',
-    refresh_token: account.refresh_token || '',
+    accessToken: account.accessToken || '',
+    refreshToken: account.refreshToken || '',
   })
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -32,8 +32,8 @@ function EditAccountModal({ account, onClose, onSuccess }) {
     setRefreshing(true)
     try {
       const updated = await invoke('sync_account', { id: account.id })
-      const quota = updated.usage_data?.usageBreakdownList?.[0]?.usageLimit ?? 50
-      const used = updated.usage_data?.usageBreakdownList?.[0]?.currentUsage ?? 0
+      const quota = updated.usageData?.usageBreakdownList?.[0]?.usageLimit ?? 50
+      const used = updated.usageData?.usageBreakdownList?.[0]?.currentUsage ?? 0
       setForm(prev => ({ ...prev, quota, used, status: updated.status }))
     } catch (e) {
       alert('刷新失败: ' + e)
@@ -48,8 +48,8 @@ function EditAccountModal({ account, onClose, onSuccess }) {
     setTimeout(() => setCopied(null), 1500)
   }
 
-  // 从 usage_data 读取免费试用和奖励信息
-  const breakdown = account.usage_data?.usageBreakdownList?.[0]
+  // 从 usageData 读取免费试用和奖励信息
+  const breakdown = account.usageData?.usageBreakdownList?.[0]
   const freeTrialInfo = breakdown?.freeTrialInfo
   const bonuses = breakdown?.bonuses || []
   const freeTrialQuota = freeTrialInfo?.usageLimit || 0
@@ -73,11 +73,11 @@ function EditAccountModal({ account, onClose, onSuccess }) {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className={`text-lg font-semibold ${colors.text}`}>{account.email}</h2>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${(account.usage_data?.subscriptionInfo?.type?.includes('PRO+') || account.usage_data?.subscriptionInfo?.subscriptionTitle?.includes('PRO+')) ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : (account.usage_data?.subscriptionInfo?.type?.includes('PRO') || account.usage_data?.subscriptionInfo?.subscriptionTitle?.includes('PRO')) ? 'bg-blue-500 text-white' : (isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600')}`}>
-                  {account.usage_data?.subscriptionInfo?.subscriptionTitle || 'Free'}
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${(account.usageData?.subscriptionInfo?.type?.includes('PRO+') || account.usageData?.subscriptionInfo?.subscriptionTitle?.includes('PRO+')) ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : (account.usageData?.subscriptionInfo?.type?.includes('PRO') || account.usageData?.subscriptionInfo?.subscriptionTitle?.includes('PRO')) ? 'bg-blue-500 text-white' : (isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600')}`}>
+                  {account.usageData?.subscriptionInfo?.subscriptionTitle || 'Free'}
                 </span>
               </div>
-              <p className={`text-sm ${colors.textMuted}`}>{account.provider || '未知'} · 添加于 {account.created_at?.split(' ')[0]}</p>
+              <p className={`text-sm ${colors.textMuted}`}>{account.provider || '未知'} · 添加于 {account.addedAt?.split(' ')[0]}</p>
             </div>
           </div>
           <button onClick={onClose} className={`p-2 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-xl transition-all`}>
@@ -174,10 +174,10 @@ function EditAccountModal({ account, onClose, onSuccess }) {
               
               {/* 订阅信息 */}
               <div className={`mt-4 pt-4 border-t ${colors.cardBorder} grid grid-cols-2 gap-x-6 gap-y-2 text-sm`}>
-                <div className="flex justify-between"><span className={colors.textMuted}>用户 ID</span><span className={`${colors.text} font-mono text-xs truncate max-w-[150px]`} title={account.usage_data?.userInfo?.userId}>{account.usage_data?.userInfo?.userId?.slice(-12) || '-'}</span></div>
-                <div className="flex justify-between"><span className={colors.textMuted}>邮箱</span><span className={`${colors.text} text-xs`}>{account.usage_data?.userInfo?.email || account.email}</span></div>
-                <div className="flex justify-between"><span className={colors.textMuted}>订阅类型</span><span className={`${colors.text} font-mono text-xs truncate max-w-[150px]`} title={account.usage_data?.subscriptionInfo?.type}>{account.usage_data?.subscriptionInfo?.type || '-'}</span></div>
-                <div className="flex justify-between"><span className={colors.textMuted}>可升级</span><span className={colors.text}>{account.usage_data?.subscriptionInfo?.upgradeCapability === 'UPGRADE_CAPABLE' ? '是' : '否'}</span></div>
+                <div className="flex justify-between"><span className={colors.textMuted}>用户 ID</span><span className={`${colors.text} font-mono text-xs truncate max-w-[150px]`} title={account.usageData?.userInfo?.userId}>{account.usageData?.userInfo?.userId?.slice(-12) || '-'}</span></div>
+                <div className="flex justify-between"><span className={colors.textMuted}>邮箱</span><span className={`${colors.text} text-xs`}>{account.usageData?.userInfo?.email || account.email}</span></div>
+                <div className="flex justify-between"><span className={colors.textMuted}>订阅类型</span><span className={`${colors.text} font-mono text-xs truncate max-w-[150px]`} title={account.usageData?.subscriptionInfo?.type}>{account.usageData?.subscriptionInfo?.type || '-'}</span></div>
+                <div className="flex justify-between"><span className={colors.textMuted}>可升级</span><span className={colors.text}>{account.usageData?.subscriptionInfo?.upgradeCapability === 'UPGRADE_CAPABLE' ? '是' : '否'}</span></div>
                 {breakdown?.overageRate && (
                   <>
                     <div className="flex justify-between"><span className={colors.textMuted}>超额费率</span><span className={colors.text}>${breakdown.overageRate}/{breakdown.unit || '次'}</span></div>
@@ -215,7 +215,7 @@ function EditAccountModal({ account, onClose, onSuccess }) {
                   <span className={`font-medium ${colors.text}`}>Token 凭证</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  {account.expires_at && <span className={`text-xs ${colors.textMuted} flex items-center gap-1`}><Clock size={12} />{account.expires_at}</span>}
+                  {account.expiresAt && <span className={`text-xs ${colors.textMuted} flex items-center gap-1`}><Clock size={12} />{account.expiresAt}</span>}
                   {showTokens ? <ChevronUp size={16} className={colors.textMuted} /> : <ChevronDown size={16} className={colors.textMuted} />}
                 </div>
               </div>
@@ -225,22 +225,22 @@ function EditAccountModal({ account, onClose, onSuccess }) {
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <span className={`text-xs font-medium ${colors.textMuted}`}>Access Token</span>
-                        <button type="button" onClick={() => handleCopy(form.access_token, 'access')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                        <button type="button" onClick={() => handleCopy(form.accessToken, 'access')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
                           {copied === 'access' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                           {copied === 'access' ? '已复制' : '复制'}
                         </button>
                       </div>
-                      <textarea value={form.access_token} onChange={(e) => setForm({ ...form, access_token: e.target.value })} placeholder={account.provider === 'BuilderId' ? 'aoa 开头' : 'eyJ 开头'} className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} />
+                      <textarea value={form.accessToken} onChange={(e) => setForm({ ...form, accessToken: e.target.value })} placeholder={account.provider === 'BuilderId' ? 'aoa 开头' : 'eyJ 开头'} className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <span className={`text-xs font-medium ${colors.textMuted}`}>Refresh Token</span>
-                        <button type="button" onClick={() => handleCopy(form.refresh_token, 'refresh')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                        <button type="button" onClick={() => handleCopy(form.refreshToken, 'refresh')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
                           {copied === 'refresh' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                           {copied === 'refresh' ? '已复制' : '复制'}
                         </button>
                       </div>
-                      <textarea value={form.refresh_token} onChange={(e) => setForm({ ...form, refresh_token: e.target.value })} placeholder={account.provider === 'BuilderId' ? 'aor 开头' : 'refresh token'} className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} />
+                      <textarea value={form.refreshToken} onChange={(e) => setForm({ ...form, refreshToken: e.target.value })} placeholder={account.provider === 'BuilderId' ? 'aor 开头' : 'refresh token'} className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} />
                     </div>
                     
                     {/* IdC (BuilderId) 专用字段 */}
@@ -253,39 +253,39 @@ function EditAccountModal({ account, onClose, onSuccess }) {
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <label className={`text-xs ${colors.textMuted}`}>Client ID Hash</label>
-                            <button type="button" onClick={() => handleCopy(account.client_id_hash, 'client_id_hash')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
-                              {copied === 'client_id_hash' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                            <button type="button" onClick={() => handleCopy(account.clientIdHash, 'clientIdHash')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                              {copied === 'clientIdHash' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                             </button>
                           </div>
-                          <input type="text" value={account.client_id_hash || '-'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                          <input type="text" value={account.clientIdHash || '-'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className={`block text-xs ${colors.textMuted} mb-1`}>Region</label>
-                            <input type="text" value={account.sso_region || 'us-east-1'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                            <input type="text" value={account.ssoRegion || 'us-east-1'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
                           </div>
                           <div>
                             <label className={`block text-xs ${colors.textMuted} mb-1`}>Session ID</label>
-                            <input type="text" value={account.sso_session_id || '-'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60 truncate`} />
+                            <input type="text" value={account.ssoSessionId || '-'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60 truncate`} />
                           </div>
                         </div>
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <label className={`text-xs ${colors.textMuted}`}>Client ID</label>
-                            <button type="button" onClick={() => handleCopy(account.sso_client_id, 'client_id')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
-                              {copied === 'client_id' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                            <button type="button" onClick={() => handleCopy(account.ssoClientId, 'ssoClientId')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                              {copied === 'ssoClientId' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                             </button>
                           </div>
-                          <input type="text" value={account.sso_client_id || ''} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                          <input type="text" value={account.ssoClientId || ''} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
                         </div>
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <label className={`text-xs ${colors.textMuted}`}>Client Secret</label>
-                            <button type="button" onClick={() => handleCopy(account.sso_client_secret, 'client_secret')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
-                              {copied === 'client_secret' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                            <button type="button" onClick={() => handleCopy(account.ssoClientSecret, 'ssoClientSecret')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                              {copied === 'ssoClientSecret' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                             </button>
                           </div>
-                          <textarea value={account.sso_client_secret || ''} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 ${colors.text} opacity-60`} />
+                          <textarea value={account.ssoClientSecret || ''} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 ${colors.text} opacity-60`} />
                         </div>
                       </div>
                     )}
@@ -293,37 +293,37 @@ function EditAccountModal({ account, onClose, onSuccess }) {
                     {/* Social 专用字段 */}
                     {(account.provider === 'Google' || account.provider === 'Github') && (
                       <div className={`pt-3 border-t ${colors.cardBorder} space-y-3`}>
-                        {account.profile_arn && (
+                        {account.profileArn && (
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className={`text-xs ${colors.textMuted}`}>Profile ARN</label>
-                              <button type="button" onClick={() => handleCopy(account.profile_arn, 'profile_arn')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
-                                {copied === 'profile_arn' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                              <button type="button" onClick={() => handleCopy(account.profileArn, 'profileArn')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                                {copied === 'profileArn' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                               </button>
                             </div>
-                            <input type="text" value={account.profile_arn} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                            <input type="text" value={account.profileArn} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
                           </div>
                         )}
-                        {account.csrf_token && (
+                        {account.csrfToken && (
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className={`text-xs ${colors.textMuted}`}>CSRF Token</label>
-                              <button type="button" onClick={() => handleCopy(account.csrf_token, 'csrf_token')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
-                                {copied === 'csrf_token' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                              <button type="button" onClick={() => handleCopy(account.csrfToken, 'csrfToken')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                                {copied === 'csrfToken' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                               </button>
                             </div>
-                            <input type="text" value={account.csrf_token} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                            <input type="text" value={account.csrfToken} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
                           </div>
                         )}
-                        {account.session_token && (
+                        {account.sessionToken && (
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className={`text-xs ${colors.textMuted}`}>Session Token</label>
-                              <button type="button" onClick={() => handleCopy(account.session_token, 'session_token')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
-                                {copied === 'session_token' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                              <button type="button" onClick={() => handleCopy(account.sessionToken, 'sessionToken')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                                {copied === 'sessionToken' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                               </button>
                             </div>
-                            <input type="text" value={account.session_token} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                            <input type="text" value={account.sessionToken} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
                           </div>
                         )}
                       </div>

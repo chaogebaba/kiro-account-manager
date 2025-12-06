@@ -4,50 +4,35 @@ use uuid::Uuid;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Account {
     pub id: String,
     pub email: String,
     pub label: String,
     pub status: String,
-    pub created_at: String,
+    pub added_at: String,
     // 认证信息
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub access_token: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_token: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub csrf_token: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub session_token: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<String>,
     // 账号信息
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub auth_method: Option<String>,
     // IdC 专用
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_client_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_client_secret: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_region: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub client_id_hash: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_session_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub id_token: Option<String>,
     // Social 专用
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub profile_arn: Option<String>,
     // 原始 usage API 响应
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_data: Option<serde_json::Value>,
 }
+
 
 impl Account {
     pub fn new(email: String, label: String) -> Self {
@@ -57,7 +42,7 @@ impl Account {
             email,
             label,
             status: "正常".to_string(),
-            created_at: now.format("%Y/%m/%d %H:%M:%S").to_string(),
+            added_at: now.format("%Y/%m/%d %H:%M:%S").to_string(),
             access_token: None,
             refresh_token: None,
             csrf_token: None,
@@ -65,7 +50,6 @@ impl Account {
             expires_at: None,
             provider: None,
             user_id: None,
-            auth_method: None,
             sso_client_id: None,
             sso_client_secret: None,
             sso_region: None,

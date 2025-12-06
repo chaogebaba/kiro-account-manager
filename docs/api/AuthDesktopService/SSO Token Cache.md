@@ -40,7 +40,7 @@
 | clientIdHash | ❌ 无 | ✅ 有 |
 | region | ❌ 无 | ✅ 有 |
 | authMethod | `social` | `IdC` |
-| provider | `Google` / `GitHub` | `BuilderId` / `Enterprise` |
+| provider | `Google` / `Github` | `BuilderId` / `Enterprise` |
 
 ## 客户端缓存
 

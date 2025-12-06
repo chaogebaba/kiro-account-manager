@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core'
 /**
  * 第一步：发起 Web OAuth 登录
  * 会打开浏览器进行授权
- * @param {string} provider - "Google" 或 "GitHub"
+ * @param {string} provider - "Google" 或 "Github"
  * @returns {Promise<string>} state 参数
  */
 export async function webOAuthInitiate(provider) {
@@ -33,7 +33,7 @@ export async function webOAuthRefresh(tokenId) {
 
 /**
  * 一键登录：打开 WebView 窗口进行授权
- * @param {string} provider - "Google" 或 "GitHub"
+ * @param {string} provider - "Google" 或 "Github"
  * @returns {Promise<{window_label: string, state: string}>}
  */
 export async function webOAuthLogin(provider) {

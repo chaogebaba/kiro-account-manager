@@ -25,8 +25,8 @@ function UpdateChecker() {
         })
         setDismissed(false)
       }
-    } catch (e) {
-      console.error('检查更新失败:', e)
+    } catch {
+      // 静默处理 - 没有发布 release 或网络问题时忽略
     }
     setChecking(false)
   }

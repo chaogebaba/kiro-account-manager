@@ -374,7 +374,7 @@ HTTP Response Body (Uint8Array)
 ```typescript
 const IdpMapping = {
   Google: "google",
-  GitHub: "github", 
+  Github: "github", 
   BuilderId: "builderid",
   Internal: "internal",
   Enterprise: "awsidc"

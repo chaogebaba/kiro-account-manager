@@ -53,15 +53,8 @@ function AccountTable({
                     </div>
                     <div>
                       <p className="font-medium mb-1">暂无账号</p>
-                      <p className="text-sm opacity-75">添加你的第一个 Kiro 账号开始管理</p>
+                      <p className="text-sm opacity-75">请通过侧边栏登录添加账号</p>
                     </div>
-                    <button 
-                      onClick={onAdd} 
-                      className="btn-icon px-5 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl text-sm font-medium hover:from-blue-600 hover:to-blue-700 flex items-center gap-2 shadow-lg shadow-blue-500/25 transition-all"
-                    >
-                      <Plus size={16} />
-                      添加账号
-                    </button>
                   </div>
                 </td>
               </tr>

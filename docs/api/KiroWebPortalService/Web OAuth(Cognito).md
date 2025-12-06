@@ -250,7 +250,7 @@ function base64UrlEncode(buffer) {
 ## 支持的身份提供商
 
 - **Google** - `identity_provider=Google`
-- **GitHub** - `identity_provider=GitHub`
+- **Github** - `identity_provider=Github`
 
 
 ---

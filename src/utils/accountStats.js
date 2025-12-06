@@ -1,23 +1,27 @@
 // 账号统计计算工具函数
 
-// 从 account 获取 quota（兼容旧数据和新 usage_data）
+// 从 account 获取 quota（兼容旧数据和新 usageData）
 // API 返回 camelCase，后端 serde 序列化也是 camelCase
+// 兼容 usageBreakdownList（数组）和 usageBreakdown（单个对象）
+const getBreakdown = (a) => {
+  return a.usageData?.usageBreakdownList?.[0] || a.usageData?.usageBreakdown || null
+}
 const getQuota = (a) => {
-  const breakdown = a.usage_data?.usageBreakdownList?.[0]
+  const breakdown = getBreakdown(a)
   const main = breakdown?.usageLimit ?? a.quota ?? 50
   const freeTrial = breakdown?.freeTrialInfo?.usageLimit ?? 0
   const bonus = (breakdown?.bonuses || []).reduce((sum, b) => sum + (b.usageLimit || 0), 0)
   return main + freeTrial + bonus
 }
 const getUsed = (a) => {
-  const breakdown = a.usage_data?.usageBreakdownList?.[0]
+  const breakdown = getBreakdown(a)
   const main = breakdown?.currentUsage ?? a.used ?? 0
   const freeTrial = breakdown?.freeTrialInfo?.currentUsage ?? 0
   const bonus = (breakdown?.bonuses || []).reduce((sum, b) => sum + (b.currentUsage || 0), 0)
   return main + freeTrial + bonus
 }
-const getSubType = (a) => a.usage_data?.subscriptionInfo?.type ?? a.subscription_type ?? ''
-const getSubPlan = (a) => a.usage_data?.subscriptionInfo?.subscriptionTitle ?? a.subscription_plan ?? ''
+const getSubType = (a) => a.usageData?.subscriptionInfo?.type ?? a.subscriptionType ?? ''
+const getSubPlan = (a) => a.usageData?.subscriptionInfo?.subscriptionTitle ?? a.subscriptionPlan ?? ''
 
 export function calcAccountStats(accounts) {
   const total = accounts.length

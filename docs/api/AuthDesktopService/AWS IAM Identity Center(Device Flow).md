@@ -27,7 +27,7 @@
 | 协议 | Smithy RPC v2 CBOR | REST JSON |
 | 端点 | `app.kiro.dev` | `oidc.amazonaws.com` / `portal.sso.amazonaws.com` |
 | 认证方式 | Cookie (AccessToken, SessionToken) | Bearer Token (JWE) |
-| 适用场景 | Web OAuth (Google/GitHub) | BuilderId / Enterprise |
+| 适用场景 | Web OAuth (Google/Github) | BuilderId / Enterprise |
 
 ---
 

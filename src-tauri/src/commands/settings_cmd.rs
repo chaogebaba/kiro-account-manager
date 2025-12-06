@@ -8,6 +8,7 @@ use std::path::PathBuf;
 // ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct KiroSettings {
     pub http_proxy: Option<String>,
     pub model_selection: Option<String>,
@@ -18,6 +19,7 @@ pub struct KiroSettings {
 // ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub theme: Option<String>,
     pub lock_model: Option<bool>,
