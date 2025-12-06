@@ -15,6 +15,7 @@ function AccountRow({
   onDelete,
   refreshingId,
   switchingId,
+  index = 0,
 }) {
   const { theme, colors } = useTheme()
   const isDark = theme === 'dark'
@@ -29,13 +30,21 @@ function AccountRow({
   const isExpired = account.expires_at && new Date(account.expires_at.replace(/\//g, '-')) < new Date()
 
   return (
-    <tr className={`${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50/50'} transition-colors group`}>
+    <tr 
+      className={`${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50/50'} transition-all group opacity-0 animate-fade-in`}
+      style={{ animationDelay: `${index * 0.05}s` }}
+    >
       <td className="px-4 py-3">
-        <input type="checkbox" checked={isSelected} onChange={(e) => onSelect(e.target.checked)} className="rounded" />
+        <input 
+          type="checkbox" 
+          checked={isSelected} 
+          onChange={(e) => onSelect(e.target.checked)} 
+          className="rounded transition-transform hover:scale-110" 
+        />
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-medium shadow-sm ${
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-medium shadow-sm transition-transform group-hover:scale-110 ${
             account.provider === 'Google' ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600') :
             account.provider === 'Github' ? (isDark ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-700') :
             (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600')
@@ -45,7 +54,10 @@ function AccountRow({
           <div>
             <div className="flex items-center gap-2">
               <span className={`font-medium ${colors.text} text-sm`}>{account.email}</span>
-              <button onClick={() => onCopy(account.email, account.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
+              <button 
+                onClick={() => onCopy(account.email, account.id)} 
+                className="btn-icon opacity-0 group-hover:opacity-100 transition-all p-1 rounded hover:bg-gray-100 dark:hover:bg-white/10"
+              >
                 {copiedId === account.id ? <Check size={12} className="text-green-500" /> : <Copy size={12} className="text-gray-400" />}
               </button>
             </div>
@@ -54,7 +66,7 @@ function AccountRow({
         </div>
       </td>
       <td className="px-4 py-3">
-        <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${
+        <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium transition-transform hover:scale-105 ${
           (subType.includes('PRO+') || subPlan.includes('PRO+'))
             ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm'
             : (subType.includes('PRO') || subPlan.includes('PRO'))
@@ -71,10 +83,13 @@ function AccountRow({
               <span className={`font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{used}/{quota}</span>
               <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'}`}>剩余 {quota - used}</span>
             </div>
-            <span className={`font-semibold ${percent > 80 ? 'text-red-500' : percent > 50 ? 'text-yellow-500' : 'text-green-500'}`}>{Math.round(percent)}%</span>
+            <span className={`font-semibold stat-number ${percent > 80 ? 'text-red-500' : percent > 50 ? 'text-yellow-500' : 'text-green-500'}`}>{Math.round(percent)}%</span>
           </div>
           <div className={`h-2 ${isDark ? 'bg-white/10' : 'bg-gray-100'} rounded-full overflow-hidden`}>
-            <div className={`h-full rounded-full transition-all ${getProgressBarColor(percent)}`} style={{ width: `${percent}%` }} />
+            <div 
+              className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(percent)}`} 
+              style={{ width: `${percent}%` }} 
+            />
           </div>
           {breakdown?.nextDateReset && (
             <div className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
@@ -84,7 +99,7 @@ function AccountRow({
         </div>
       </td>
       <td className="px-4 py-3">
-        <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${
+        <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium transition-transform hover:scale-105 ${
           account.status === '正常' || account.status === '有效'
             ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700')
             : (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600')
@@ -100,16 +115,34 @@ function AccountRow({
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-1">
-          <button onClick={() => onSwitch(account)} disabled={switchingId === account.id} className={`p-1.5 ${isDark ? 'bg-blue-500/20 hover:bg-blue-500/30' : 'bg-blue-50 hover:bg-blue-100'} rounded-lg disabled:opacity-50`} title="切换账号">
+          <button 
+            onClick={() => onSwitch(account)} 
+            disabled={switchingId === account.id} 
+            className={`btn-icon p-1.5 ${isDark ? 'bg-blue-500/20 hover:bg-blue-500/30' : 'bg-blue-50 hover:bg-blue-100'} rounded-lg disabled:opacity-50 transition-all`} 
+            title="切换账号"
+          >
             <Repeat size={14} className={`text-blue-500 ${switchingId === account.id ? 'animate-spin' : ''}`} />
           </button>
-          <button onClick={() => onRefresh(account.id)} disabled={refreshingId === account.id} className={`p-1.5 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-lg`} title="刷新">
+          <button 
+            onClick={() => onRefresh(account.id)} 
+            disabled={refreshingId === account.id} 
+            className={`btn-icon p-1.5 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-lg transition-all`} 
+            title="刷新"
+          >
             <RefreshCw size={14} className={`${colors.textMuted} ${refreshingId === account.id ? 'animate-spin' : ''}`} />
           </button>
-          <button onClick={() => onEdit(account)} className={`p-1.5 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-lg`} title="编辑">
+          <button 
+            onClick={() => onEdit(account)} 
+            className={`btn-icon p-1.5 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-lg transition-all`} 
+            title="编辑"
+          >
             <Edit2 size={14} className={colors.textMuted} />
           </button>
-          <button onClick={() => onDelete(account.id)} className={`p-1.5 ${isDark ? 'hover:bg-red-500/20' : 'hover:bg-red-50'} rounded-lg`} title="删除">
+          <button 
+            onClick={() => onDelete(account.id)} 
+            className={`btn-icon p-1.5 ${isDark ? 'hover:bg-red-500/20' : 'hover:bg-red-50'} rounded-lg transition-all`} 
+            title="删除"
+          >
             <Trash2 size={14} className="text-red-400" />
           </button>
         </div>

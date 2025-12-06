@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Database } from 'lucide-react'
+import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Database, Settings as SettingsIcon } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
 function Settings() {
@@ -181,12 +181,15 @@ function Settings() {
   ]
 
   // 复制到剪贴板
-  const copyToClipboard = (text) => {
+  const [copiedField, setCopiedField] = useState(null)
+  const copyToClipboard = (text, field) => {
     navigator.clipboard.writeText(text)
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(null), 1500)
   }
 
   // 信息项组件
-  const InfoItem = ({ label, value, copyable = false }) => (
+  const InfoItem = ({ label, value, copyable = false, fieldKey }) => (
     <div className={`flex items-center justify-between py-2 ${isDark ? 'border-white/5' : 'border-gray-100'} border-b last:border-0`}>
       <span className={`text-sm ${colors.textMuted}`}>{label}</span>
       <div className="flex items-center gap-2">
@@ -195,10 +198,14 @@ function Settings() {
         </code>
         {copyable && value && (
           <button 
-            onClick={() => copyToClipboard(value)}
-            className={`p-1 rounded-lg ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} transition-colors`}
+            onClick={() => copyToClipboard(value, fieldKey)}
+            className={`btn-icon p-1 rounded-lg ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} transition-colors`}
           >
-            <Copy size={14} className={colors.textMuted} />
+            {copiedField === fieldKey ? (
+              <Check size={14} className="text-green-500" />
+            ) : (
+              <Copy size={14} className={colors.textMuted} />
+            )}
           </button>
         )}
       </div>
@@ -207,38 +214,50 @@ function Settings() {
 
   return (
     <div className={`h-full ${colors.main} p-8 overflow-auto`}>
-      <div className="max-w-3xl mx-auto">
+      {/* 背景装饰 */}
+      <div className="bg-glow bg-glow-1" />
+      <div className="bg-glow bg-glow-2" />
+      
+      <div className="max-w-3xl mx-auto relative">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className={`text-2xl font-bold ${colors.text} mb-2`}>Kiro 设置</h1>
-          <p className={colors.textMuted}>配置 Kiro IDE 的模型、代理等设置，修改后即时生效</p>
+        <div className="mb-8 opacity-0 animate-fade-in-up">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 bg-gradient-to-br from-gray-500 to-gray-700 rounded-2xl flex items-center justify-center shadow-lg animate-float">
+              <SettingsIcon size={24} className="text-white" />
+            </div>
+            <div>
+              <h1 className={`text-2xl font-bold ${colors.text}`}>Kiro 设置</h1>
+              <p className={colors.textMuted}>配置 Kiro IDE 的模型、代理等设置，修改后即时生效</p>
+            </div>
+          </div>
         </div>
 
         {/* 主题设置 */}
-        <section className={`${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-fade-in-up delay-100`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>主题设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>选择你喜欢的界面主题</p>
           
           <div className="grid grid-cols-4 gap-3">
-            {themeOptions.map(opt => {
+            {themeOptions.map((opt, index) => {
               const Icon = opt.icon
               const isActive = theme === opt.key
               return (
                 <button
                   key={opt.key}
                   onClick={() => setTheme(opt.key)}
-                  className={`relative p-4 rounded-xl border-2 transition-all ${
+                  className={`relative p-4 rounded-xl border-2 transition-all hover:scale-105 ${
                     isActive 
                       ? 'border-blue-500 shadow-lg shadow-blue-500/20' 
                       : `${isDark ? 'border-gray-700 hover:border-gray-600' : 'border-gray-200 hover:border-gray-300'}`
                   }`}
+                  style={{ animationDelay: `${index * 0.05}s` }}
                 >
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${opt.color} flex items-center justify-center mx-auto mb-2`}>
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${opt.color} flex items-center justify-center mx-auto mb-2 transition-transform group-hover:scale-110`}>
                     <Icon size={20} className="text-white" />
                   </div>
                   <div className={`text-sm font-medium ${colors.text}`}>{opt.name}</div>
                   {isActive && (
-                    <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                    <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center animate-scale-in">
                       <Check size={12} className="text-white" />
                     </div>
                   )}
@@ -249,7 +268,7 @@ function Settings() {
         </section>
 
         {/* 模型设置 */}
-        <section className={`${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-fade-in-up delay-200`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>模型设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>选择默认使用的 AI 模型，并可选择锁定模型防止被修改</p>
           
@@ -260,7 +279,7 @@ function Settings() {
                 value={aiModel}
                 onChange={(e) => handleApplyModel(e.target.value)}
                 disabled={savingModel}
-                className={`w-full px-4 py-3 border rounded-xl ${colors.text} ${colors.input} ${colors.inputFocus} focus:ring-2 appearance-none cursor-pointer disabled:opacity-50`}
+                className={`w-full px-4 py-3 border rounded-xl ${colors.text} ${colors.input} ${colors.inputFocus} focus:ring-2 appearance-none cursor-pointer disabled:opacity-50 transition-all`}
               >
                 <option value="claude-sonnet-4.5">Claude Sonnet 4.5 - 1.3x (⭐ 推荐)</option>
                 <option value="claude-sonnet-4">Claude Sonnet 4 - 1.3x</option>
@@ -275,7 +294,7 @@ function Settings() {
             </div>
           </div>
 
-          <label className={`flex items-start gap-3 cursor-pointer ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl p-4 transition-colors`}>
+          <label className={`flex items-start gap-3 cursor-pointer ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl p-4 transition-all hover:scale-[1.01]`}>
             <input
               type="checkbox"
               checked={lockModel}
@@ -293,7 +312,7 @@ function Settings() {
         </section>
 
         {/* 代理设置 */}
-        <section className={`${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-fade-in-up delay-300`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>代理设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>
             配置 Kiro IDE 的 HTTP 代理（与 settings.json 中的 http.proxy 同步）
@@ -307,19 +326,19 @@ function Settings() {
                 value={httpProxy}
                 onChange={(e) => setHttpProxy(e.target.value)}
                 placeholder="http://127.0.0.1:7897"
-                className={`flex-1 px-4 py-3 border rounded-xl ${colors.text} ${colors.input} ${colors.inputFocus} focus:ring-2`}
+                className={`flex-1 px-4 py-3 border rounded-xl ${colors.text} ${colors.input} ${colors.inputFocus} focus:ring-2 transition-all`}
               />
               <button
                 onClick={handleApplyProxy}
                 disabled={savingProxy}
-                className="px-5 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 flex items-center gap-2 font-medium shadow-sm disabled:opacity-50"
+                className="btn-icon px-5 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 flex items-center gap-2 font-medium shadow-sm disabled:opacity-50 transition-all"
               >
                 {savingProxy ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
                 {savingProxy ? '保存中...' : '应用'}
               </button>
               <button 
                 onClick={loadSettings}
-                className={`px-4 py-3 border rounded-xl ${isDark ? 'border-gray-700 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'} ${colors.textMuted}`}
+                className={`btn-icon px-4 py-3 border rounded-xl ${isDark ? 'border-gray-700 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'} ${colors.textMuted} transition-all`}
               >
                 ↻
               </button>
@@ -331,7 +350,7 @@ function Settings() {
         </section>
 
         {/* Kiro IDE 信息 */}
-        <section className={`${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-fade-in-up delay-400`}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>Kiro IDE 信息</h2>
@@ -340,9 +359,9 @@ function Settings() {
             <button
               onClick={loadSettings}
               disabled={loading}
-              className={`p-2 rounded-xl ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} transition-colors ${loading ? 'animate-spin' : ''}`}
+              className={`btn-icon p-2 rounded-xl ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} transition-colors`}
             >
-              <RefreshCw size={18} className={colors.textMuted} />
+              <RefreshCw size={18} className={`${colors.textMuted} ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
@@ -356,21 +375,21 @@ function Settings() {
               <button 
                 onClick={handleResetMachineId} 
                 disabled={resetting}
-                className="text-xs text-red-500 hover:underline font-medium disabled:opacity-50"
+                className="btn-icon text-xs text-red-500 hover:underline font-medium disabled:opacity-50 transition-all"
               >
                 {resetting ? '重置中...' : '重置全部'}
               </button>
             </div>
-            <InfoItem label="Machine ID" value={telemetryInfo?.machineId} copyable />
-            <InfoItem label="SQM ID" value={telemetryInfo?.sqmId} copyable />
-            <InfoItem label="Dev Device ID" value={telemetryInfo?.devDeviceId} copyable />
-            <InfoItem label="Service Machine ID" value={telemetryInfo?.serviceMachineId} copyable />
+            <InfoItem label="Machine ID" value={telemetryInfo?.machineId} copyable fieldKey="machineId" />
+            <InfoItem label="SQM ID" value={telemetryInfo?.sqmId} copyable fieldKey="sqmId" />
+            <InfoItem label="Dev Device ID" value={telemetryInfo?.devDeviceId} copyable fieldKey="devDeviceId" />
+            <InfoItem label="Service Machine ID" value={telemetryInfo?.serviceMachineId} copyable fieldKey="serviceMachineId" />
           </div>
 
           {/* Kiro IDE 状态 */}
           <div className={`flex items-center justify-between ${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl p-4`}>
             <div className="flex items-center gap-3">
-              <div className={`w-2.5 h-2.5 rounded-full ${kiroRunning ? 'bg-green-500' : 'bg-gray-400'}`} />
+              <div className={`w-2.5 h-2.5 rounded-full ${kiroRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
               <span className={`text-sm ${colors.text}`}>Kiro IDE</span>
               <span className={`text-xs px-2 py-0.5 rounded-full ${
                 kiroRunning 
@@ -382,7 +401,7 @@ function Settings() {
             </div>
             <button
               onClick={handleToggleKiro}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              className={`btn-icon px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 kiroRunning
                   ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
                   : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
