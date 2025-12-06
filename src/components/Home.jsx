@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { RefreshCw, Users, Zap, Shield, Clock, TrendingUp, ArrowRight, Sparkles } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
-import { calcTokenStats } from '../utils/tokenStats'
+import { calcAccountStats, getQuota, getUsed, getSubType, getSubPlan } from '../utils/accountStats'
 
 function Home({ onNavigate }) {
   const { theme, colors } = useTheme()
@@ -16,7 +16,7 @@ function Home({ onNavigate }) {
     setLoading(true)
     try {
       const [tokensData, localData] = await Promise.all([
-        invoke('get_tokens'),
+        invoke('get_accounts'),
         invoke('get_kiro_local_token').catch(() => null)
       ])
       setTokens(tokensData)
@@ -25,7 +25,7 @@ function Home({ onNavigate }) {
     setLoading(false)
   }
 
-  const stats = calcTokenStats(tokens)
+  const stats = calcAccountStats(tokens)
 
   const isDark = theme === 'dark'
 
@@ -49,7 +49,7 @@ function Home({ onNavigate }) {
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
               <Sparkles size={24} className="text-white" />
             </div>
-            <h1 className={`text-2xl font-bold ${colors.text}`}>Kiro Token Manager</h1>
+            <h1 className={`text-2xl font-bold ${colors.text}`}>Kiro Account Manager</h1>
           </div>
           <p className={colors.textMuted}>管理你的 Kiro IDE 账号，智能切换，配额监控</p>
         </div>
@@ -253,7 +253,13 @@ function Home({ onNavigate }) {
                 <div className="text-sm mt-1">点击添加按钮开始</div>
               </div>
             ) : tokens.slice(0, 5).map(token => {
-              const percent = token.quota > 0 ? (token.used / token.quota * 100) : 0
+              const quota = getQuota(token)
+              const used = getUsed(token)
+              const percent = quota > 0 ? (used / quota * 100) : 0
+              const subType = getSubType(token)
+              const subPlan = getSubPlan(token)
+              const isPro = subType.includes('PRO') || subPlan.includes('PRO')
+              const isProPlus = subType.includes('PRO+') || subPlan.includes('PRO+')
               return (
                 <div key={token.id} className={`flex items-center gap-4 px-6 py-4 ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} transition-colors`}>
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-sm font-semibold ${
@@ -266,11 +272,11 @@ function Home({ onNavigate }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`font-medium ${colors.text} truncate`}>{token.email}</span>
-                      {(token.subscription_type?.includes('PRO') || token.subscription_plan?.includes('PRO')) && (
+                      {isPro && (
                         <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${
-                          (token.subscription_type?.includes('PRO+') || token.subscription_plan?.includes('PRO+')) ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'bg-blue-500 text-white'
+                          isProPlus ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'bg-blue-500 text-white'
                         }`}>
-                          {(token.subscription_type?.includes('PRO+') || token.subscription_plan?.includes('PRO+')) ? 'PRO+' : 'PRO'}
+                          {isProPlus ? 'PRO+' : 'PRO'}
                         </span>
                       )}
                     </div>
@@ -278,7 +284,7 @@ function Home({ onNavigate }) {
                   </div>
                   <div className="w-28">
                     <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className={`${colors.textMuted} font-medium`}>{token.used}/{token.quota}</span>
+                      <span className={`${colors.textMuted} font-medium`}>{used}/{quota}</span>
                       <span className={`font-semibold ${percent > 80 ? 'text-red-500' : percent > 50 ? 'text-yellow-500' : 'text-green-500'}`}>{Math.round(percent)}%</span>
                     </div>
                     <div className={`h-2 ${isDark ? 'bg-white/10' : 'bg-gray-100'} rounded-full overflow-hidden`}>

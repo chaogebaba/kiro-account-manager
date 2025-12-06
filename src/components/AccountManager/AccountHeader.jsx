@@ -1,7 +1,7 @@
 import { Search, Download, RefreshCw, Trash2, Plus, Users, Zap, Shield } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
-function TokenHeader({
+function AccountHeader({
   stats,
   searchTerm,
   onSearchChange,
@@ -25,7 +25,6 @@ function TokenHeader({
             <h1 className={`text-xl font-bold ${colors.text}`}>账号管理</h1>
             <p className={`text-sm ${colors.textMuted} mt-0.5`}>管理你的 Kiro 账号和配额</p>
           </div>
-          {/* 统计卡片 */}
           <div className="flex gap-3 ml-4">
             <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-blue-500/20' : 'bg-blue-50'} rounded-xl`}>
               <Users size={16} className="text-blue-500" />
@@ -71,7 +70,6 @@ function TokenHeader({
           </button>
         </div>
       </div>
-      {/* 刷新进度 */}
       {autoRefreshing && refreshProgress.total > 0 && (
         <div className="mt-3 flex items-center gap-3">
           <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -84,4 +82,4 @@ function TokenHeader({
   )
 }
 
-export default TokenHeader
+export default AccountHeader

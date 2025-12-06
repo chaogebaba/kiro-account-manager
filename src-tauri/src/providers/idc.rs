@@ -118,7 +118,12 @@ impl AuthProvider for IdcProvider {
         let expires_at = chrono::Local::now() + chrono::Duration::seconds(token_response.expires_in);
         let client_id_hash = Self::compute_client_id_hash(start_url);
 
-        println!("[IdC] {} login successful!", provider);
+        println!("[IdC] {} login successful! {}", provider, serde_json::to_string_pretty(&serde_json::json!({
+            "expiresIn": token_response.expires_in,
+            "expiresAt": expires_at.format("%Y/%m/%d %H:%M:%S").to_string(),
+            "hasIdToken": token_response.id_token.is_some(),
+            "hasSsoSessionId": token_response.aws_sso_app_session_id.is_some(),
+        })).unwrap_or_default());
 
         Ok(AuthResult {
             access_token: token_response.access_token,

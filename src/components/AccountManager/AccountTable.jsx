@@ -1,10 +1,10 @@
 import { Users } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import TokenRow from './TokenRow'
+import AccountRow from './AccountRow'
 
-function TokenTable({
-  tokens,
-  filteredTokens,
+function AccountTable({
+  accounts,
+  filteredAccounts,
   selectedIds,
   onSelectAll,
   onSelectOne,
@@ -30,7 +30,7 @@ function TokenTable({
               <th className="px-3 py-3 w-10">
                 <input
                   type="checkbox"
-                  checked={selectedIds.length === filteredTokens.length && filteredTokens.length > 0}
+                  checked={selectedIds.length === filteredAccounts.length && filteredAccounts.length > 0}
                   onChange={(e) => onSelectAll(e.target.checked)}
                   className="rounded"
                 />
@@ -44,7 +44,7 @@ function TokenTable({
             </tr>
           </thead>
           <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-100'}`}>
-            {tokens.length === 0 ? (
+            {accounts.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-20 text-center">
                   <div className={`flex flex-col items-center gap-3 ${colors.textMuted}`}>
@@ -54,12 +54,12 @@ function TokenTable({
                   </div>
                 </td>
               </tr>
-            ) : tokens.map((token) => (
-              <TokenRow
-                key={token.id}
-                token={token}
-                isSelected={selectedIds.includes(token.id)}
-                onSelect={(checked) => onSelectOne(token.id, checked)}
+            ) : accounts.map((account) => (
+              <AccountRow
+                key={account.id}
+                account={account}
+                isSelected={selectedIds.includes(account.id)}
+                onSelect={(checked) => onSelectOne(account.id, checked)}
                 copiedId={copiedId}
                 onCopy={onCopy}
                 onSwitch={onSwitch}
@@ -77,4 +77,4 @@ function TokenTable({
   )
 }
 
-export default TokenTable
+export default AccountTable

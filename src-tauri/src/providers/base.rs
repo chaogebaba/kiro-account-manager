@@ -7,20 +7,19 @@ use async_trait::async_trait;
 /// 认证结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthResult {
+    // 通用字段
     pub access_token: String,
     pub refresh_token: String,
     pub expires_at: String,
+    pub expires_in: i64,
     pub provider: String,
-    pub auth_method: String,  // "social" 或 "IdC"
-    
-    // 可选字段
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id_token: Option<String>,
+    pub auth_method: String,  // "social" / "IdC" / "web_oauth"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_type: Option<String>,
-    pub expires_in: i64,
     
-    // IdC 专用
+    // IdC (BuilderId) 专用
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id_token: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -32,7 +31,7 @@ pub struct AuthResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sso_session_id: Option<String>,
     
-    // Social 专用
+    // Social (Google/Github) 专用
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile_arn: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sidebar from './components/Sidebar'
 import Home from './components/Home'
-import TokenManager from './components/TokenManager/index'
+import AccountManager from './components/AccountManager/index'
 import Settings from './components/Settings'
 import About from './components/About'
 import Login from './components/Login'
@@ -64,7 +64,7 @@ function App() {
   const renderContent = () => {
     switch (activeMenu) {
       case 'home': return <Home onNavigate={setActiveMenu} />
-      case 'token': return <TokenManager />
+      case 'token': return <AccountManager />
       case 'login': return <Login onLogin={(user) => { handleLogin(user); setActiveMenu('token'); }} />
       case 'web-oauth': return <WebOAuthLogin onLogin={(user) => { handleLogin(user); setActiveMenu('token'); }} />
       case 'callback': return <AuthCallback />

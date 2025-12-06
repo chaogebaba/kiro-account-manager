@@ -10,113 +10,82 @@ const CODEWHISPERER_API: &str = "https://codewhisperer.us-east-1.amazonaws.com";
 
 /// CodeWhisperer 限额响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CodeWhispererUsageResponse {
-    #[serde(rename = "daysUntilReset")]
     pub days_until_reset: Option<i32>,
-    #[serde(rename = "nextDateReset")]
     pub next_date_reset: Option<f64>,
-    #[serde(rename = "userInfo")]
     pub user_info: Option<UserInfo>,
-    #[serde(rename = "subscriptionInfo")]
     pub subscription_info: Option<SubscriptionInfo>,
-    #[serde(rename = "usageBreakdownList")]
     pub usage_breakdown_list: Option<Vec<UsageBreakdown>>,
-    #[serde(rename = "overageConfiguration")]
     pub overage_configuration: Option<OverageConfiguration>,
     pub limits: Option<Vec<serde_json::Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserInfo {
     pub email: Option<String>,
-    #[serde(rename = "userId")]
     pub user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SubscriptionInfo {
-    #[serde(rename = "subscriptionTitle")]
     pub subscription_title: Option<String>,
     #[serde(rename = "type")]
     pub subscription_type: Option<String>,
-    #[serde(rename = "overageCapability")]
     pub overage_capability: Option<String>,
-    #[serde(rename = "upgradeCapability")]
     pub upgrade_capability: Option<String>,
-    #[serde(rename = "subscriptionManagementTarget")]
     pub subscription_management_target: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OverageConfiguration {
-    #[serde(rename = "overageStatus")]
     pub overage_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UsageBreakdown {
-    #[serde(rename = "usageLimit")]
     pub usage_limit: Option<i32>,
-    #[serde(rename = "currentUsage")]
     pub current_usage: Option<i32>,
-    #[serde(rename = "usageLimitWithPrecision")]
     pub usage_limit_with_precision: Option<f64>,
-    #[serde(rename = "currentUsageWithPrecision")]
     pub current_usage_with_precision: Option<f64>,
-    #[serde(rename = "nextDateReset")]
     pub next_date_reset: Option<f64>,
-    #[serde(rename = "freeTrialInfo")]
     pub free_trial_info: Option<FreeTrialInfo>,
     pub bonuses: Option<Vec<BonusInfo>>,
-    #[serde(rename = "overageRate")]
     pub overage_rate: Option<f64>,
-    #[serde(rename = "overageCap")]
     pub overage_cap: Option<i32>,
-    #[serde(rename = "overageCapWithPrecision")]
     pub overage_cap_with_precision: Option<f64>,
-    #[serde(rename = "currentOverages")]
     pub current_overages: Option<i32>,
-    #[serde(rename = "currentOveragesWithPrecision")]
     pub current_overages_with_precision: Option<f64>,
-    #[serde(rename = "overageCharges")]
     pub overage_charges: Option<f64>,
-    #[serde(rename = "displayName")]
     pub display_name: Option<String>,
-    #[serde(rename = "displayNamePlural")]
     pub display_name_plural: Option<String>,
-    #[serde(rename = "resourceType")]
     pub resource_type: Option<String>,
     pub unit: Option<String>,
     pub currency: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FreeTrialInfo {
-    #[serde(rename = "usageLimit")]
     pub usage_limit: Option<i32>,
-    #[serde(rename = "currentUsage")]
     pub current_usage: Option<i32>,
-    #[serde(rename = "usageLimitWithPrecision")]
     pub usage_limit_with_precision: Option<f64>,
-    #[serde(rename = "currentUsageWithPrecision")]
     pub current_usage_with_precision: Option<f64>,
-    #[serde(rename = "freeTrialExpiry")]
     pub free_trial_expiry: Option<f64>,
-    #[serde(rename = "freeTrialStatus")]
     pub free_trial_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BonusInfo {
-    #[serde(rename = "bonusCode")]
     pub bonus_code: Option<String>,
-    #[serde(rename = "displayName")]
     pub display_name: Option<String>,
-    #[serde(rename = "usageLimit")]
     pub usage_limit: Option<f64>,
-    #[serde(rename = "currentUsage")]
     pub current_usage: Option<f64>,
-    #[serde(rename = "expiresAt")]
     pub expires_at: Option<f64>,
     pub status: Option<String>,
 }

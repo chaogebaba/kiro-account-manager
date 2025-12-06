@@ -25,11 +25,15 @@ pub struct AppSettings {
 }
 
 fn get_app_settings_path() -> PathBuf {
-    let home = std::env::var("USERPROFILE")
-        .or_else(|_| std::env::var("HOME"))
-        .unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home)
-        .join(".kiro-token-manager")
+    let data_dir = dirs::data_dir()
+        .unwrap_or_else(|| {
+            let home = std::env::var("USERPROFILE")
+                .or_else(|_| std::env::var("HOME"))
+                .unwrap_or_else(|_| ".".to_string());
+            PathBuf::from(home)
+        });
+    data_dir
+        .join("kiro-account-manager")
         .join("app-settings.json")
 }
 

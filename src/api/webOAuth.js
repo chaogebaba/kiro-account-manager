@@ -28,7 +28,7 @@ export async function webOAuthComplete(callbackUrl) {
  * @returns {Promise<object>} 更新后的 Token 对象
  */
 export async function webOAuthRefresh(tokenId) {
-  return await invoke('web_oauth_refresh', { tokenId })
+  return await invoke('web_oauth_refresh', { accountId: tokenId })
 }
 
 /**

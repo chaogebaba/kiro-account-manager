@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
-import { calcTokenStats, getUsagePercent as getUsagePercentUtil } from '../../../utils/tokenStats'
+import { calcAccountStats, getUsagePercent as getUsagePercentUtil } from '../../../utils/accountStats'
 
 // Hook: 使用 memoized 统计数据
-export function useTokenStats(tokens) {
-  return useMemo(() => calcTokenStats(tokens), [tokens])
+export function useAccountStats(accounts) {
+  return useMemo(() => calcAccountStats(accounts), [accounts])
 }
 
 // 重新导出工具函数供组件使用
@@ -20,4 +20,3 @@ export function getProgressBarColor(percent) {
   if (percent > 50) return 'bg-gradient-to-r from-yellow-400 to-orange-500'
   return 'bg-gradient-to-r from-green-400 to-emerald-500'
 }
-

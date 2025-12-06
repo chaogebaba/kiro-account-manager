@@ -21,37 +21,23 @@ function RefreshProgressModal({ refreshProgress }) {
               <span className="text-blue-500 font-medium">{refreshProgress.current}/{refreshProgress.total}</span>
             </div>
             <div className={`h-2 ${isDark ? 'bg-white/10' : 'bg-gray-200'} rounded-full overflow-hidden`}>
-              <div
-                className="h-full bg-blue-500 rounded-full transition-all"
-                style={{ width: `${(refreshProgress.current / refreshProgress.total) * 100}%` }}
-              />
+              <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(refreshProgress.current / refreshProgress.total) * 100}%` }} />
             </div>
           </div>
           {refreshProgress.currentEmail && (
-            <div className={`text-sm ${colors.textMuted}`}>
-              正在刷新: <span className={colors.text}>{refreshProgress.currentEmail}</span>
-            </div>
+            <div className={`text-sm ${colors.textMuted}`}>正在刷新: <span className={colors.text}>{refreshProgress.currentEmail}</span></div>
           )}
           {refreshProgress.results.length > 0 && (
             <div className="max-h-48 overflow-y-auto space-y-1">
               {refreshProgress.results.map((r, i) => (
-                <div
-                  key={i}
-                  className={`text-xs px-3 py-2 rounded-xl flex justify-between ${
-                    r.success
-                      ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-700')
-                      : (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600')
-                  }`}
-                >
+                <div key={i} className={`text-xs px-3 py-2 rounded-xl flex justify-between ${r.success ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-700') : (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600')}`}>
                   <span className="truncate">{r.email}</span>
                   <span>{r.success ? `✓ ${r.message}` : `✗ ${r.message}`}</span>
                 </div>
               ))}
             </div>
           )}
-          {refreshProgress.current === refreshProgress.total && (
-            <div className="text-center text-green-500 font-medium">刷新完成！</div>
-          )}
+          {refreshProgress.current === refreshProgress.total && (<div className="text-center text-green-500 font-medium">刷新完成！</div>)}
         </div>
       </div>
     </div>

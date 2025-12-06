@@ -1,7 +1,7 @@
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
-function TokenPagination({
+function AccountPagination({
   totalCount,
   pageSize,
   currentPage,
@@ -30,39 +30,17 @@ function TokenPagination({
         <span>条，共 {totalCount} 条</span>
       </div>
       <div className="flex items-center gap-1">
-        <button
-          onClick={() => onPageChange(1)}
-          disabled={currentPage === 1}
-          className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`}
-          title="首页"
-        >
+        <button onClick={() => onPageChange(1)} disabled={currentPage === 1} className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`} title="首页">
           <ChevronsLeft size={16} className={colors.textMuted} />
         </button>
-        <button
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`}
-          title="上一页"
-        >
+        <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`} title="上一页">
           <ChevronLeft size={16} className={colors.textMuted} />
         </button>
-        <span className={`px-4 py-1.5 text-sm ${colors.text} font-medium`}>
-          {currentPage} / {totalPages}
-        </span>
-        <button
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`}
-          title="下一页"
-        >
+        <span className={`px-4 py-1.5 text-sm ${colors.text} font-medium`}>{currentPage} / {totalPages}</span>
+        <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`} title="下一页">
           <ChevronRight size={16} className={colors.textMuted} />
         </button>
-        <button
-          onClick={() => onPageChange(totalPages)}
-          disabled={currentPage === totalPages}
-          className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`}
-          title="末页"
-        >
+        <button onClick={() => onPageChange(totalPages)} disabled={currentPage === totalPages} className={`p-2 border ${colors.cardBorder} rounded-lg ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} disabled:opacity-40`} title="末页">
           <ChevronsRight size={16} className={colors.textMuted} />
         </button>
       </div>
@@ -70,4 +48,4 @@ function TokenPagination({
   )
 }
 
-export default TokenPagination
+export default AccountPagination

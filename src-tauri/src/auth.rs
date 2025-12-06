@@ -47,96 +47,73 @@ const PROFILE_ARN: &str = "arn:aws:codewhisperer:us-east-1:699475941385:profile/
 // ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DesktopRefreshResponse {
-    #[serde(rename = "accessToken")]
     pub access_token: String,
-    #[serde(rename = "refreshToken")]
     pub refresh_token: String,
-    #[serde(rename = "expiresIn")]
     pub expires_in: i64,
-    #[serde(rename = "profileArn")]
     pub profile_arn: String,
-    #[serde(rename = "csrfToken")]
     pub csrf_token: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DesktopUsageResponse {
-    #[serde(rename = "daysUntilReset")]
     pub days_until_reset: Option<i32>,
-    #[serde(rename = "nextDateReset")]
     pub next_date_reset: Option<f64>,
-    #[serde(rename = "userInfo")]
     pub user_info: Option<DesktopUserInfo>,
-    #[serde(rename = "subscriptionInfo")]
     pub subscription_info: Option<DesktopSubscriptionInfo>,
-    #[serde(rename = "usageBreakdownList")]
     pub usage_breakdown_list: Option<Vec<DesktopUsageBreakdown>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DesktopUserInfo {
     pub email: Option<String>,
-    #[serde(rename = "userId")]
     pub user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DesktopSubscriptionInfo {
-    #[serde(rename = "subscriptionTitle")]
     pub subscription_title: Option<String>,
     #[serde(rename = "type")]
     pub subscription_type: Option<String>,
-    #[serde(rename = "overageCapability")]
     pub overage_capability: Option<String>,
-    #[serde(rename = "upgradeCapability")]
     pub upgrade_capability: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DesktopUsageBreakdown {
-    #[serde(rename = "usageLimit")]
     pub usage_limit: Option<i32>,
-    #[serde(rename = "currentUsage")]
     pub current_usage: Option<i32>,
-    #[serde(rename = "nextDateReset")]
     pub next_date_reset: Option<f64>,
-    #[serde(rename = "freeTrialInfo")]
     pub free_trial_info: Option<FreeTrialInfo>,
     pub bonuses: Option<Vec<BonusInfo>>,
-    #[serde(rename = "overageRate")]
     pub overage_rate: Option<f64>,
-    #[serde(rename = "overageCap")]
     pub overage_cap: Option<i32>,
     pub currency: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FreeTrialInfo {
-    #[serde(rename = "usageLimit")]
     pub usage_limit: Option<i32>,
-    #[serde(rename = "currentUsage")]
     pub current_usage: Option<i32>,
-    #[serde(rename = "freeTrialExpiry")]
     pub free_trial_expiry: Option<f64>,
-    #[serde(rename = "freeTrialStatus")]
     pub free_trial_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BonusInfo {
-    #[serde(rename = "bonusCode")]
     pub bonus_code: Option<String>,
-    #[serde(rename = "displayName")]
     pub display_name: Option<String>,
     pub description: Option<String>,
-    #[serde(rename = "usageLimit")]
     pub usage_limit: Option<f64>,
-    #[serde(rename = "currentUsage")]
     pub current_usage: Option<f64>,
-    #[serde(rename = "expiresAt")]
     pub expires_at: Option<f64>,
-    #[serde(rename = "redeemedAt")]
     pub redeemed_at: Option<f64>,
     pub status: Option<String>,
 }

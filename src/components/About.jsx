@@ -4,7 +4,7 @@ import { open } from '@tauri-apps/plugin-shell'
 import { getVersion } from '@tauri-apps/api/app'
 import { useTheme } from '../contexts/ThemeContext'
 
-const GITHUB_REPO = 'hj01857655/kiro-token-manager'
+const GITHUB_REPO = 'hj01857655/kiro-account-manager'
 
 // 版本比较：a > b 返回 1，a < b 返回 -1，相等返回 0
 const compareVersions = (a, b) => {
@@ -74,7 +74,7 @@ function About() {
         </div>
 
         {/* 标题 */}
-        <h1 className={`text-xl font-bold ${colors.text} mb-1.5`}>Kiro Token Manager</h1>
+        <h1 className={`text-xl font-bold ${colors.text} mb-1.5`}>Kiro Account Manager</h1>
         <div className="flex items-center justify-center gap-2 mb-3">
           <span className={`px-2.5 py-0.5 ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'} rounded-full text-xs font-medium`}>
             v{version || '...'}
@@ -116,7 +116,7 @@ function About() {
         {/* 链接按钮 */}
         <div className="space-y-2 mb-5">
           <a 
-            href="https://github.com/hj01857655/kiro-token-manager" 
+            href="https://github.com/hj01857655/kiro-account-manager" 
             target="_blank" 
             rel="noopener noreferrer"
             className={`flex items-center justify-center gap-3 ${isDark ? 'bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600' : 'bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700'} rounded-xl p-3 transition-all group`}

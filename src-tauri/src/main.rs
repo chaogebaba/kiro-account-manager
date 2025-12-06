@@ -11,17 +11,17 @@ mod oauth_callback_server;
 mod process;
 mod providers;
 mod state;
-mod token;
+mod account;
 
+use account::AccountStore;
 use auth::AuthState;
 use state::AppState;
 use std::sync::Mutex;
-use token::TokenStore;
 
 // 导入命令
 use commands::auth_cmd::*;
 use commands::settings_cmd::*;
-use commands::token_cmd::*;
+use commands::account_cmd::*;
 use commands::web_oauth_cmd::*;
 use kiro::{
     get_kiro_local_token, get_kiro_telemetry_info, reset_kiro_machine_id, switch_kiro_account,
@@ -36,30 +36,29 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .setup(|_app| Ok(()))
         .manage(AppState {
-            store: Mutex::new(TokenStore::new()),
+            store: Mutex::new(AccountStore::new()),
             auth: AuthState::new(),
             pending_login: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
-            // Token 命令
-            get_tokens,
-            update_token,
-            delete_token,
-            delete_tokens,
-            refresh_token_from_api,
-            verify_token,
+            // 账号命令
+            get_accounts,
+            delete_account,
+            delete_accounts,
+            sync_account,
+            verify_account,
             add_account_by_social,
             add_local_kiro_account,
             add_account_by_idc,
-            import_tokens,
-            export_tokens,
+            import_accounts,
+            export_accounts,
             // Auth 命令
             get_current_user,
             logout,
             kiro_login,
             get_supported_providers,
             handle_kiro_social_callback,
-            add_kiro_token,
+            add_kiro_account,
             // Kiro IDE 命令
             get_kiro_local_token,
             switch_kiro_account,

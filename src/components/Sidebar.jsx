@@ -39,7 +39,7 @@ function Sidebar({ activeMenu, onMenuChange }) {
           </div>
           <div>
             <span className="font-bold text-lg tracking-wide">KIRO</span>
-            <p className={`text-xs ${colors.sidebarMuted}`}>Token Manager</p>
+            <p className={`text-xs ${colors.sidebarMuted}`}>Account Manager</p>
           </div>
         </div>
       </div>

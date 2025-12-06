@@ -1,8 +1,8 @@
-# Kiro Token Manager
+# Kiro Account Manager
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-blue" alt="Platform">
-  <img src="https://img.shields.io/github/v/release/hj01857655/kiro-token-manager?label=Version&color=green" alt="Version">
+  <img src="https://img.shields.io/github/v/release/hj01857655/kiro-account-manager?label=Version&color=green" alt="Version">
   <img src="https://img.shields.io/badge/QQ群-1020204332-12B7F5?logo=tencentqq" alt="QQ群">
 </p>
 
@@ -38,9 +38,9 @@
 
 ## 📥 下载
 
-[![Release](https://img.shields.io/github/v/release/hj01857655/kiro-token-manager?style=flat-square)](https://github.com/hj01857655/kiro-token-manager/releases/latest)
+[![Release](https://img.shields.io/github/v/release/hj01857655/kiro-account-manager?style=flat-square)](https://github.com/hj01857655/kiro-account-manager/releases/latest)
 
-👉 **[点击这里下载最新版本](https://github.com/hj01857655/kiro-token-manager/releases/latest)**
+👉 **[点击这里下载最新版本](https://github.com/hj01857655/kiro-account-manager/releases/latest)**
 
 | 平台 | 文件类型 | 说明 |
 |------|----------|------|
@@ -62,8 +62,8 @@
 ## 💬 交流反馈
 
 - 💡 问题反馈、功能建议、使用交流
-- 🐛 [提交 Issue](https://github.com/hj01857655/kiro-token-manager/issues)
-- 💬 QQ 群：[Kiro Token Manager 交流群 (1020204332)](https://qm.qq.com/q/Vh7mUrNpa8)
+- 🐛 [提交 Issue](https://github.com/hj01857655/kiro-account-manager/issues)
+- 💬 QQ 群：[Kiro Account Manager 交流群 (1020204332)](https://qm.qq.com/q/Vh7mUrNpa8)
 
 <p align="center">
   <a href="https://qm.qq.com/q/Vh7mUrNpa8">

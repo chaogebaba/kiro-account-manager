@@ -102,7 +102,12 @@ impl AuthProvider for SocialProvider {
         // Step 7: 构建 AuthResult
         let expires_at = chrono::Local::now() + chrono::Duration::seconds(token_response.expires_in);
 
-        println!("[Social] {} login successful!", provider);
+        println!("[Social] {} login successful! {}", provider, serde_json::to_string_pretty(&serde_json::json!({
+            "expiresIn": token_response.expires_in,
+            "expiresAt": expires_at.format("%Y/%m/%d %H:%M:%S").to_string(),
+            "hasIdToken": token_response.id_token.is_some(),
+            "hasProfileArn": token_response.profile_arn.is_some(),
+        })).unwrap_or_default());
 
         Ok(AuthResult {
             access_token: token_response.access_token,

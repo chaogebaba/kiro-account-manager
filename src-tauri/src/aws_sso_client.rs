@@ -82,7 +82,7 @@ impl AWSSSOClient {
         let url = format!("{}/client/register", self.base_url);
         
         let body = serde_json::json!({
-            "clientName": "Kiro Token Manager",
+            "clientName": "Kiro Account Manager",
             "clientType": "public",
             "scopes": [
                 "codewhisperer:completions",
