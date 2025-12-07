@@ -169,6 +169,10 @@ pub struct SwitchAccountParams {
     #[serde(default)]
     pub client_id_hash: Option<String>,
     #[serde(default)]
+    pub client_id: Option<String>,
+    #[serde(default)]
+    pub client_secret: Option<String>,
+    #[serde(default)]
     pub region: Option<String>,
     // 选项
     #[serde(default)]
@@ -191,6 +195,8 @@ pub async fn switch_kiro_account(params: SwitchAccountParams) -> Result<SwitchAc
         let provider = params.provider;
         let profile_arn = params.profile_arn;
         let client_id_hash = params.client_id_hash;
+        let client_id = params.client_id;
+        let client_secret = params.client_secret;
         let region = params.region;
         
         // 1. 如果 Kiro 正在运行，先关闭
@@ -225,19 +231,16 @@ pub async fn switch_kiro_account(params: SwitchAccountParams) -> Result<SwitchAc
         // 根据 auth_method 构建不同的 token 数据
         let token_data = if auth_method == "IdC" {
             // IdC 账号: clientIdHash + region
-            let mut data = serde_json::json!({
+            let hash = client_id_hash.clone().unwrap_or_default();
+            let data = serde_json::json!({
                 "accessToken": access_token,
                 "refreshToken": refresh_token,
                 "expiresAt": expires_at.to_rfc3339(),
                 "authMethod": "IdC",
-                "provider": provider
+                "provider": provider,
+                "clientIdHash": hash,
+                "region": region.clone().unwrap_or_else(|| "us-east-1".to_string())
             });
-            if let Some(hash) = client_id_hash {
-                data["clientIdHash"] = serde_json::json!(hash);
-            }
-            if let Some(r) = region {
-                data["region"] = serde_json::json!(r);
-            }
             data
         } else {
             // Social 账号: profileArn
@@ -259,6 +262,23 @@ pub async fn switch_kiro_account(params: SwitchAccountParams) -> Result<SwitchAc
         
         std::fs::write(&file_path, content)
             .map_err(|e| format!("Failed to write file: {}", e))?;
+        
+        // IdC 账号还需要写入 Client Registration 文件
+        if auth_method == "IdC" {
+            if let (Some(hash), Some(cid), Some(csec)) = (client_id_hash, client_id, client_secret) {
+                let client_reg_path = dir_path.join(format!("{}.json", hash));
+                let client_expires = chrono::Utc::now() + chrono::Duration::days(90);
+                let client_reg_data = serde_json::json!({
+                    "clientId": cid,
+                    "clientSecret": csec,
+                    "expiresAt": client_expires.to_rfc3339()
+                });
+                let client_reg_content = serde_json::to_string_pretty(&client_reg_data)
+                    .map_err(|e| format!("Failed to serialize client registration: {}", e))?;
+                std::fs::write(&client_reg_path, client_reg_content)
+                    .map_err(|e| format!("Failed to write client registration: {}", e))?;
+            }
+        }
         
         // 4. 如果之前在运行且需要自动重启，则启动 Kiro
         let kiro_restarted = if kiro_was_running && should_restart {
