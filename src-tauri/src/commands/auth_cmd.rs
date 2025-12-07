@@ -64,6 +64,7 @@ async fn login_social(
         existing.user_id = user_id;
         existing.expires_at = Some(auth_result.expires_at.clone());
         existing.profile_arn = auth_result.profile_arn;
+        existing.label = format!("Kiro {} 账号", provider_id);
         // 不覆盖 csrfToken，保留 Web OAuth 的
         existing.usage_data = Some(usage_data);
         existing.status = "正常".to_string();

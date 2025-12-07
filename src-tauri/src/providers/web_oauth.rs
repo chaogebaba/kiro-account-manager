@@ -90,7 +90,7 @@ pub struct ExchangeTokenResult {
     pub csrf_token: Option<String>,     // body
     pub expires_in: Option<i64>,        // body
     pub profile_arn: Option<String>,    // body
-    pub session_token: Option<String>,  // Set-Cookie (SessionToken for BuilderId, RefreshToken for Google/Github)
+    pub session_token: Option<String>,  // Set-Cookie RefreshToken
     pub idp: Option<String>,            // Set-Cookie
 }
 
@@ -348,7 +348,6 @@ impl KiroWebPortalClient {
         }
         
         // 从 Set-Cookie 响应头提取 cookie
-        // 注意：BuilderId 返回 SessionToken，Google/Github 返回 RefreshToken
         let mut cookie_session_token: Option<String> = None;
         let mut cookie_access_token: Option<String> = None;
         let mut cookie_idp: Option<String> = None;
@@ -359,8 +358,7 @@ impl KiroWebPortalClient {
                 if let Ok(c) = cookie::Cookie::parse(cookie_str) {
                     println!("[WebOAuth] Set-Cookie parsed: {}={}", c.name(), &c.value()[..20.min(c.value().len())]);
                     match c.name() {
-                        // BuilderId 用 SessionToken，Google/Github 用 RefreshToken
-                        "SessionToken" | "RefreshToken" => cookie_session_token = Some(c.value().to_string()),
+                        "RefreshToken" => cookie_session_token = Some(c.value().to_string()),
                         "AccessToken" => cookie_access_token = Some(c.value().to_string()),
                         "Idp" => cookie_idp = Some(c.value().to_string()),
                         _ => {}
@@ -405,8 +403,8 @@ impl KiroWebPortalClient {
     /// 调用 RefreshToken 接口
     /// access_token: AccessToken cookie
     /// csrf_token: csrfToken (body 和 x-csrf-token header)
-    /// session_token: SessionToken/RefreshToken cookie (BuilderId 用 SessionToken，Google/Github 用 RefreshToken)
-    /// idp: Idp cookie (Google/Github/BuilderId)
+    /// refresh_token: RefreshToken cookie
+    /// idp: Idp cookie (Google/Github)
     pub async fn refresh_token_with_cookies(
         &self,
         access_token: &str,
@@ -426,19 +424,16 @@ impl KiroWebPortalClient {
 
         let body = cbor_encode(&request)?;
         
-        // Cookie 格式：BuilderId 用 SessionToken，Google/Github 用 RefreshToken
-        let session_cookie_name = if idp == "BuilderId" { "SessionToken" } else { "RefreshToken" };
         let cookie = format!(
-            "AccessToken={}; {}={}; Idp={}", 
-            access_token, session_cookie_name, session_token, idp
+            "AccessToken={}; RefreshToken={}; Idp={}", 
+            access_token, session_token, idp
         );
 
         println!("[WebOAuth] RefreshToken Request: {}", serde_json::to_string_pretty(&serde_json::json!({
             "url": url,
             "idp": idp,
             "accessToken": format!("{}...", &access_token[..20.min(access_token.len())]),
-            "sessionCookieName": session_cookie_name,
-            "sessionToken": format!("{}...", &session_token[..20.min(session_token.len())]),
+            "refreshToken": format!("{}...", &session_token[..20.min(session_token.len())]),
             "csrfToken": csrf_token
         })).unwrap_or_default());
 
@@ -503,11 +498,9 @@ impl KiroWebPortalClient {
         };
 
         let body = cbor_encode(&request)?;
-        // Cookie 格式：BuilderId 用 SessionToken，Google/Github 用 RefreshToken
-        let session_cookie_name = if idp == "BuilderId" { "SessionToken" } else { "RefreshToken" };
         let cookie = format!(
-            "AccessToken={}; {}={}; Idp={}", 
-            access_token, session_cookie_name, session_token, idp
+            "AccessToken={}; RefreshToken={}; Idp={}", 
+            access_token, session_token, idp
         );
 
         println!("[WebOAuth] GetUserInfo Request: {}", serde_json::to_string_pretty(&serde_json::json!({
@@ -574,11 +567,9 @@ impl KiroWebPortalClient {
         };
 
         let body = cbor_encode(&request)?;
-        // Cookie 格式：BuilderId 用 SessionToken，Google/Github 用 RefreshToken
-        let session_cookie_name = if idp == "BuilderId" { "SessionToken" } else { "RefreshToken" };
         let cookie = format!(
-            "AccessToken={}; {}={}; Idp={}", 
-            access_token, session_cookie_name, session_token, idp
+            "AccessToken={}; RefreshToken={}; Idp={}", 
+            access_token, session_token, idp
         );
 
         println!("[WebOAuth] GetUserUsageAndLimits Request: {}", serde_json::to_string_pretty(&serde_json::json!({
@@ -646,7 +637,6 @@ impl WebOAuthProvider {
         match self.provider_id.as_str() {
             "Google" => "Google",
             "Github" => "Github",
-            "BuilderId" => "BuilderId",
             other => other,
         }
     }

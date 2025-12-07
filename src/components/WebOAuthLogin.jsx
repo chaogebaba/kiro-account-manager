@@ -152,20 +152,6 @@ function WebOAuthLogin({ onLogin }) {
             <span className={`absolute right-6 ${colors.text} opacity-0 group-hover:opacity-100 transition-opacity`}>Sign in →</span>
           </button>
 
-          {/* AWS Builder ID */}
-          <button
-            onClick={() => handleLogin('BuilderId')}
-            disabled={!!loadingProvider}
-            className={`group w-full relative flex items-center justify-center gap-2 px-6 py-4 ${colors.loginBtn} border hover:border-purple-500 rounded-lg transition-all disabled:opacity-50`}
-          >
-            {loadingProvider === 'BuilderId' ? (
-              <Loader size={20} className={`animate-spin ${colors.text}`} />
-            ) : (
-              <span className="text-[#ff9900] font-bold text-base">aws</span>
-            )}
-            <span className={`${colors.text} font-medium`}>Builder ID</span>
-            <span className={`absolute right-6 ${colors.text} opacity-0 group-hover:opacity-100 transition-opacity`}>Sign in →</span>
-          </button>
         </div>
       )}
 

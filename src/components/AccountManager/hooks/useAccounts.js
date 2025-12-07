@@ -111,15 +111,34 @@ export function useAccounts() {
         csrfToken: account.csrfToken || null,
         provider: account.provider || 'Google'
       })
-      await invoke('switch_kiro_account', {
-        params: {
-          accessToken: account.accessToken,
-          refreshToken: account.refreshToken,
-          provider: account.provider || 'Google',
-          resetMachineId: true
-        }
-      })
-      alert(`切换成功！配额: ${usage.currentUsage || 0}/${usage.usageLimit || 50}\n\n请重启 Kiro IDE`)
+      
+      // 根据账号类型判断 authMethod
+      const isIdC = account.provider === 'BuilderId' || account.provider === 'Enterprise' || account.clientIdHash
+      const authMethod = isIdC ? 'IdC' : 'social'
+      
+      // 构建完整的切换参数
+      const params = {
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        provider: account.provider || 'Google',
+        authMethod,
+        resetMachineId: true,
+        autoRestart: true
+      }
+      
+      if (isIdC) {
+        // IdC 账号: 需要 clientIdHash, region, clientId, clientSecret
+        params.clientIdHash = account.clientIdHash || null
+        params.region = account.ssoRegion || 'us-east-1'
+        params.clientId = account.ssoClientId || null
+        params.clientSecret = account.ssoClientSecret || null
+      } else {
+        // Social 账号: 需要 profileArn
+        params.profileArn = account.profileArn || 'arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK'
+      }
+      
+      await invoke('switch_kiro_account', { params })
+      alert(`切换成功！配额: ${usage.currentUsage || 0}/${usage.usageLimit || 50}\n\nKiro IDE 将自动重启`)
     } catch (e) {
       alert('切换失败: ' + e)
     } finally {
