@@ -311,12 +311,10 @@ function Settings() {
               onChange={(e) => handleLockModelChange(e.target.checked)}
               className="mt-0.5 w-4 h-4 rounded-lg border-gray-300 text-blue-500 focus:ring-blue-500"
             />
-            <div className="flex items-center gap-2">
-              <Lock size={16} className={colors.textMuted} />
-              <div>
-                <span className={`text-sm font-medium ${colors.text}`}>锁定模型</span>
-                <p className={`text-xs ${colors.textMuted} mt-0.5`}>启用后，将自动监控并恢复 Kiro 配置中的模型设置，防止被其他操作修改</p>
-              </div>
+            <Lock size={16} className={`${colors.textMuted} mt-0.5 flex-shrink-0`} />
+            <div>
+              <span className={`text-sm font-medium ${colors.text}`}>锁定模型</span>
+              <p className={`text-xs ${colors.textMuted} mt-0.5`}>启用后，将自动监控并恢复 Kiro 配置中的模型设置，防止被其他操作修改</p>
             </div>
           </label>
         </section>
@@ -333,12 +331,10 @@ function Settings() {
               onChange={(e) => handleAutoRefreshChange(e.target.checked)}
               className="mt-0.5 w-4 h-4 rounded-lg border-gray-300 text-blue-500 focus:ring-blue-500"
             />
-            <div className="flex items-center gap-2">
-              <Clock size={16} className={colors.textMuted} />
-              <div>
-                <span className={`text-sm font-medium ${colors.text}`}>自动刷新 Token</span>
-                <p className={`text-xs ${colors.textMuted} mt-0.5`}>每 50 分钟自动刷新所有账号的 Token，保持账号始终有效</p>
-              </div>
+            <Clock size={16} className={`${colors.textMuted} mt-0.5 flex-shrink-0`} />
+            <div>
+              <span className={`text-sm font-medium ${colors.text}`}>自动刷新 Token</span>
+              <p className={`text-xs ${colors.textMuted} mt-0.5`}>每 50 分钟自动刷新所有账号的 Token，保持账号始终有效</p>
             </div>
           </label>
         </section>
