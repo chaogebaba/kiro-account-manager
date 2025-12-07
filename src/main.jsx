@@ -6,19 +6,34 @@ import { ThemeProvider } from './contexts/ThemeContext.jsx'
 import { DialogProvider } from './contexts/DialogContext.jsx'
 import './index.css'
 
-// 生产环境禁用开发者工具
+// 生产环境禁用浏览器快捷键
 if (import.meta.env.PROD) {
-  // 禁用 F12、Ctrl+Shift+I、Ctrl+Shift+J、Ctrl+U
   document.addEventListener('keydown', (e) => {
-    if (
-      e.key === 'F12' ||
-      (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) ||
-      (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'j')) ||
-      (e.ctrlKey && (e.key === 'U' || e.key === 'u'))
-    ) {
+    // F5 - 刷新
+    // F12 - 开发者工具
+    if (e.key === 'F5' || e.key === 'F12') {
       e.preventDefault()
-      e.stopPropagation()
       return false
+    }
+    
+    // Ctrl 组合键
+    if (e.ctrlKey) {
+      const key = e.key.toLowerCase()
+      // Ctrl+R - 刷新
+      // Ctrl+U - 查看源码
+      // Ctrl+P - 打印
+      // Ctrl+S - 保存
+      // Ctrl+G - 查找
+      // Ctrl+F - 页面搜索
+      if (['r', 'u', 'p', 's', 'g', 'f'].includes(key)) {
+        e.preventDefault()
+        return false
+      }
+      // Ctrl+Shift+I/J - 开发者工具
+      if (e.shiftKey && ['i', 'j'].includes(key)) {
+        e.preventDefault()
+        return false
+      }
     }
   })
   
