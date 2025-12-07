@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Database, Settings as SettingsIcon, Clock } from 'lucide-react'
+import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Database, Settings as SettingsIcon, Clock, Globe, Search } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useDialog } from '../contexts/DialogContext'
 
@@ -16,6 +16,11 @@ function Settings() {
   const [originalProxy, setOriginalProxy] = useState('') // 原始代理值，用于判断是否修改
   const [savingProxy, setSavingProxy] = useState(false)
   const [savingModel, setSavingModel] = useState(false)
+  const [browserPath, setBrowserPath] = useState('')
+  const [originalBrowserPath, setOriginalBrowserPath] = useState('')
+  const [savingBrowser, setSavingBrowser] = useState(false)
+  const [detectedBrowsers, setDetectedBrowsers] = useState([])
+  const [showBrowserList, setShowBrowserList] = useState(false)
   
   // Kiro IDE 信息
   const [telemetryInfo, setTelemetryInfo] = useState(null)
@@ -42,6 +47,9 @@ function Settings() {
       if (appSettings) {
         setLockModel(appSettings.lockModel ?? true)
         setAutoRefresh(appSettings.autoRefresh ?? true)
+        const browser = appSettings.browserPath || ''
+        setBrowserPath(browser)
+        setOriginalBrowserPath(browser)
       }
     } catch (err) {
       console.error('Failed to load settings:', err)
@@ -106,6 +114,42 @@ function Settings() {
   const handleAutoRefreshChange = async (checked) => {
     setAutoRefresh(checked)
     await saveAppSettings({ autoRefresh: checked })
+  }
+
+  const handleApplyBrowser = async () => {
+    setSavingBrowser(true)
+    try {
+      await saveAppSettings({ browserPath: browserPath })
+      setOriginalBrowserPath(browserPath)
+      await showSuccess('保存成功', browserPath ? '浏览器路径已保存' : '已恢复使用系统默认浏览器')
+    } catch (err) {
+      await showError('保存失败', '保存浏览器路径失败: ' + err)
+    } finally {
+      setSavingBrowser(false)
+    }
+  }
+
+  const browserChanged = browserPath !== originalBrowserPath
+
+  const handleDetectBrowsers = async () => {
+    try {
+      const browsers = await invoke('detect_installed_browsers')
+      setDetectedBrowsers(browsers)
+      setShowBrowserList(true)
+      if (browsers.length === 0) {
+        await showError('未检测到浏览器', '未在常见路径中检测到浏览器，请手动输入路径')
+      }
+    } catch (err) {
+      await showError('检测失败', '检测浏览器失败: ' + err)
+    }
+  }
+
+  const handleSelectBrowser = (browser, useIncognito = true) => {
+    const path = useIncognito && browser.incognitoArg 
+      ? `"${browser.path}" ${browser.incognitoArg}`
+      : `"${browser.path}"`
+    setBrowserPath(path)
+    setShowBrowserList(false)
   }
 
   const [resetting, setResetting] = useState(false)
@@ -328,7 +372,7 @@ function Settings() {
         </section>
 
         {/* 账号设置 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-300`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>账号设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>配置账号自动刷新等功能</p>
           
@@ -347,8 +391,97 @@ function Settings() {
           </label>
         </section>
 
+        {/* 浏览器设置 */}
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-350`}>
+          <div className="flex items-center gap-2 mb-1">
+            <Globe size={18} className="text-blue-500" />
+            <h2 className={`text-lg font-semibold ${colors.text}`}>浏览器设置</h2>
+          </div>
+          <p className={`text-sm ${colors.textMuted} mb-5`}>
+            配置 OAuth 登录时使用的浏览器，可指定无痕模式等参数
+          </p>
+          
+          <div className="mb-3">
+            <label className={`block text-sm ${colors.textMuted} mb-2`}>浏览器路径</label>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={browserPath}
+                onChange={(e) => setBrowserPath(e.target.value)}
+                placeholder="留空使用系统默认浏览器"
+                className={`flex-1 px-4 py-3 border rounded-xl ${colors.text} ${colors.input} ${colors.inputFocus} focus:ring-2 transition-all`}
+              />
+              <button
+                onClick={handleDetectBrowsers}
+                className={`btn-icon px-4 py-3 border rounded-xl ${isDark ? 'border-gray-700 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'} ${colors.text} transition-all flex items-center gap-2`}
+                title="自动检测已安装的浏览器"
+              >
+                <Search size={16} />
+                检测
+              </button>
+              <button
+                onClick={handleApplyBrowser}
+                disabled={savingBrowser || !browserChanged}
+                className={`btn-icon px-5 py-3 rounded-xl flex items-center gap-2 font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all ${
+                  browserChanged 
+                    ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                    : `${isDark ? 'bg-white/10 text-white/50' : 'bg-gray-200 text-gray-400'}`
+                }`}
+              >
+                {savingBrowser ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
+                {savingBrowser ? '保存中...' : '应用'}
+              </button>
+            </div>
+          </div>
+
+          {/* 检测到的浏览器列表 */}
+          {showBrowserList && detectedBrowsers.length > 0 && (
+            <div className={`mt-4 p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+              <div className="flex items-center justify-between mb-3">
+                <span className={`text-sm font-medium ${colors.text}`}>检测到的浏览器</span>
+                <button 
+                  onClick={() => setShowBrowserList(false)}
+                  className={`text-xs ${colors.textMuted} hover:underline`}
+                >
+                  关闭
+                </button>
+              </div>
+              <div className="space-y-2">
+                {detectedBrowsers.map((browser, index) => (
+                  <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-white hover:bg-gray-100'} transition-colors`}>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-medium ${colors.text}`}>{browser.name}</div>
+                      <div className={`text-xs ${colors.textMuted} truncate`}>{browser.path}</div>
+                    </div>
+                    <div className="flex gap-2 ml-3">
+                      {browser.incognitoArg && (
+                        <button
+                          onClick={() => handleSelectBrowser(browser, true)}
+                          className="btn-icon px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                        >
+                          无痕模式
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleSelectBrowser(browser, false)}
+                        className={`btn-icon px-3 py-1.5 text-xs rounded-lg transition-colors ${isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-200 hover:bg-gray-300'} ${colors.text}`}
+                      >
+                        普通模式
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className={`text-xs ${colors.textMuted} mt-3`}>
+            留空表示使用系统默认浏览器。点击"检测"可自动查找已安装的浏览器
+          </p>
+        </section>
+
         {/* 代理设置 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-400`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>代理设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>
             配置 Kiro IDE 的 HTTP 代理（与 settings.json 中的 http.proxy 同步）
@@ -390,7 +523,7 @@ function Settings() {
         </section>
 
         {/* Kiro IDE 信息 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-500`}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>Kiro IDE 信息</h2>

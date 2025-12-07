@@ -3,6 +3,7 @@
 mod auth;
 mod auth_social;
 mod aws_sso_client;
+mod browser;
 mod codewhisperer_client;
 mod commands;
 mod kiro;
@@ -19,6 +20,7 @@ use state::AppState;
 use std::sync::Mutex;
 
 // 导入命令
+use browser::detect_installed_browsers;
 use commands::auth_cmd::*;
 use commands::settings_cmd::*;
 use commands::account_cmd::*;
@@ -80,7 +82,9 @@ fn main() {
             web_oauth_complete,
             web_oauth_refresh,
             web_oauth_login,
-            web_oauth_close_window
+            web_oauth_close_window,
+            // 浏览器检测
+            detect_installed_browsers
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::browser::open_browser;
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
@@ -70,20 +71,7 @@ impl KiroAuthServiceClient {
 
         let login_url = login_url.trim().to_string();
         
-        #[cfg(target_os = "windows")]
-        {
-            // Windows: 使用 rundll32 打开 URL
-            std::process::Command::new("rundll32")
-                .args(["url.dll,FileProtocolHandler", &login_url])
-                .spawn()
-                .map_err(|e| format!("Failed to open browser: {}", e))?;
-        }
-        
-        #[cfg(not(target_os = "windows"))]
-        {
-            open::that(&login_url)
-                .map_err(|e| format!("Failed to open browser for Kiro Auth login: {}", e))?;
-        }
+        open_browser(&login_url)?;
 
         Ok(())
     }

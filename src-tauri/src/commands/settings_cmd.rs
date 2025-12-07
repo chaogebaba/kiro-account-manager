@@ -15,7 +15,7 @@ pub struct KiroSettings {
 }
 
 // ============================================================
-// 应用自身设置 (存到 ~/.kiro-token-manager/app-settings.json)
+// 应用自身设置 (存到 ~/.kiro-account-manager/app-settings.json)
 // ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -24,6 +24,8 @@ pub struct AppSettings {
     pub theme: Option<String>,
     pub lock_model: Option<bool>,
     pub locked_model: Option<String>,
+    pub auto_refresh: Option<bool>,
+    pub browser_path: Option<String>,  // 自定义浏览器路径，如 "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe --incognito"
 }
 
 fn get_app_settings_path() -> PathBuf {
@@ -35,7 +37,7 @@ fn get_app_settings_path() -> PathBuf {
             PathBuf::from(home)
         });
     data_dir
-        .join("kiro-account-manager")
+        .join(".kiro-account-manager")
         .join("app-settings.json")
 }
 
@@ -199,4 +201,18 @@ pub async fn set_kiro_model(model: String) -> Result<(), String> {
     tokio::task::spawn_blocking(move || set_kiro_model_inner(model))
         .await
         .map_err(|e| format!("Task failed: {}", e))?
+}
+
+/// 获取自定义浏览器路径（供打开浏览器时使用）
+pub fn get_browser_path() -> Option<String> {
+    let path = get_app_settings_path();
+    println!("[Settings] App settings path: {:?}", path);
+    
+    let result = get_app_settings_inner();
+    println!("[Settings] get_app_settings_inner result: {:?}", result);
+    
+    let browser_path = result.ok().and_then(|s| s.browser_path).filter(|p| !p.is_empty());
+    println!("[Settings] browser_path: {:?}", browser_path);
+    
+    browser_path
 }

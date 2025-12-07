@@ -2,6 +2,7 @@
 // 参考 kiro-batch-login/src/providers/idc-provider.js
 
 use crate::aws_sso_client::AWSSSOClient;
+use crate::browser::open_browser;
 use crate::oauth_callback_server::OAuthCallbackServer;
 use sha2::{Digest, Sha256};
 use super::{AuthResult, AuthProvider, RefreshMetadata};
@@ -79,18 +80,7 @@ impl AuthProvider for IdcProvider {
 
         // Step 6: 打开浏览器
         println!("[IdC] Opening browser...");
-        #[cfg(target_os = "windows")]
-        {
-            std::process::Command::new("rundll32")
-                .args(["url.dll,FileProtocolHandler", &auth_url])
-                .spawn()
-                .map_err(|e| format!("Failed to open browser: {}", e))?;
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            open::that(&auth_url)
-                .map_err(|e| format!("Failed to open browser: {}", e))?;
-        }
+        open_browser(&auth_url)?;
 
         // Step 7: 等待回调
         println!("[IdC] Waiting for callback...");

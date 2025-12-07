@@ -81,7 +81,7 @@ impl AccountStore {
                 .unwrap_or_else(|_| ".".to_string());
             PathBuf::from(home)
         });
-        data_dir.join("kiro-account-manager").join("accounts.json")
+        data_dir.join(".kiro-account-manager").join("accounts.json")
     }
 
     fn load_from_file(path: &PathBuf) -> Vec<Account> {
