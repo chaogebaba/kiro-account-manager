@@ -3,6 +3,8 @@ import { Github, Heart, Coffee, ExternalLink, Sparkles, Code2, Palette, Cpu, Ref
 import { open } from '@tauri-apps/plugin-shell'
 import { getVersion } from '@tauri-apps/api/app'
 import { useTheme } from '../contexts/ThemeContext'
+import alipayQR from '../assets/donate/alipay.jpg'
+import wechatQR from '../assets/donate/wechat.jpg'
 
 const GITHUB_REPO = 'hj01857655/kiro-account-manager'
 
@@ -147,8 +149,28 @@ function About() {
           </a>
         </div>
 
+        {/* 请作者喝杯咖啡 */}
+        <div className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl p-4 mb-5 opacity-0 animate-fade-in-up delay-500`}>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <Coffee size={16} className="text-amber-500" />
+            <span className={`text-sm font-medium ${colors.text}`}>请作者喝杯咖啡</span>
+          </div>
+          <div className="flex justify-center gap-4">
+            {/* 支付宝 */}
+            <div className="text-center">
+              <img src={alipayQR} alt="支付宝" className="w-24 h-24 rounded-lg object-cover mb-1" />
+              <span className={`text-xs ${colors.textMuted}`}>支付宝</span>
+            </div>
+            {/* 微信 */}
+            <div className="text-center">
+              <img src={wechatQR} alt="微信" className="w-24 h-24 rounded-lg object-cover mb-1" />
+              <span className={`text-xs ${colors.textMuted}`}>微信支付</span>
+            </div>
+          </div>
+        </div>
+
         {/* 底部 */}
-        <div className={`flex items-center justify-center gap-1.5 text-xs ${colors.textMuted} opacity-0 animate-fade-in delay-500`}>
+        <div className={`flex items-center justify-center gap-1.5 text-xs ${colors.textMuted} opacity-0 animate-fade-in delay-600`}>
           <span>Made with</span>
           <Heart size={12} className="text-red-500 fill-red-500 animate-pulse" />
           <span>by hj01857655</span>
