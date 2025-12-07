@@ -45,7 +45,7 @@ function Settings() {
       }
     } catch (err) {
       console.error('Failed to load settings:', err)
-      await showError('加载失败', '加载设置失败: ' + err)
+      // 暂时不显示错误弹窗，避免阻塞页面
     } finally {
       setLoading(false)
     }
@@ -328,7 +328,7 @@ function Settings() {
         </section>
 
         {/* 账号设置 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-300`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>账号设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>配置账号自动刷新等功能</p>
           
@@ -348,7 +348,7 @@ function Settings() {
         </section>
 
         {/* 代理设置 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-400`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>代理设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>
             配置 Kiro IDE 的 HTTP 代理（与 settings.json 中的 http.proxy 同步）
@@ -390,7 +390,7 @@ function Settings() {
         </section>
 
         {/* Kiro IDE 信息 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-500`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6`}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>Kiro IDE 信息</h2>
