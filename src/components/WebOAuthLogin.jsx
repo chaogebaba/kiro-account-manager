@@ -139,7 +139,7 @@ function WebOAuthLogin({ onLogin }) {
 
       <div className="relative z-10 w-full max-w-md px-6">
         {/* Logo */}
-        <div className="flex flex-col items-center mb-10 opacity-0 animate-zoom-in">
+        <div className="flex flex-col items-center mb-10 animate-zoom-in">
           <div className={`
             w-20 h-20 rounded-3xl mb-5
             bg-gradient-to-br from-purple-500 to-indigo-600
@@ -165,7 +165,7 @@ function WebOAuthLogin({ onLogin }) {
 
         {/* 选择登录 */}
         {step === 'idle' && (
-          <div className="space-y-3 opacity-0 animate-slide-in-right delay-100">
+          <div className="space-y-3 animate-slide-in-right delay-100">
             {providers.map((provider) => (
               <button
                 key={provider.id}
@@ -296,7 +296,7 @@ function WebOAuthLogin({ onLogin }) {
       </div>
 
       {/* Footer */}
-      <p className={`absolute bottom-6 text-xs ${colors.textMuted} text-center opacity-0 animate-blur-in delay-300`}>
+      <p className={`absolute bottom-6 text-xs ${colors.textMuted} text-center animate-blur-in delay-300`}>
         通过 Cognito + KiroWebPortalService 安全登录
       </p>
     </div>

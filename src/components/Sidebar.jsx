@@ -31,7 +31,7 @@ function Sidebar({ activeMenu, onMenuChange }) {
     <div className={`w-56 ${colors.sidebar} ${colors.sidebarText} flex flex-col relative`}>
       {/* Logo */}
       <div className="p-5 pb-4">
-        <div className="flex items-center gap-2.5 mb-1 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+        <div className="flex items-center gap-2.5 mb-1 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-110 hover:rotate-3">
             <svg width="24" height="24" viewBox="0 0 40 40" fill="none">
               <path d="M20 4C12 4 6 10 6 18C6 22 8 25 8 25C8 25 7 28 7 30C7 32 8 34 10 34C11 34 12 33 13 32C14 33 16 34 20 34C24 34 26 33 27 32C28 33 29 34 30 34C32 34 33 32 33 30C33 28 32 25 32 25C32 25 34 22 34 18C34 10 28 4 20 4ZM14 20C12.5 20 11 18.5 11 17C11 15.5 12.5 14 14 14C15.5 14 17 15.5 17 17C17 18.5 15.5 20 14 20ZM26 20C24.5 20 23 18.5 23 17C23 15.5 24.5 14 26 14C27.5 14 29 15.5 29 17C29 18.5 27.5 20 26 20Z" fill="white"/>
@@ -53,7 +53,7 @@ function Sidebar({ activeMenu, onMenuChange }) {
             <button
               key={item.id}
               onClick={() => onMenuChange(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all rounded-xl group opacity-0 animate-slide-in-left ${
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all rounded-xl group animate-slide-in-left ${
                 isActive ? `${colors.sidebarActive} font-medium shadow-sm` : `${colors.sidebarText} ${colors.sidebarHover}`
               }`}
               style={{ animationDelay: `${0.15 + index * 0.05}s` }}
@@ -75,7 +75,7 @@ function Sidebar({ activeMenu, onMenuChange }) {
 
       {/* Kiro IDE 本地连接状态 */}
       {localToken && (
-        <div className={`mx-3 mb-3 ${colors.sidebarCard} rounded-xl p-3 opacity-0 animate-fade-in-up card-glow`} style={{ animationDelay: '0.5s' }}>
+        <div className={`mx-3 mb-3 ${colors.sidebarCard} rounded-xl p-3 animate-fade-in-up card-glow`} style={{ animationDelay: '0.5s' }}>
           <div className={`text-xs ${colors.sidebarMuted} mb-2 flex items-center gap-1.5`}>
             <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
             Kiro IDE 已连接

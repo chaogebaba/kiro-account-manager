@@ -78,7 +78,7 @@ function Login({ onLogin }) {
 
       <div className="relative z-10 w-full max-w-sm px-6">
         {/* Logo */}
-        <div className="flex flex-col items-center mb-10 opacity-0 animate-bounce-in">
+        <div className="flex flex-col items-center mb-10 animate-bounce-in">
           <div className={`w-16 h-16 rounded-2xl ${isDark ? 'bg-gradient-to-br from-purple-500 to-blue-600' : 'bg-gradient-to-br from-purple-400 to-blue-500'} flex items-center justify-center mb-4 shadow-lg shadow-purple-500/25 animate-float`}>
             <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
               <path d="M20 4C12 4 6 10 6 18C6 22 8 25 8 25C8 25 7 28 7 30C7 32 8 34 10 34C11 34 12 33 13 32C14 33 16 34 20 34C24 34 26 33 27 32C28 33 29 34 30 34C32 34 33 32 33 30C33 28 32 25 32 25C32 25 34 22 34 18C34 10 28 4 20 4ZM14 20C12.5 20 11 18.5 11 17C11 15.5 12.5 14 14 14C15.5 14 17 15.5 17 17C17 18.5 15.5 20 14 20ZM26 20C24.5 20 23 18.5 23 17C23 15.5 24.5 14 26 14C27.5 14 29 15.5 29 17C29 18.5 27.5 20 26 20Z" fill="white"/>
@@ -97,7 +97,7 @@ function Login({ onLogin }) {
         )}
 
         {/* Buttons */}
-        <div className="space-y-3 opacity-0 animate-pop-up delay-100">
+        <div className="space-y-3 animate-pop-up delay-100">
           {providers.map((provider) => (
             <button
               key={provider.id}
@@ -129,7 +129,7 @@ function Login({ onLogin }) {
         </div>
 
         {/* Footer */}
-        <p className={`mt-10 text-xs ${colors.textMuted} text-center leading-relaxed opacity-0 animate-blur-in delay-300`}>
+        <p className={`mt-10 text-xs ${colors.textMuted} text-center leading-relaxed animate-blur-in delay-300`}>
           登录即表示同意{' '}
           <a href="https://aws.amazon.com/agreement/" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">AWS 客户协议</a>、
           <a href="https://aws.amazon.com/service-terms/" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">服务条款</a> 和{' '}

@@ -190,7 +190,7 @@ function AccountManager() {
         switchingId={switchingId}
       />
       </div>
-      <div className="opacity-0 animate-slide-in-right delay-200">
+      <div className="animate-slide-in-right delay-200">
       <AccountPagination
         totalCount={filteredAccounts.length}
         pageSize={pageSize}

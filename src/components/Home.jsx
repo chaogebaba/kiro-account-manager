@@ -82,7 +82,7 @@ function LoadingSkeleton({ isDark, colors }) {
 function StatCard({ icon: Icon, iconBg, value, label, delay, isDark }) {
   return (
     <div 
-      className={`card-glow rounded-2xl p-5 shadow-sm border opacity-0 animate-scale-in ${delay}`}
+      className={`card-glow rounded-2xl p-5 shadow-sm border animate-scale-in ${delay}`}
       style={{ 
         background: isDark ? 'rgba(30, 30, 50, 0.8)' : 'white',
         borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
@@ -153,7 +153,7 @@ function Home({ onNavigate }) {
       
       <div className="max-w-5xl mx-auto p-8 relative">
         {/* Header */}
-        <div className="mb-8 opacity-0 animate-bounce-in">
+        <div className="mb-8 animate-bounce-in">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25 animate-float">
               <Sparkles size={24} className="text-white" />
@@ -171,7 +171,7 @@ function Home({ onNavigate }) {
         </div>
 
         {/* 快捷操作区 */}
-        <div className={`mb-6 opacity-0 animate-blur-in delay-500`}>
+        <div className={`mb-6 animate-blur-in delay-500`}>
           <div className={`${colors.card} rounded-2xl p-4 border ${colors.cardBorder} flex items-center justify-between`}>
             <div className="flex items-center gap-3">
               <span className={`font-medium ${colors.text}`}>快捷操作</span>
@@ -202,7 +202,7 @@ function Home({ onNavigate }) {
 
         <div className="grid grid-cols-2 gap-6">
           {/* 本地 Kiro 账号 */}
-          <div className={`card-glow ${colors.card} rounded-2xl shadow-sm border ${colors.cardBorder} overflow-hidden opacity-0 animate-scale-in delay-300`}>
+          <div className={`card-glow ${colors.card} rounded-2xl shadow-sm border ${colors.cardBorder} overflow-hidden animate-scale-in delay-300`}>
             <div className={`px-6 py-4 border-b ${colors.cardBorder} flex items-center justify-between`}>
               <h2 className={`font-semibold ${colors.text}`}>当前登录账号</h2>
               <button 
@@ -292,7 +292,7 @@ function Home({ onNavigate }) {
           </div>
 
           {/* 配额总览 */}
-          <div className={`card-glow ${colors.card} rounded-2xl shadow-sm border ${colors.cardBorder} overflow-hidden opacity-0 animate-scale-in delay-400`}>
+          <div className={`card-glow ${colors.card} rounded-2xl shadow-sm border ${colors.cardBorder} overflow-hidden animate-scale-in delay-400`}>
             <div className={`px-6 py-4 border-b ${colors.cardBorder}`}>
               <h2 className={`font-semibold ${colors.text}`}>配额总览</h2>
             </div>
@@ -344,7 +344,7 @@ function Home({ onNavigate }) {
         </div>
 
         {/* 最近账号 */}
-        <div className={`card-glow ${colors.card} rounded-2xl shadow-sm border ${colors.cardBorder} overflow-hidden mt-6 opacity-0 animate-slide-up delay-500`}>
+        <div className={`card-glow ${colors.card} rounded-2xl shadow-sm border ${colors.cardBorder} overflow-hidden mt-6 animate-slide-up delay-500`}>
           <div className={`px-6 py-4 border-b ${colors.cardBorder} flex items-center justify-between`}>
             <h2 className={`font-semibold ${colors.text}`}>最近账号</h2>
             <button onClick={() => onNavigate?.('token')} className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1 font-medium group">
@@ -381,7 +381,7 @@ function Home({ onNavigate }) {
                   key={token.id} 
                   className={`flex items-center gap-4 px-6 py-4 transition-all cursor-pointer
                     ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}
-                    opacity-0 animate-slide-in-left`}
+                    animate-slide-in-left`}
                   style={{ animationDelay: `${0.5 + index * 0.1}s` }}
                   onClick={() => onNavigate?.('token')}
                 >

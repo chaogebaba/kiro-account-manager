@@ -15,7 +15,7 @@ function AccountPagination({
   if (totalCount === 0) return null
 
   return (
-    <div className={`${colors.card} border-t ${colors.cardBorder} px-6 py-3 flex items-center justify-between opacity-0 animate-fade-in delay-300`}>
+    <div className={`${colors.card} border-t ${colors.cardBorder} px-6 py-3 flex items-center justify-between animate-fade-in delay-300`}>
       <div className={`flex items-center gap-2 text-sm ${colors.textMuted}`}>
         <span>每页</span>
         <select
