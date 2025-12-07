@@ -3,9 +3,11 @@ import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { Download, RefreshCw, X } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useDialog } from '../contexts/DialogContext'
 
 function UpdateChecker() {
   const { theme, colors } = useTheme()
+  const { showError } = useDialog()
   const isDark = theme === 'dark'
   const [updateInfo, setUpdateInfo] = useState(null)
   const [checking, setChecking] = useState(false)
@@ -39,6 +41,7 @@ function UpdateChecker() {
       await relaunch()
     } catch (e) {
       console.error('安装更新失败:', e)
+      showError('更新失败', '安装更新失败: ' + e)
       setInstalling(false)
     }
   }

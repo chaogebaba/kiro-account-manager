@@ -40,6 +40,7 @@ function Settings() {
       }
     } catch (err) {
       console.error('Failed to load settings:', err)
+      await showError('加载失败', '加载设置失败: ' + err)
     } finally {
       setLoading(false)
     }
@@ -56,6 +57,7 @@ function Settings() {
       await invoke('save_app_settings', { settings: { ...current, ...updates } })
     } catch (err) {
       console.error('Failed to save app settings:', err)
+      await showError('保存失败', '保存设置失败: ' + err)
     }
   }
 
@@ -221,7 +223,7 @@ function Settings() {
       
       <div className="max-w-3xl mx-auto relative">
         {/* Header */}
-        <div className="mb-8 opacity-0 animate-fade-in-up">
+        <div className="mb-8 opacity-0 animate-slide-in-left">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-12 h-12 bg-gradient-to-br from-gray-500 to-gray-700 rounded-2xl flex items-center justify-center shadow-lg animate-float">
               <SettingsIcon size={24} className="text-white" />
@@ -234,7 +236,7 @@ function Settings() {
         </div>
 
         {/* 主题设置 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-fade-in-up delay-100`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-100`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>主题设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>选择你喜欢的界面主题</p>
           
@@ -269,7 +271,7 @@ function Settings() {
         </section>
 
         {/* 模型设置 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-fade-in-up delay-200`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-200`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>模型设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>选择默认使用的 AI 模型，并可选择锁定模型防止被修改</p>
           
@@ -313,7 +315,7 @@ function Settings() {
         </section>
 
         {/* 代理设置 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-fade-in-up delay-300`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-300`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>代理设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>
             配置 Kiro IDE 的 HTTP 代理（与 settings.json 中的 http.proxy 同步）
@@ -351,7 +353,7 @@ function Settings() {
         </section>
 
         {/* Kiro IDE 信息 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-fade-in-up delay-400`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-400`}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>Kiro IDE 信息</h2>

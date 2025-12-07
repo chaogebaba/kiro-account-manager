@@ -23,7 +23,7 @@ function AccountTable({
 
   return (
     <div className="flex-1 overflow-auto p-6">
-      <div className={`card-glow ${colors.card} rounded-2xl shadow-sm overflow-hidden max-w-6xl border ${colors.cardBorder}`}>
+      <div className={`card-glow ${colors.card} rounded-2xl shadow-sm overflow-hidden max-w-6xl border ${colors.cardBorder} opacity-0 animate-scale-in delay-200`}>
         <table className="w-full table-fixed">
           <thead>
             <tr className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} border-b ${colors.cardBorder} text-left text-xs font-medium ${colors.textMuted} uppercase tracking-wider`}>

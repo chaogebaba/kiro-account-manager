@@ -78,8 +78,8 @@ function About() {
         </div>
 
         {/* 标题 */}
-        <h1 className={`text-xl font-bold ${colors.text} mb-1.5 opacity-0 animate-fade-in-up delay-100`}>Kiro Account Manager</h1>
-        <div className="flex items-center justify-center gap-2 mb-3 opacity-0 animate-fade-in-up delay-200">
+        <h1 className={`text-xl font-bold ${colors.text} mb-1.5 opacity-0 animate-pop-up delay-100`}>Kiro Account Manager</h1>
+        <div className="flex items-center justify-center gap-2 mb-3 opacity-0 animate-pop-up delay-200">
           <span className={`px-2.5 py-0.5 ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'} rounded-full text-xs font-medium`}>
             v{version || '...'}
           </span>
@@ -104,7 +104,7 @@ function About() {
             )}
           </div>
         )}
-        <p className={`${colors.textMuted} text-sm mb-5 opacity-0 animate-fade-in-up delay-300`}>智能管理 Kiro 访问令牌，一键切换，配额监控</p>
+        <p className={`${colors.textMuted} text-sm mb-5 opacity-0 animate-blur-in delay-300`}>智能管理 Kiro 访问令牌，一键切换，配额监控</p>
 
         {/* 技术栈卡片 */}
         <div className="grid grid-cols-3 gap-2 mb-5">

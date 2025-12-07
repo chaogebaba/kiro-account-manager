@@ -64,8 +64,12 @@ function EditAccountModal({ account, onClose, onSuccess }) {
   const totalPercent = totalQuota > 0 ? Math.min(100, (totalUsed / totalQuota) * 100) : 0
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className={`${isDark ? 'bg-[#1a1a2e]' : 'bg-gray-50'} rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col`} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={onClose}>
+      <div 
+        className={`${isDark ? 'bg-[#1a1a2e]' : 'bg-gray-50'} rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col`} 
+        onClick={e => e.stopPropagation()}
+        style={{ animation: 'modalSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
+      >
         {/* Header */}
         <div className={`flex items-center justify-between px-6 py-4 ${colors.card} border-b ${colors.cardBorder}`}>
           <div className="flex items-center gap-4">
@@ -357,3 +361,29 @@ function EditAccountModal({ account, onClose, onSuccess }) {
 }
 
 export default EditAccountModal
+
+// 添加动画样式
+const style = document.createElement('style')
+style.textContent = `
+  @keyframes modalSlideIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95) translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out;
+  }
+`
+if (!document.querySelector('#edit-modal-styles')) {
+  style.id = 'edit-modal-styles'
+  document.head.appendChild(style)
+}

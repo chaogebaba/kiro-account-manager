@@ -91,7 +91,7 @@ function AccountManager() {
     setSwitchDialog({
       type: 'confirm',
       title: '切换账号',
-      message: `确定切换到 ${account.email}？\n\nKiro IDE 将自动重启以应用新账号。`,
+      message: `确定切换到 ${account.email}？`,
       account,
     })
   }, [])
@@ -135,10 +135,14 @@ function AccountManager() {
       
       await invoke('switch_kiro_account', { params })
       
+      const used = usage.currentUsage || 0
+      const limit = usage.usageLimit || 50
+      const remaining = limit - used
+      const provider = account.provider || 'Unknown'
       setSwitchDialog({
         type: 'success',
         title: '切换成功',
-        message: `已切换到 ${account.email}\n\n配额: ${usage.currentUsage || 0}/${usage.usageLimit || 50}\nKiro IDE 正在重启...`,
+        message: `${account.email}\n\n📊 配额: ${used}/${limit} (剩余 ${remaining})\n🏷️ 类型: ${provider}`,
         account: null,
       })
     } catch (e) {
@@ -168,6 +172,7 @@ function AccountManager() {
         lastRefreshTime={lastRefreshTime}
         refreshProgress={refreshProgress}
       />
+      <div className="opacity-0 animate-slide-up delay-100 flex-1 overflow-hidden">
       <AccountTable
         accounts={paginatedAccounts}
         filteredAccounts={filteredAccounts}
@@ -184,6 +189,8 @@ function AccountManager() {
         refreshingId={refreshingId}
         switchingId={switchingId}
       />
+      </div>
+      <div className="opacity-0 animate-slide-in-right delay-200">
       <AccountPagination
         totalCount={filteredAccounts.length}
         pageSize={pageSize}
@@ -192,6 +199,7 @@ function AccountManager() {
         onPageSizeChange={handlePageSizeChange}
         onPageChange={setCurrentPage}
       />
+      </div>
       {editingAccount && (
         <EditAccountModal
           account={editingAccount}

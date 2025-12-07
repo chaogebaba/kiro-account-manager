@@ -206,6 +206,9 @@ impl AWSSSOClient {
         let text = resp.text().await.unwrap_or_default();
 
         if !status.is_success() {
+            if status.as_u16() == 401 {
+                return Err("RefreshToken 已过期或无效".to_string());
+            }
             return Err(format!("Token refresh failed ({}): {}", status, text));
         }
 

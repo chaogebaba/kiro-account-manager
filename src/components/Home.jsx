@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { RefreshCw, Users, Zap, Shield, Clock, TrendingUp, ArrowRight, Sparkles, Play, RotateCcw } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useDialog } from '../contexts/DialogContext'
 import { calcAccountStats, getQuota, getUsed, getSubType, getSubPlan } from '../utils/accountStats'
 
 // 骨架屏组件
@@ -81,7 +82,7 @@ function LoadingSkeleton({ isDark, colors }) {
 function StatCard({ icon: Icon, iconBg, value, label, delay, isDark }) {
   return (
     <div 
-      className={`card-glow rounded-2xl p-5 shadow-sm border opacity-0 animate-fade-in-up ${delay}`}
+      className={`card-glow rounded-2xl p-5 shadow-sm border opacity-0 animate-scale-in ${delay}`}
       style={{ 
         background: isDark ? 'rgba(30, 30, 50, 0.8)' : 'white',
         borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
@@ -100,6 +101,7 @@ function StatCard({ icon: Icon, iconBg, value, label, delay, isDark }) {
 
 function Home({ onNavigate }) {
   const { theme, colors } = useTheme()
+  const { showError } = useDialog()
   const [tokens, setTokens] = useState([])
   const [localToken, setLocalToken] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -116,7 +118,10 @@ function Home({ onNavigate }) {
       ])
       setTokens(tokensData)
       setLocalToken(localData)
-    } catch (e) { console.error('Failed to load data:', e) }
+    } catch (e) { 
+      console.error('Failed to load data:', e)
+      showError('加载失败', '加载数据失败: ' + e)
+    }
     setLoading(false)
   }
 
@@ -148,7 +153,7 @@ function Home({ onNavigate }) {
       
       <div className="max-w-5xl mx-auto p-8 relative">
         {/* Header */}
-        <div className="mb-8 opacity-0 animate-fade-in-up">
+        <div className="mb-8 opacity-0 animate-bounce-in">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25 animate-float">
               <Sparkles size={24} className="text-white" />
@@ -166,7 +171,7 @@ function Home({ onNavigate }) {
         </div>
 
         {/* 快捷操作区 */}
-        <div className={`mb-6 opacity-0 animate-fade-in-up delay-500`}>
+        <div className={`mb-6 opacity-0 animate-blur-in delay-500`}>
           <div className={`${colors.card} rounded-2xl p-4 border ${colors.cardBorder} flex items-center justify-between`}>
             <div className="flex items-center gap-3">
               <span className={`font-medium ${colors.text}`}>快捷操作</span>
@@ -339,7 +344,7 @@ function Home({ onNavigate }) {
         </div>
 
         {/* 最近账号 */}
-        <div className={`card-glow ${colors.card} rounded-2xl shadow-sm border ${colors.cardBorder} overflow-hidden mt-6 opacity-0 animate-fade-in-up delay-500`}>
+        <div className={`card-glow ${colors.card} rounded-2xl shadow-sm border ${colors.cardBorder} overflow-hidden mt-6 opacity-0 animate-slide-up delay-500`}>
           <div className={`px-6 py-4 border-b ${colors.cardBorder} flex items-center justify-between`}>
             <h2 className={`font-semibold ${colors.text}`}>最近账号</h2>
             <button onClick={() => onNavigate?.('token')} className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1 font-medium group">

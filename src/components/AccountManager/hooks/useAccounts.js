@@ -68,10 +68,16 @@ export function useAccounts() {
     try {
       const updated = await invoke('sync_account', { id })
       setAccounts(prev => prev.map(a => a.id === id ? updated : a))
+      return { success: true }
     } catch (e) {
       console.warn(e)
+      // 更新账号状态为错误信息
+      const errorMsg = String(e)
+      setAccounts(prev => prev.map(a => a.id === id ? { ...a, status: errorMsg.includes('401') || errorMsg.includes('过期') ? 'Token已失效' : '刷新失败' } : a))
+      return { success: false, error: errorMsg }
+    } finally {
+      setRefreshingId(null)
     }
-    setRefreshingId(null)
   }, [])
 
   const handleExport = useCallback(async () => {

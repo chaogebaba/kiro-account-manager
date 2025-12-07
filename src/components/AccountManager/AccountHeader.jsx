@@ -24,7 +24,7 @@ function AccountHeader({
       
       <div className="flex items-center justify-between relative">
         <div className="flex items-center gap-6">
-          <div className="opacity-0 animate-fade-in-up">
+          <div className="opacity-0 animate-slide-in-right">
             <div className="flex items-center gap-3 mb-1">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 animate-float">
                 <Sparkles size={20} className="text-white" />
@@ -34,15 +34,15 @@ function AccountHeader({
             <p className={`text-sm ${colors.textMuted}`}>管理你的 Kiro 账号和配额</p>
           </div>
           <div className="flex gap-3 ml-4">
-            <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-blue-500/20' : 'bg-blue-50'} rounded-xl opacity-0 animate-fade-in-up delay-100 transition-transform hover:scale-105`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-blue-500/20' : 'bg-blue-50'} rounded-xl opacity-0 animate-scale-in delay-100 transition-transform hover:scale-105`}>
               <Users size={16} className="text-blue-500" />
               <span className={`text-sm font-medium ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>{stats.total} 账号</span>
             </div>
-            <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-green-500/20' : 'bg-green-50'} rounded-xl opacity-0 animate-fade-in-up delay-200 transition-transform hover:scale-105`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-green-500/20' : 'bg-green-50'} rounded-xl opacity-0 animate-scale-in delay-200 transition-transform hover:scale-105`}>
               <Shield size={16} className="text-green-500" />
               <span className={`text-sm font-medium ${isDark ? 'text-green-300' : 'text-green-700'}`}>{stats.active} 正常</span>
             </div>
-            <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-purple-500/20' : 'bg-purple-50'} rounded-xl opacity-0 animate-fade-in-up delay-300 transition-transform hover:scale-105`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-purple-500/20' : 'bg-purple-50'} rounded-xl opacity-0 animate-scale-in delay-300 transition-transform hover:scale-105`}>
               <Zap size={16} className="text-purple-500" />
               <span className={`text-sm font-medium ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>{stats.totalUsed}/{stats.totalQuota}</span>
             </div>

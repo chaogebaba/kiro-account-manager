@@ -201,6 +201,9 @@ impl KiroAuthServiceClient {
 
         if !status.is_success() {
             println!("Error: {}", body_str);
+            if status.as_u16() == 401 {
+                return Err("RefreshToken 已过期或无效".to_string());
+            }
             return Err(format!(
                 "Kiro Auth Service token refresh failed: {} - {}",
                 status,

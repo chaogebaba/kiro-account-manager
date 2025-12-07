@@ -303,7 +303,7 @@ pub async fn switch_kiro_account(params: SwitchAccountParams) -> Result<SwitchAc
             }
         }
         
-        // 4. 如果之前在运行且需要自动重启，则启动 Kiro
+        // 4. 切换完成
         let kiro_restarted = if kiro_was_running && should_restart {
             launch_kiro().is_ok()
         } else {
