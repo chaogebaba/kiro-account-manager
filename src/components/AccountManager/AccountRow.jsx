@@ -31,8 +31,7 @@ function AccountRow({
 
   return (
     <tr 
-      className={`${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50/50'} transition-all group opacity-0 animate-fade-in`}
-      style={{ animationDelay: `${index * 0.05}s` }}
+      className={`${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50/50'} transition-all group`}
     >
       <td className="px-4 py-3">
         <input 

@@ -95,7 +95,7 @@ function Sidebar({ activeMenu, onMenuChange }) {
       )}
 
       {/* Theme & Version */}
-      <div className={`px-3 pb-3 flex items-center justify-between opacity-0 animate-fade-in`} style={{ animationDelay: '0.6s' }}>
+      <div className={`px-3 pb-3 flex items-center justify-between`}>
         <div className="relative">
           <button
             onClick={() => setShowThemeMenu(!showThemeMenu)}

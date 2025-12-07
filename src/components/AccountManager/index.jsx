@@ -172,7 +172,7 @@ function AccountManager() {
         lastRefreshTime={lastRefreshTime}
         refreshProgress={refreshProgress}
       />
-      <div className="opacity-0 animate-slide-up delay-100 flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden">
       <AccountTable
         accounts={paginatedAccounts}
         filteredAccounts={filteredAccounts}

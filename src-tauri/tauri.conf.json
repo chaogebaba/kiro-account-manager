@@ -24,7 +24,10 @@
         "width": 1280,
         "minWidth": 1100,
         "minHeight": 650,
-        "visible": false
+        "visible": false,
+        "center": true,
+        "decorations": true,
+        "shadow": true
       }
     ],
     "security": {
@@ -33,6 +36,8 @@
   },
   "bundle": {
     "active": true,
+    "category": "DeveloperTool",
+    "copyright": "© 2025 hj01857655",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -40,7 +45,20 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "targets": "all"
+    "targets": "all",
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine",
+        "installerIcon": "icons/icon.ico",
+        "displayLanguageSelector": true,
+        "languages": ["SimpChinese", "English"]
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "shortDescription": "Kiro 账号管理工具",
+    "longDescription": "管理 Kiro IDE 账号，支持多账号切换和配额监控"
   },
   "plugins": {
     "updater": {

@@ -26,27 +26,30 @@ function About() {
   const checkUpdate = async () => {
     setChecking(true)
     setUpdateStatus(null)
+    setUpdateInfo(null)
     try {
       const update = await check()
       if (update) {
         setUpdateInfo(update)
-        setUpdateStatus({ type: 'update', message: `发现新版本 ${update.version}` })
+        setUpdateStatus({ type: 'update', message: `发现新版本 ${update.version}`, update })
       } else {
         setUpdateStatus({ type: 'latest', message: '已是最新版本' })
       }
     } catch (e) {
       console.error('检查更新失败:', e)
       setUpdateStatus({ type: 'error', message: '检查失败，请稍后重试' })
+    } finally {
+      setChecking(false)
     }
-    setChecking(false)
   }
 
   const doUpdate = async () => {
-    if (!updateInfo) return
+    const update = updateInfo || updateStatus?.update
+    if (!update) return
     setDownloading(true)
     setDownloadProgress(0)
     try {
-      await updateInfo.downloadAndInstall((event) => {
+      await update.downloadAndInstall((event) => {
         if (event.event === 'Progress') {
           const progress = Math.round((event.data.chunkLength / event.data.contentLength) * 100)
           setDownloadProgress(prev => Math.min(prev + progress, 100))
@@ -116,7 +119,7 @@ function About() {
               ) : (
                 <>
                   {updateStatus.message}
-                  {updateStatus.type === 'update' && updateInfo && (
+                  {updateStatus.type === 'update' && (updateInfo || updateStatus.update) && (
                     <button 
                       onClick={doUpdate} 
                       className="ml-3 px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors inline-flex items-center gap-1"
