@@ -91,7 +91,7 @@ export const themes = {
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState('light')
+  const [theme, setThemeState] = useState('dark')
   const [loaded, setLoaded] = useState(false)
 
   // 从文件加载设置
