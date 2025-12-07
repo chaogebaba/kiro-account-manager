@@ -13,6 +13,7 @@ function Settings() {
   const [lockModel, setLockModel] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [httpProxy, setHttpProxy] = useState('')
+  const [originalProxy, setOriginalProxy] = useState('') // 原始代理值，用于判断是否修改
   const [savingProxy, setSavingProxy] = useState(false)
   const [savingModel, setSavingModel] = useState(false)
   
@@ -32,7 +33,9 @@ function Settings() {
       setTelemetryInfo(telemetry)
       // 从 Kiro IDE 设置读取
       if (kiroSettings) {
-        setHttpProxy(kiroSettings.httpProxy || '')
+        const proxy = kiroSettings.httpProxy || ''
+        setHttpProxy(proxy)
+        setOriginalProxy(proxy)
         setAiModel(kiroSettings.modelSelection || 'claude-sonnet-4.5')
       }
       // 从应用设置读取
@@ -67,12 +70,17 @@ function Settings() {
     setSavingProxy(true)
     try {
       await invoke('set_kiro_proxy', { proxy: httpProxy })
+      setOriginalProxy(httpProxy) // 保存成功后更新原始值
+      await showSuccess('保存成功', httpProxy ? '代理设置已应用' : '代理已清除')
     } catch (err) {
       await showError('保存失败', '保存代理设置失败: ' + err)
     } finally {
       setSavingProxy(false)
     }
   }
+  
+  // 代理是否有修改
+  const proxyChanged = httpProxy !== originalProxy
 
   const handleApplyModel = async (model) => {
     setAiModel(model)
@@ -358,8 +366,12 @@ function Settings() {
               />
               <button
                 onClick={handleApplyProxy}
-                disabled={savingProxy}
-                className="btn-icon px-5 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 flex items-center gap-2 font-medium shadow-sm disabled:opacity-50 transition-all"
+                disabled={savingProxy || !proxyChanged}
+                className={`btn-icon px-5 py-3 rounded-xl flex items-center gap-2 font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all ${
+                  proxyChanged 
+                    ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                    : `${isDark ? 'bg-white/10 text-white/50' : 'bg-gray-200 text-gray-400'}`
+                }`}
               >
                 {savingProxy ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
                 {savingProxy ? '保存中...' : '应用'}
