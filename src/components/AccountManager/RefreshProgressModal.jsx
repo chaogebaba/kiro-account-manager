@@ -48,3 +48,25 @@ function RefreshProgressModal({ refreshProgress }) {
 }
 
 export default RefreshProgressModal
+
+// 添加动画样式
+const style = document.createElement('style')
+style.textContent = `
+  @keyframes modalBounceIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    50% {
+      transform: scale(1.02);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+`
+if (!document.querySelector('#refresh-modal-styles')) {
+  style.id = 'refresh-modal-styles'
+  document.head.appendChild(style)
+}

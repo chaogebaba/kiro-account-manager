@@ -54,7 +54,10 @@ function UpdateChecker() {
   if (!updateInfo || dismissed) return null
 
   return (
-    <div className={`fixed bottom-4 right-4 ${colors.card} rounded-2xl shadow-lg border ${colors.cardBorder} p-4 w-80 z-50`}>
+    <div 
+      className={`fixed bottom-4 right-4 ${colors.card} rounded-2xl shadow-lg border ${colors.cardBorder} p-4 w-80 z-50`}
+      style={{ animation: 'slideInFromBottom 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 ${isDark ? 'bg-blue-500/20' : 'bg-blue-100'} rounded-lg flex items-center justify-center`}>
@@ -97,3 +100,22 @@ function UpdateChecker() {
 }
 
 export default UpdateChecker
+
+// 添加动画样式
+const style = document.createElement('style')
+style.textContent = `
+  @keyframes slideInFromBottom {
+    from {
+      opacity: 0;
+      transform: translateY(30px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+`
+if (!document.querySelector('#update-checker-styles')) {
+  style.id = 'update-checker-styles'
+  document.head.appendChild(style)
+}
