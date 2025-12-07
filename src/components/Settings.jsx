@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Database, Settings as SettingsIcon } from 'lucide-react'
+import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Database, Settings as SettingsIcon, Clock } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useDialog } from '../contexts/DialogContext'
 
@@ -11,6 +11,7 @@ function Settings() {
   
   const [aiModel, setAiModel] = useState('claude-sonnet-4.5')
   const [lockModel, setLockModel] = useState(true)
+  const [autoRefresh, setAutoRefresh] = useState(true)
   const [httpProxy, setHttpProxy] = useState('')
   const [savingProxy, setSavingProxy] = useState(false)
   const [savingModel, setSavingModel] = useState(false)
@@ -34,9 +35,10 @@ function Settings() {
         setHttpProxy(kiroSettings.httpProxy || '')
         setAiModel(kiroSettings.modelSelection || 'claude-sonnet-4.5')
       }
-      // 从应用设置读取锁定模型
+      // 从应用设置读取
       if (appSettings) {
         setLockModel(appSettings.lockModel ?? true)
+        setAutoRefresh(appSettings.autoRefresh ?? true)
       }
     } catch (err) {
       console.error('Failed to load settings:', err)
@@ -91,6 +93,11 @@ function Settings() {
   const handleLockModelChange = async (checked) => {
     setLockModel(checked)
     await saveAppSettings({ lock_model: checked, locked_model: checked ? aiModel : null })
+  }
+
+  const handleAutoRefreshChange = async (checked) => {
+    setAutoRefresh(checked)
+    await saveAppSettings({ autoRefresh: checked })
   }
 
   const [resetting, setResetting] = useState(false)
@@ -314,8 +321,30 @@ function Settings() {
           </label>
         </section>
 
-        {/* 代理设置 */}
+        {/* 账号设置 */}
         <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-300`}>
+          <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>账号设置</h2>
+          <p className={`text-sm ${colors.textMuted} mb-5`}>配置账号自动刷新等功能</p>
+          
+          <label className={`flex items-start gap-3 cursor-pointer ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl p-4 transition-all hover:scale-[1.01]`}>
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => handleAutoRefreshChange(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded-lg border-gray-300 text-blue-500 focus:ring-blue-500"
+            />
+            <div className="flex items-center gap-2">
+              <Clock size={16} className={colors.textMuted} />
+              <div>
+                <span className={`text-sm font-medium ${colors.text}`}>自动刷新 Token</span>
+                <p className={`text-xs ${colors.textMuted} mt-0.5`}>每 50 分钟自动刷新所有账号的 Token，保持账号始终有效</p>
+              </div>
+            </div>
+          </label>
+        </section>
+
+        {/* 代理设置 */}
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-400`}>
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>代理设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>
             配置 Kiro IDE 的 HTTP 代理（与 settings.json 中的 http.proxy 同步）
@@ -353,7 +382,7 @@ function Settings() {
         </section>
 
         {/* Kiro IDE 信息 */}
-        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-400`}>
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 opacity-0 animate-slide-in-left delay-500`}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>Kiro IDE 信息</h2>

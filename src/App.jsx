@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Sidebar from './components/Sidebar'
@@ -13,11 +13,48 @@ import UpdateChecker from './components/UpdateChecker'
 
 import { useTheme } from './contexts/ThemeContext'
 
+// 自动刷新间隔：50分钟
+const AUTO_REFRESH_INTERVAL = 50 * 60 * 1000
+
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeMenu, setActiveMenu] = useState('home')
   const { colors } = useTheme()
+  const refreshTimerRef = useRef(null)
+
+  // 自动刷新所有账号
+  const autoRefreshAccounts = async () => {
+    try {
+      const settings = await invoke('get_app_settings').catch(() => ({}))
+      if (!settings.autoRefresh) return
+      
+      const accounts = await invoke('get_accounts')
+      if (!accounts || accounts.length === 0) return
+      
+      console.log(`[AutoRefresh] 开始刷新 ${accounts.length} 个账号...`)
+      
+      for (const account of accounts) {
+        try {
+          await invoke('sync_account', { id: account.id })
+        } catch (e) {
+          console.warn(`[AutoRefresh] 刷新 ${account.email} 失败:`, e)
+        }
+      }
+      
+      console.log('[AutoRefresh] 刷新完成')
+    } catch (e) {
+      console.error('[AutoRefresh] 自动刷新失败:', e)
+    }
+  }
+
+  // 启动自动刷新定时器
+  const startAutoRefreshTimer = () => {
+    if (refreshTimerRef.current) {
+      clearInterval(refreshTimerRef.current)
+    }
+    refreshTimerRef.current = setInterval(autoRefreshAccounts, AUTO_REFRESH_INTERVAL)
+  }
 
   useEffect(() => {
     checkAuth()
@@ -36,7 +73,15 @@ function App() {
       setActiveMenu('token')
     })
     
-    return () => { unlisten.then(fn => fn()) }
+    // 启动自动刷新定时器
+    startAutoRefreshTimer()
+    
+    return () => { 
+      unlisten.then(fn => fn())
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current)
+      }
+    }
   }, [])
 
   const checkAuth = async () => {
