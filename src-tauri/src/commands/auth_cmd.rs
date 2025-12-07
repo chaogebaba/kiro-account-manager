@@ -7,6 +7,7 @@ use crate::auth::{User, get_usage_limits_desktop};
 use crate::auth_social;
 use crate::codewhisperer_client::CodeWhispererClient;
 use crate::providers::{AuthMethod, AuthProvider, get_provider_config, create_social_provider, create_idc_provider};
+use crate::kiro::get_machine_id;
 
 #[tauri::command]
 pub fn get_current_user(state: State<AppState>) -> Option<User> {
@@ -45,13 +46,18 @@ async fn login_social(
     let auth_method = social_provider.get_auth_method();
     
     let auth_result = social_provider.login().await?;
-    let usage = get_usage_limits_desktop(&auth_result.access_token).await?;
+    
+    // 获取 usage，失败不影响登录（账号可能被暂停但仍可保存）
+    let usage = get_usage_limits_desktop(&auth_result.access_token).await.ok();
     let usage_data = serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null);
 
-    let email = usage.user_info.as_ref()
+    // 优先从 usage 获取 email，否则用默认值
+    let email = usage.as_ref()
+        .and_then(|u| u.user_info.as_ref())
         .and_then(|ui| ui.email.clone())
-        .ok_or("No email in GetUsageLimits response")?;
-    let user_id = usage.user_info.as_ref()
+        .unwrap_or_else(|| format!("user@{}.social", provider_id.to_lowercase()));
+    let user_id = usage.as_ref()
+        .and_then(|u| u.user_info.as_ref())
         .and_then(|ui| ui.user_id.clone());
 
     let mut store = state.store.lock().unwrap();
@@ -105,9 +111,14 @@ async fn login_idc(
     
     let auth_result = idc_provider.login().await?;
 
-    let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
-    let cw_client = CodeWhispererClient::new(machine_id);
-    let usage = cw_client.get_usage_limits(&auth_result.access_token).await.ok();
+    let machine_id = get_machine_id();
+    let cw_client = CodeWhispererClient::new(&machine_id);
+    let usage_call = cw_client.get_usage_limits(&auth_result.access_token).await;
+    let (usage, is_banned) = match &usage_call {
+        Ok(u) => (Some(u.clone()), false),
+        Err(e) if e.starts_with("BANNED:") => (None, true),
+        Err(_) => (None, false),
+    };
     let usage_data = serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null);
 
     let email = usage.as_ref()
@@ -134,7 +145,7 @@ async fn login_idc(
         existing.id_token = auth_result.id_token;
         existing.profile_arn = auth_result.profile_arn;
         existing.usage_data = Some(usage_data);
-        existing.status = "正常".to_string();
+        existing.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
         existing.clone()
     } else {
         let mut account = Account::new(email.clone(), format!("Kiro {} 账号", provider_id));
@@ -151,6 +162,7 @@ async fn login_idc(
         account.id_token = auth_result.id_token;
         account.profile_arn = auth_result.profile_arn;
         account.usage_data = Some(usage_data);
+        account.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
         store.accounts.insert(0, account.clone());
         account
     };

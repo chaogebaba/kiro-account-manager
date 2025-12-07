@@ -140,6 +140,21 @@ pub async fn get_kiro_telemetry_info() -> Option<KiroTelemetryInfo> {
         .flatten()
 }
 
+/// 获取当前机器 ID（供其他模块使用）
+pub fn get_machine_id() -> String {
+    get_kiro_telemetry_info_inner()
+        .and_then(|info| info.machine_id)
+        .unwrap_or_else(|| {
+            // 如果获取失败，生成一个随机的
+            use uuid::Uuid;
+            let uuid_bytes = Uuid::new_v4();
+            use sha2::{Digest, Sha256};
+            let mut hasher = Sha256::new();
+            hasher.update(uuid_bytes.as_bytes());
+            hex::encode(hasher.finalize())
+        })
+}
+
 // ===== 切换账号 =====
 
 use crate::process::{check_kiro_running, kill_kiro, launch_kiro};
@@ -181,7 +196,7 @@ pub struct SwitchAccountParams {
     pub auto_restart: Option<bool>,
 }
 
-/// 切换 Kiro 账号（完整流程：关闭IDE → 重置机器ID → 替换Token → 启动IDE）
+/// 切换 Kiro 账号（直接写入 Token 文件，仅重置机器ID时才关闭IDE）
 #[tauri::command]
 pub async fn switch_kiro_account(params: SwitchAccountParams) -> Result<SwitchAccountResult, String> {
     // 使用 spawn_blocking 避免阻塞异步运行时
@@ -199,8 +214,8 @@ pub async fn switch_kiro_account(params: SwitchAccountParams) -> Result<SwitchAc
         let client_secret = params.client_secret;
         let region = params.region;
         
-        // 1. 如果 Kiro 正在运行，先关闭
-        if kiro_was_running {
+        // 1. 只在需要重置机器 ID 时才关闭 IDE
+        if should_reset && kiro_was_running {
             kill_kiro()?;
             // 等待进程退出
             std::thread::sleep(std::time::Duration::from_millis(300));
@@ -260,13 +275,18 @@ pub async fn switch_kiro_account(params: SwitchAccountParams) -> Result<SwitchAc
         let content = serde_json::to_string_pretty(&token_data)
             .map_err(|e| format!("Failed to serialize: {}", e))?;
         
-        std::fs::write(&file_path, content)
-            .map_err(|e| format!("Failed to write file: {}", e))?;
+        // 原子写入：先写临时文件，再覆盖
+        let temp_file_path = dir_path.join("kiro-auth-token.json.tmp");
+        std::fs::write(&temp_file_path, &content)
+            .map_err(|e| format!("Failed to write temp file: {}", e))?;
+        std::fs::rename(&temp_file_path, &file_path)
+            .map_err(|e| format!("Failed to rename file: {}", e))?;
         
         // IdC 账号还需要写入 Client Registration 文件
         if auth_method == "IdC" {
             if let (Some(hash), Some(cid), Some(csec)) = (client_id_hash, client_id, client_secret) {
                 let client_reg_path = dir_path.join(format!("{}.json", hash));
+                let client_reg_temp_path = dir_path.join(format!("{}.json.tmp", hash));
                 let client_expires = chrono::Utc::now() + chrono::Duration::days(90);
                 let client_reg_data = serde_json::json!({
                     "clientId": cid,
@@ -275,8 +295,11 @@ pub async fn switch_kiro_account(params: SwitchAccountParams) -> Result<SwitchAc
                 });
                 let client_reg_content = serde_json::to_string_pretty(&client_reg_data)
                     .map_err(|e| format!("Failed to serialize client registration: {}", e))?;
-                std::fs::write(&client_reg_path, client_reg_content)
-                    .map_err(|e| format!("Failed to write client registration: {}", e))?;
+                // 原子写入
+                std::fs::write(&client_reg_temp_path, client_reg_content)
+                    .map_err(|e| format!("Failed to write client registration temp: {}", e))?;
+                std::fs::rename(&client_reg_temp_path, &client_reg_path)
+                    .map_err(|e| format!("Failed to rename client registration: {}", e))?;
             }
         }
         

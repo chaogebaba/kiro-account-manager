@@ -63,21 +63,6 @@ export function useAccounts() {
   }, [autoRefreshing, isExpiringSoon])
 
 
-  const handleDelete = useCallback(async (id) => {
-    if (confirm('确定删除？')) {
-      await invoke('delete_account', { id })
-      loadAccounts()
-    }
-  }, [loadAccounts])
-
-  const handleBatchDelete = useCallback(async (selectedIds, setSelectedIds) => {
-    if (selectedIds.length && confirm(`删除 ${selectedIds.length} 个账号？`)) {
-      await invoke('delete_accounts', { ids: selectedIds })
-      setSelectedIds([])
-      loadAccounts()
-    }
-  }, [loadAccounts])
-
   const handleRefreshStatus = useCallback(async (id) => {
     setRefreshingId(id)
     try {
@@ -97,54 +82,9 @@ export function useAccounts() {
     a.click()
   }, [])
 
-  const handleSwitchAccount = useCallback(async (account) => {
-    if (!account.accessToken || !account.refreshToken) {
-      alert('缺少认证信息')
-      return
-    }
-    if (!confirm(`切换到 ${account.email}？\n\n需要重启 Kiro IDE 生效。`)) return
-    setSwitchingId(account.id)
-    try {
-      const usage = await invoke('verify_account', {
-        accessToken: account.accessToken,
-        refreshToken: account.refreshToken,
-        csrfToken: account.csrfToken || null,
-        provider: account.provider || 'Google'
-      })
-      
-      // 根据账号类型判断 authMethod
-      const isIdC = account.provider === 'BuilderId' || account.provider === 'Enterprise' || account.clientIdHash
-      const authMethod = isIdC ? 'IdC' : 'social'
-      
-      // 构建完整的切换参数
-      const params = {
-        accessToken: account.accessToken,
-        refreshToken: account.refreshToken,
-        provider: account.provider || 'Google',
-        authMethod,
-        resetMachineId: true,
-        autoRestart: true
-      }
-      
-      if (isIdC) {
-        // IdC 账号: 需要 clientIdHash, region, clientId, clientSecret
-        params.clientIdHash = account.clientIdHash || null
-        params.region = account.ssoRegion || 'us-east-1'
-        params.clientId = account.ssoClientId || null
-        params.clientSecret = account.ssoClientSecret || null
-      } else {
-        // Social 账号: 需要 profileArn
-        params.profileArn = account.profileArn || 'arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK'
-      }
-      
-      await invoke('switch_kiro_account', { params })
-      alert(`切换成功！配额: ${usage.currentUsage || 0}/${usage.usageLimit || 50}\n\nKiro IDE 将自动重启`)
-    } catch (e) {
-      alert('切换失败: ' + e)
-    } finally {
-      setSwitchingId(null)
-    }
-  }, [])
+  // 注意：handleDelete, handleBatchDelete, handleSwitchAccount 已移动到 AccountManager/index.jsx 中
+  // 使用 useDialog 的 showConfirm 实现自定义弹窗
+  // 这里只保留 setSwitchingId 供组件使用
 
   // 初始化和事件监听
   useEffect(() => {
@@ -191,11 +131,9 @@ export function useAccounts() {
     lastRefreshTime,
     refreshingId,
     switchingId,
+    setSwitchingId,
     autoRefreshAll,
-    handleDelete,
-    handleBatchDelete,
     handleRefreshStatus,
     handleExport,
-    handleSwitchAccount,
   }
 }

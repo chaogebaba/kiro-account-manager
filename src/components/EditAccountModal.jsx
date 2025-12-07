@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { X, Copy, Check, RefreshCw, User, CreditCard, Key, Clock, ChevronDown, ChevronUp, Shield } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useDialog } from '../contexts/DialogContext'
 
 function EditAccountModal({ account, onClose, onSuccess }) {
   const { theme, colors } = useTheme()
+  const { showError } = useDialog()
   const isDark = theme === 'dark'
   const initQuota = account.usageData?.usageBreakdownList?.[0]?.usageLimit ?? account.quota ?? 50
   const initUsed = account.usageData?.usageBreakdownList?.[0]?.currentUsage ?? account.used ?? 0
@@ -36,7 +38,7 @@ function EditAccountModal({ account, onClose, onSuccess }) {
       const used = updated.usageData?.usageBreakdownList?.[0]?.currentUsage ?? 0
       setForm(prev => ({ ...prev, quota, used, status: updated.status }))
     } catch (e) {
-      alert('刷新失败: ' + e)
+      await showError('刷新失败', e.toString())
     } finally {
       setRefreshing(false)
     }

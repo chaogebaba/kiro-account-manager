@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useDialog } from '../../contexts/DialogContext'
 import { useAccounts } from './hooks/useAccounts'
 import { useAccountStats } from './hooks/useAccountStats'
 import AccountHeader from './AccountHeader'
@@ -8,9 +10,11 @@ import AccountPagination from './AccountPagination'
 import AddAccountModal from './AddAccountModal'
 import RefreshProgressModal from './RefreshProgressModal'
 import EditAccountModal from '../EditAccountModal'
+import ConfirmDialog from './ConfirmDialog'
 
 function AccountManager() {
   const { colors } = useTheme()
+  const { showConfirm } = useDialog()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
   const [pageSize, setPageSize] = useState(20)
@@ -18,6 +22,9 @@ function AccountManager() {
   const [editingAccount, setEditingAccount] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
+  
+  // 切换账号弹窗状态
+  const [switchDialog, setSwitchDialog] = useState(null) // { type, title, message, account }
 
   const {
     accounts,
@@ -27,12 +34,10 @@ function AccountManager() {
     lastRefreshTime,
     refreshingId,
     switchingId,
+    setSwitchingId,
     autoRefreshAll,
-    handleDelete,
-    handleBatchDelete,
     handleRefreshStatus,
     handleExport,
-    handleSwitchAccount,
   } = useAccounts()
 
   const stats = useAccountStats(accounts)
@@ -56,7 +61,97 @@ function AccountManager() {
   const handleSelectAll = useCallback((checked) => { setSelectedIds(checked ? filteredAccounts.map(a => a.id) : []) }, [filteredAccounts])
   const handleSelectOne = useCallback((id, checked) => { setSelectedIds(prev => checked ? [...prev, id] : prev.filter(i => i !== id)) }, [])
   const handleCopy = useCallback((text, id) => { navigator.clipboard.writeText(text); setCopiedId(id); setTimeout(() => setCopiedId(null), 1500) }, [])
-  const onBatchDelete = useCallback(() => { handleBatchDelete(selectedIds, setSelectedIds) }, [selectedIds, handleBatchDelete])
+  
+  // 删除单个账号
+  const handleDelete = useCallback(async (id) => {
+    const confirmed = await showConfirm('删除账号', '确定删除该账号？')
+    if (confirmed) {
+      await invoke('delete_account', { id })
+      loadAccounts()
+    }
+  }, [showConfirm, loadAccounts])
+
+  // 批量删除
+  const onBatchDelete = useCallback(async () => {
+    if (selectedIds.length === 0) return
+    const confirmed = await showConfirm('批量删除', `确定删除 ${selectedIds.length} 个账号？`)
+    if (confirmed) {
+      await invoke('delete_accounts', { ids: selectedIds })
+      setSelectedIds([])
+      loadAccounts()
+    }
+  }, [selectedIds, showConfirm, loadAccounts])
+
+  // 切换账号 - 显示确认弹窗
+  const handleSwitchAccount = useCallback((account) => {
+    if (!account.accessToken || !account.refreshToken) {
+      setSwitchDialog({ type: 'error', title: '切换失败', message: '缺少认证信息', account: null })
+      return
+    }
+    setSwitchDialog({
+      type: 'confirm',
+      title: '切换账号',
+      message: `确定切换到 ${account.email}？\n\nKiro IDE 将自动重启以应用新账号。`,
+      account,
+    })
+  }, [])
+
+  // 确认切换
+  const confirmSwitch = useCallback(async () => {
+    const account = switchDialog?.account
+    if (!account) return
+    
+    setSwitchDialog(null)
+    setSwitchingId(account.id)
+    
+    try {
+      const usage = await invoke('verify_account', {
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        csrfToken: account.csrfToken || null,
+        provider: account.provider || 'Google'
+      })
+      
+      const isIdC = account.provider === 'BuilderId' || account.provider === 'Enterprise' || account.clientIdHash
+      const authMethod = isIdC ? 'IdC' : 'social'
+      
+      const params = {
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        provider: account.provider || 'Google',
+        authMethod,
+        resetMachineId: false,
+        autoRestart: false
+      }
+      
+      if (isIdC) {
+        params.clientIdHash = account.clientIdHash || null
+        params.region = account.ssoRegion || 'us-east-1'
+        params.clientId = account.ssoClientId || null
+        params.clientSecret = account.ssoClientSecret || null
+      } else {
+        params.profileArn = account.profileArn || 'arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK'
+      }
+      
+      await invoke('switch_kiro_account', { params })
+      
+      setSwitchDialog({
+        type: 'success',
+        title: '切换成功',
+        message: `已切换到 ${account.email}\n\n配额: ${usage.currentUsage || 0}/${usage.usageLimit || 50}\nKiro IDE 正在重启...`,
+        account: null,
+      })
+    } catch (e) {
+      setSwitchDialog({
+        type: 'error',
+        title: '切换失败',
+        message: String(e),
+        account: null,
+      })
+    } finally {
+      setSwitchingId(null)
+    }
+  }, [switchDialog, setSwitchingId])
 
   return (
     <div className={`h-full flex flex-col ${colors.main}`}>
@@ -106,8 +201,21 @@ function AccountManager() {
       )}
       {showAddModal && (<AddAccountModal onClose={() => setShowAddModal(false)} onSuccess={loadAccounts} />)}
       {autoRefreshing && (<RefreshProgressModal refreshProgress={refreshProgress} />)}
+      
+      {/* 切换账号弹窗 */}
+      {switchDialog && (
+        <ConfirmDialog
+          type={switchDialog.type}
+          title={switchDialog.title}
+          message={switchDialog.message}
+          onConfirm={switchDialog.type === 'confirm' ? confirmSwitch : () => setSwitchDialog(null)}
+          onCancel={() => setSwitchDialog(null)}
+          confirmText={switchDialog.type === 'confirm' ? '确定切换' : '确定'}
+        />
+      )}
     </div>
   )
 }
 
 export default AccountManager
+

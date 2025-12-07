@@ -10,6 +10,7 @@ import Login from './components/Login'
 import WebOAuthLogin from './components/WebOAuthLogin'
 import AuthCallback from './components/AuthCallback'
 import UpdateChecker from './components/UpdateChecker'
+
 import { useTheme } from './contexts/ThemeContext'
 
 function App() {

@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Database, Settings as SettingsIcon } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useDialog } from '../contexts/DialogContext'
 
 function Settings() {
   const { theme, setTheme, colors } = useTheme()
+  const { showConfirm, showError, showSuccess } = useDialog()
   const isDark = theme === 'dark'
   
   const [aiModel, setAiModel] = useState('claude-sonnet-4.5')
@@ -62,7 +64,7 @@ function Settings() {
     try {
       await invoke('set_kiro_proxy', { proxy: httpProxy })
     } catch (err) {
-      alert('保存代理设置失败: ' + err)
+      await showError('保存失败', '保存代理设置失败: ' + err)
     } finally {
       setSavingProxy(false)
     }
@@ -78,7 +80,7 @@ function Settings() {
         await saveAppSettings({ locked_model: model })
       }
     } catch (err) {
-      alert('保存模型设置失败: ' + err)
+      await showError('保存失败', '保存模型设置失败: ' + err)
     } finally {
       setSavingModel(false)
     }
@@ -115,22 +117,20 @@ function Settings() {
     // 检查 Kiro IDE 是否运行
     const running = await invoke('is_kiro_ide_running')
     if (running) {
-      if (!confirm('检测到 Kiro IDE 正在运行，需要先关闭才能重置机器 ID。\n\n是否关闭 Kiro IDE 并继续？')) {
-        return
-      }
+      const confirmed = await showConfirm('关闭 Kiro IDE', '检测到 Kiro IDE 正在运行，需要先关闭才能重置机器 ID。\n\n是否关闭 Kiro IDE 并继续？', { confirmText: '关闭并继续', cancelText: '取消' })
+      if (!confirmed) return
       // 关闭 Kiro IDE
       try {
         await invoke('close_kiro_ide')
         // 等待进程完全退出
         await new Promise(r => setTimeout(r, 1000))
       } catch (err) {
-        alert('关闭 Kiro IDE 失败: ' + err)
+        await showError('操作失败', '关闭 Kiro IDE 失败: ' + err)
         return
       }
     } else {
-      if (!confirm('确定要重置所有机器 ID 吗？')) {
-        return
-      }
+      const confirmed = await showConfirm('重置机器 ID', '确定要重置所有机器 ID 吗？')
+      if (!confirmed) return
     }
     
     setResetting(true)
@@ -139,12 +139,13 @@ function Settings() {
       setTelemetryInfo(newInfo)
       
       // 询问是否重新启动
-      if (confirm('机器 ID 已重置！\n\n是否立即启动 Kiro IDE？')) {
+      const shouldStart = await showConfirm('重置成功', '机器 ID 已重置！\n\n是否立即启动 Kiro IDE？', { confirmText: '启动', cancelText: '稍后' })
+      if (shouldStart) {
         await invoke('start_kiro_ide')
       }
     } catch (err) {
       console.error('Failed to reset machine ID:', err)
-      alert('重置失败: ' + err)
+      await showError('重置失败', '重置机器 ID 失败: ' + err)
     } finally {
       setResetting(false)
       checkKiroStatus()
@@ -162,7 +163,7 @@ function Settings() {
       await new Promise(r => setTimeout(r, 500))
       checkKiroStatus()
     } catch (err) {
-      alert('操作失败: ' + err)
+      await showError('操作失败', err.toString())
     }
   }
 

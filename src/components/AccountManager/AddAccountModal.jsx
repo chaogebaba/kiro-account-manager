@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { X, Download } from 'lucide-react'
+import { X, Download, Key, Shield, ChevronDown } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
 function AddAccountModal({ onClose, onSuccess }) {
@@ -66,47 +66,149 @@ function AddAccountModal({ onClose, onSuccess }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
-      <div className={`${colors.card} rounded-2xl w-[400px] shadow-2xl`} onClick={e => e.stopPropagation()}>
-        <div className={`flex items-center justify-between px-5 py-4 border-b ${colors.cardBorder}`}>
-          <h2 className={`text-lg font-semibold ${colors.text}`}>添加账号</h2>
-          <button onClick={onClose} className={`p-1.5 hover:opacity-70 rounded-xl`}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div 
+        className={`${colors.card} rounded-2xl w-full max-w-[420px] shadow-2xl border ${colors.cardBorder} overflow-hidden`} 
+        onClick={e => e.stopPropagation()}
+        style={{ animation: 'dialogIn 0.2s ease-out' }}
+      >
+        {/* Header */}
+        <div className={`flex items-center justify-between px-5 py-4 ${isDark ? 'bg-white/[0.02]' : 'bg-gray-50/50'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl ${isDark ? 'bg-blue-500/15' : 'bg-blue-50'} flex items-center justify-center`}>
+              <Key size={20} className="text-blue-500" />
+            </div>
+            <h2 className={`text-base font-semibold ${colors.text}`}>添加账号</h2>
+          </div>
+          <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}>
             <X size={18} className={colors.textMuted} />
           </button>
         </div>
-        <div className="p-5 space-y-3">
-          <button onClick={handleSaveLocal} disabled={addLoading} className={`w-full flex items-center justify-center gap-2 px-4 py-3 ${colors.loginBtn} border hover:border-green-500 rounded-lg transition-all disabled:opacity-50`}>
-            <Download size={18} className="text-green-500" />
-            <span className={`${colors.text} font-medium`}>保存本地账号</span>
+
+        <div className="p-5 space-y-4">
+          {/* 保存本地账号 */}
+          <button 
+            onClick={handleSaveLocal} 
+            disabled={addLoading} 
+            className={`w-full flex items-center gap-4 px-4 py-4 ${isDark ? 'bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/15' : 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100'} border rounded-xl transition-all disabled:opacity-50 active:scale-[0.98]`}
+          >
+            <div className={`w-10 h-10 rounded-xl ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'} flex items-center justify-center`}>
+              <Download size={20} className="text-emerald-500" />
+            </div>
+            <div className="text-left">
+              <div className={`font-medium ${colors.text}`}>保存本地账号</div>
+              <div className={`text-xs ${colors.textMuted}`}>从 Kiro IDE 读取当前登录的账号</div>
+            </div>
           </button>
+
+          {/* 分隔线 */}
           <div className="flex items-center gap-3">
-            <div className={`flex-1 h-px ${colors.cardBorder}`}></div>
+            <div className={`flex-1 h-px ${isDark ? 'bg-white/10' : 'bg-gray-200'}`}></div>
             <span className={`text-xs ${colors.textMuted}`}>或手动输入</span>
-            <div className={`flex-1 h-px ${colors.cardBorder}`}></div>
+            <div className={`flex-1 h-px ${isDark ? 'bg-white/10' : 'bg-gray-200'}`}></div>
           </div>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setAddType('social')} className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${addType === 'social' ? 'bg-blue-500 text-white' : `${colors.loginBtn} ${colors.text}`}`}>SSO Token</button>
-            <button type="button" onClick={() => setAddType('idc')} className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${addType === 'idc' ? 'bg-blue-500 text-white' : `${colors.loginBtn} ${colors.text}`}`}>OIDC 凭证</button>
+
+          {/* 类型切换 */}
+          <div className={`flex gap-1 p-1 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
+            <button 
+              type="button" 
+              onClick={() => setAddType('social')} 
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${addType === 'social' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : `${colors.text} hover:bg-white/10`}`}
+            >
+              <Key size={14} />
+              SSO Token
+            </button>
+            <button 
+              type="button" 
+              onClick={() => setAddType('idc')} 
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${addType === 'idc' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : `${colors.text} hover:bg-white/10`}`}
+            >
+              <Shield size={14} />
+              OIDC 凭证
+            </button>
           </div>
+
+          {/* 表单 */}
           <div className="space-y-3">
-            <input type="text" placeholder="Refresh Token (aor 开头)" value={refreshToken} onChange={(e) => setRefreshToken(e.target.value)} className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${colors.input} focus:outline-none focus:ring-2 ${colors.inputFocus}`} />
+            <div>
+              <label className={`block text-xs font-medium ${colors.textMuted} mb-1.5`}>Refresh Token</label>
+              <input 
+                type="text" 
+                placeholder="aor 开头的 token" 
+                value={refreshToken} 
+                onChange={(e) => setRefreshToken(e.target.value)} 
+                className={`w-full px-4 py-3 border rounded-xl text-sm ${colors.text} ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all`} 
+              />
+            </div>
+
             {addType === 'idc' && (
               <>
-                <input type="text" placeholder="Client ID" value={clientId} onChange={(e) => setClientId(e.target.value)} className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${colors.input} focus:outline-none focus:ring-2 ${colors.inputFocus}`} />
-                <input type="text" placeholder="Client Secret" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${colors.input} focus:outline-none focus:ring-2 ${colors.inputFocus}`} />
                 <div>
-                  <label className={`block text-sm font-medium ${colors.textMuted} mb-1.5`}>AWS Region</label>
-                  <select value={region} onChange={(e) => setRegion(e.target.value)} className={`w-full px-4 py-2.5 border rounded-xl text-sm ${colors.text} ${colors.input} focus:outline-none focus:ring-2 ${colors.inputFocus}`}>
-                    {awsRegions.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
-                  </select>
+                  <label className={`block text-xs font-medium ${colors.textMuted} mb-1.5`}>Client ID</label>
+                  <input 
+                    type="text" 
+                    placeholder="OIDC Client ID" 
+                    value={clientId} 
+                    onChange={(e) => setClientId(e.target.value)} 
+                    className={`w-full px-4 py-3 border rounded-xl text-sm ${colors.text} ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all`} 
+                  />
+                </div>
+                <div>
+                  <label className={`block text-xs font-medium ${colors.textMuted} mb-1.5`}>Client Secret</label>
+                  <input 
+                    type="password" 
+                    placeholder="OIDC Client Secret" 
+                    value={clientSecret} 
+                    onChange={(e) => setClientSecret(e.target.value)} 
+                    className={`w-full px-4 py-3 border rounded-xl text-sm ${colors.text} ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all`} 
+                  />
+                </div>
+                <div>
+                  <label className={`block text-xs font-medium ${colors.textMuted} mb-1.5`}>AWS Region</label>
+                  <div className="relative">
+                    <select 
+                      value={region} 
+                      onChange={(e) => setRegion(e.target.value)} 
+                      className={`w-full px-4 py-3 border rounded-xl text-sm ${colors.text} ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all appearance-none cursor-pointer`}
+                    >
+                      {awsRegions.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
+                    </select>
+                    <ChevronDown size={16} className={`absolute right-4 top-1/2 -translate-y-1/2 ${colors.textMuted} pointer-events-none`} />
+                  </div>
                 </div>
               </>
             )}
-            <button onClick={handleAddManual} disabled={addLoading} className={`w-full px-4 py-2.5 ${colors.loginBtn} border rounded-xl text-sm font-medium ${colors.text} transition-colors disabled:opacity-50`}>{addLoading ? '验证中...' : '添加账号'}</button>
+
+            <button 
+              onClick={handleAddManual} 
+              disabled={addLoading || !refreshToken} 
+              className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl text-sm font-medium shadow-lg shadow-blue-500/25 hover:from-blue-600 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+            >
+              {addLoading ? '验证中...' : '添加账号'}
+            </button>
           </div>
-          {addError && (<div className={`text-sm text-red-500 ${isDark ? 'bg-red-500/20' : 'bg-red-50'} px-3 py-2 rounded-xl text-center`}>{addError}</div>)}
+
+          {/* Error */}
+          {addError && (
+            <div className={`text-sm text-red-500 ${isDark ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'} border px-4 py-3 rounded-xl`}>
+              {addError}
+            </div>
+          )}
         </div>
       </div>
+
+      <style>{`
+        @keyframes dialogIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95) translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+      `}</style>
     </div>
   )
 }

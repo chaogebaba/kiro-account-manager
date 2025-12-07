@@ -6,6 +6,7 @@ use crate::account::Account;
 use crate::auth::{User, refresh_token_desktop, get_usage_limits_desktop};
 use crate::codewhisperer_client::CodeWhispererClient;
 use crate::providers::{AuthProvider, SocialProvider, IdcProvider, RefreshMetadata};
+use crate::kiro::get_machine_id;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,14 +77,24 @@ pub async fn sync_account(state: State<'_, AppState>, id: String) -> Result<Acco
         };
     
     // 获取 usage 数据
-    let usage_data: serde_json::Value = if provider_str == "BuilderId" {
-        let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
-        let cw_client = CodeWhispererClient::new(machine_id);
-        let usage = cw_client.get_usage_limits(&new_access_token).await.ok();
-        serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null)
+    let (usage_data, is_banned): (serde_json::Value, bool) = if provider_str == "BuilderId" {
+        let machine_id = get_machine_id();
+        let cw_client = CodeWhispererClient::new(&machine_id);
+        let usage_call = cw_client.get_usage_limits(&new_access_token).await;
+        let (usage, banned) = match &usage_call {
+            Ok(u) => (Some(u.clone()), false),
+            Err(e) if e.starts_with("BANNED:") => (None, true),
+            Err(_) => (None, false),
+        };
+        (serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null), banned)
     } else {
-        let usage = get_usage_limits_desktop(&new_access_token).await.ok();
-        serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null)
+        let usage_call = get_usage_limits_desktop(&new_access_token).await;
+        let (usage, banned) = match &usage_call {
+            Ok(u) => (Some(u.clone()), false),
+            Err(e) if e.starts_with("BANNED:") => (None, true),
+            Err(_) => (None, false),
+        };
+        (serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null), banned)
     };
 
     let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
@@ -107,7 +118,7 @@ pub async fn sync_account(state: State<'_, AppState>, id: String) -> Result<Acco
         }
         a.expires_at = Some(expires_at_str);
         a.usage_data = Some(usage_data);
-        a.status = "正常".to_string();
+        a.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
         
         let result = a.clone();
         store.save_to_file();
@@ -156,13 +167,21 @@ pub async fn add_account_by_social(
     let access_token = refresh_result.access_token;
     let new_refresh_token = refresh_result.refresh_token;
     
-    let usage_result = get_usage_limits_desktop(&access_token).await?;
+    let usage_call = get_usage_limits_desktop(&access_token).await;
+    let (usage_result, ban_reason) = match &usage_call {
+        Ok(usage) => (Some(usage.clone()), None),
+        Err(e) if e.starts_with("BANNED:") => (None, Some(e.strip_prefix("BANNED:").unwrap_or("UNKNOWN").to_string())),
+        Err(_) => (None, None),
+    };
     let usage_data = serde_json::to_value(&usage_result).unwrap_or(serde_json::Value::Null);
+    let is_banned = ban_reason.is_some();
     
-    let email = usage_result.user_info.as_ref()
+    let email = usage_result.as_ref()
+        .and_then(|u| u.user_info.as_ref())
         .and_then(|u| u.email.clone())
         .unwrap_or_else(|| "unknown@kiro.dev".to_string());
-    let user_id = usage_result.user_info.as_ref()
+    let user_id = usage_result.as_ref()
+        .and_then(|u| u.user_info.as_ref())
         .and_then(|u| u.user_id.clone());
     
     let idp = provider.unwrap_or_else(|| {
@@ -179,7 +198,7 @@ pub async fn add_account_by_social(
         existing.provider = Some(idp.clone());
         existing.user_id = user_id;
         existing.usage_data = Some(usage_data);
-        existing.status = "正常".to_string();
+        existing.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
         existing.clone()
     } else {
         let mut account = Account::new(email.clone(), format!("Kiro {} 账号", idp));
@@ -188,6 +207,7 @@ pub async fn add_account_by_social(
         account.provider = Some(idp.clone());
         account.user_id = user_id;
         account.usage_data = Some(usage_data);
+        account.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
         store.accounts.insert(0, account.clone());
         account
     };
@@ -267,28 +287,40 @@ pub async fn add_local_kiro_account(state: State<'_, AppState>) -> Result<Accoun
         };
     
     // 获取 usage 数据（根据 auth_method 选择不同的 API）
-    let (usage_data, email, user_id) = if auth_method == "IdC" {
-        let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
-        let cw_client = CodeWhispererClient::new(machine_id);
-        let usage = cw_client.get_usage_limits(&access_token).await
-            .map_err(|e| format!("获取配额失败: {}", e))?;
+    let (usage_data, email, user_id, is_banned) = if auth_method == "IdC" {
+        let machine_id = get_machine_id();
+        let cw_client = CodeWhispererClient::new(&machine_id);
+        let usage_call = cw_client.get_usage_limits(&access_token).await;
+        let (usage, is_banned) = match &usage_call {
+            Ok(u) => (Some(u.clone()), false),
+            Err(e) if e.starts_with("BANNED:") => (None, true),
+            Err(_) => (None, false),
+        };
         let data = serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null);
-        let email = usage.user_info.as_ref()
+        let email = usage.as_ref()
+            .and_then(|u| u.user_info.as_ref())
             .and_then(|u| u.email.clone())
             .unwrap_or_else(|| format!("{}@kiro.dev", provider.to_lowercase()));
-        let user_id = usage.user_info.as_ref()
+        let user_id = usage.as_ref()
+            .and_then(|u| u.user_info.as_ref())
             .and_then(|u| u.user_id.clone());
-        (data, email, user_id)
+        (data, email, user_id, is_banned)
     } else {
-        let usage = get_usage_limits_desktop(&access_token).await
-            .map_err(|e| format!("获取配额失败: {}", e))?;
+        let usage_call = get_usage_limits_desktop(&access_token).await;
+        let (usage, is_banned) = match &usage_call {
+            Ok(u) => (Some(u.clone()), false),
+            Err(e) if e.starts_with("BANNED:") => (None, true),
+            Err(_) => (None, false),
+        };
         let data = serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null);
-        let email = usage.user_info.as_ref()
+        let email = usage.as_ref()
+            .and_then(|u| u.user_info.as_ref())
             .and_then(|u| u.email.clone())
             .unwrap_or_else(|| format!("{}@kiro.dev", provider.to_lowercase()));
-        let user_id = usage.user_info.as_ref()
+        let user_id = usage.as_ref()
+            .and_then(|u| u.user_info.as_ref())
             .and_then(|u| u.user_id.clone());
-        (data, email, user_id)
+        (data, email, user_id, is_banned)
     };
     
     let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
@@ -309,7 +341,7 @@ pub async fn add_local_kiro_account(state: State<'_, AppState>) -> Result<Accoun
         existing.client_id_hash = client_id_hash;
         existing.profile_arn = local_token.profile_arn;
         existing.usage_data = Some(usage_data);
-        existing.status = "正常".to_string();
+        existing.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
         
         let result = existing.clone();
         store.save_to_file();
@@ -329,6 +361,7 @@ pub async fn add_local_kiro_account(state: State<'_, AppState>) -> Result<Accoun
     account.client_id_hash = client_id_hash;
     account.profile_arn = local_token.profile_arn;
     account.usage_data = Some(usage_data);
+    account.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
     
     store.accounts.insert(0, account.clone());
     store.save_to_file();
@@ -356,16 +389,22 @@ pub async fn add_account_by_idc(
     let idc_provider = IdcProvider::new("BuilderId", &region, None);
     let auth_result = idc_provider.refresh_token(&refresh_token, metadata).await?;
     
-    let machine_id = "66c23a8c5d15afabec89ef9954ef52a119f10d369df04d548fc6c1eac694b0d1";
-    let cw_client = CodeWhispererClient::new(machine_id);
-    let usage = cw_client.get_usage_limits(&auth_result.access_token).await
-        .map_err(|e| format!("获取配额失败: {}", e))?;
+    let machine_id = get_machine_id();
+    let cw_client = CodeWhispererClient::new(&machine_id);
+    let usage_call = cw_client.get_usage_limits(&auth_result.access_token).await;
+    let (usage, is_banned) = match &usage_call {
+        Ok(u) => (Some(u.clone()), false),
+        Err(e) if e.starts_with("BANNED:") => (None, true),
+        Err(_) => (None, false),
+    };
     let usage_data = serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null);
     
-    let email = usage.user_info.as_ref()
+    let email = usage.as_ref()
+        .and_then(|u| u.user_info.as_ref())
         .and_then(|u| u.email.clone())
         .unwrap_or_else(|| "builderid@kiro.dev".to_string());
-    let user_id = usage.user_info.as_ref()
+    let user_id = usage.as_ref()
+        .and_then(|u| u.user_info.as_ref())
         .and_then(|u| u.user_id.clone());
     
     use sha2::{Digest, Sha256};
@@ -391,7 +430,7 @@ pub async fn add_account_by_idc(
         existing.id_token = auth_result.id_token;
         existing.sso_session_id = auth_result.sso_session_id;
         existing.usage_data = Some(usage_data);
-        existing.status = "正常".to_string();
+        existing.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
         existing.clone()
     } else {
         let mut account = Account::new(email.clone(), "Kiro BuilderId 账号".to_string());
@@ -407,6 +446,7 @@ pub async fn add_account_by_idc(
         account.id_token = auth_result.id_token;
         account.sso_session_id = auth_result.sso_session_id;
         account.usage_data = Some(usage_data);
+        account.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
         store.accounts.insert(0, account.clone());
         account
     };

@@ -149,6 +149,13 @@ impl CodeWhispererClient {
 
         if !status.is_success() {
             println!("Error: {}", text);
+            // 解析错误响应，提取 reason 字段
+            if let Ok(error_json) = serde_json::from_str::<serde_json::Value>(&text) {
+                if let Some(reason) = error_json.get("reason").and_then(|r| r.as_str()) {
+                    // 返回特殊格式: "BANNED:REASON" 便于上层识别
+                    return Err(format!("BANNED:{}", reason));
+                }
+            }
             return Err(format!("GetUsageLimits failed ({}): {}", status, text));
         }
 
