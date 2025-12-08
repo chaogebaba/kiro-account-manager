@@ -8,6 +8,7 @@ import AccountHeader from './AccountHeader'
 import AccountTable from './AccountTable'
 import AccountPagination from './AccountPagination'
 import AddAccountModal from './AddAccountModal'
+import ImportAccountModal from './ImportAccountModal'
 import RefreshProgressModal from './RefreshProgressModal'
 import EditAccountModal from '../EditAccountModal'
 import ConfirmDialog from './ConfirmDialog'
@@ -21,6 +22,7 @@ function AccountManager() {
   const [currentPage, setCurrentPage] = useState(1)
   const [editingAccount, setEditingAccount] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
   
   // 切换账号弹窗状态
@@ -105,21 +107,13 @@ function AccountManager() {
     setSwitchingId(account.id)
     
     try {
-      // verify_account 会刷新 token 并返回新的 token
-      const verifyResult = await invoke('verify_account', {
-        accessToken: account.accessToken,
-        refreshToken: account.refreshToken,
-        csrfToken: account.csrfToken || null,
-        provider: account.provider || 'Google'
-      })
-      
       const isIdC = account.provider === 'BuilderId' || account.provider === 'Enterprise' || account.clientIdHash
       const authMethod = isIdC ? 'IdC' : 'social'
       
-      // 使用刷新后的新 token 进行切换
+      // 直接使用账号中的 token 进行切换，不再刷新
       const params = {
-        accessToken: verifyResult.accessToken,
-        refreshToken: verifyResult.refreshToken,
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
         provider: account.provider || 'Google',
         authMethod,
         resetMachineId: false,
@@ -137,10 +131,11 @@ function AccountManager() {
       
       await invoke('switch_kiro_account', { params })
       
-      const usage = verifyResult
-      
-      const used = usage.currentUsage || 0
-      const limit = usage.usageLimit || 50
+      // 从 usage_data 获取配额信息
+      const usageData = account.usageData
+      const breakdown = usageData?.usage_breakdown_list?.[0] || usageData?.usageBreakdownList?.[0]
+      const used = breakdown?.current_usage ?? breakdown?.currentUsage ?? 0
+      const limit = breakdown?.usage_limit ?? breakdown?.usageLimit ?? 50
       const remaining = limit - used
       const provider = account.provider || 'Unknown'
       setSwitchDialog({
@@ -170,7 +165,7 @@ function AccountManager() {
         selectedCount={selectedIds.length}
         onBatchDelete={onBatchDelete}
         onAdd={() => setShowAddModal(true)}
-        onImport={() => alert('导入功能待实现')}
+        onImport={() => setShowImportModal(true)}
         onExport={() => handleExport(selectedIds)}
         onRefreshAll={() => autoRefreshAll(accounts, true)}
         autoRefreshing={autoRefreshing}
@@ -213,6 +208,7 @@ function AccountManager() {
         />
       )}
       {showAddModal && (<AddAccountModal onClose={() => setShowAddModal(false)} onSuccess={loadAccounts} />)}
+      {showImportModal && (<ImportAccountModal onClose={() => setShowImportModal(false)} onSuccess={loadAccounts} />)}
       {autoRefreshing && (<RefreshProgressModal refreshProgress={refreshProgress} />)}
       
       {/* 切换账号弹窗 */}

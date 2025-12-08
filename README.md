@@ -14,7 +14,7 @@
 
 ## ✨ 功能特性
 
-- 🔐 **多账号管理** - 支持 Google、Github 等多种登录方式
+- 🔐 **多账号管理** - 支持 Google、GitHub、BuilderId 等多种登录方式
 - 📊 **配额监控** - 实时查看账号配额使用情况（主配额/试用/奖励）
 - 🔄 **一键切换** - 快速切换 Kiro IDE 账号，自动重置机器 ID
 - ⚙️ **IDE 设置** - 代理/模型设置同步
@@ -55,9 +55,9 @@
 
 ## 🛠️ 技术栈
 
-- **前端**: React 18 + Vite + TailwindCSS
-- **后端**: Tauri 1.x + Rust
-- **图标**: Lucide Icons
+- **前端**: React 18 + Vite 5 + TailwindCSS 3
+- **后端**: Tauri 2.x + Rust
+- **图标**: Lucide React
 
 ## 💬 交流反馈
 

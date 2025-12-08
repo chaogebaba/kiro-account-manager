@@ -1,0 +1,107 @@
+import { useState, useEffect, useCallback } from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import { useTheme } from '../../contexts/ThemeContext'
+import { Package, Tag, Calendar, User } from 'lucide-react'
+
+function PowersPanel() {
+  const { theme, colors } = useTheme()
+  const isDark = theme === 'dark'
+  const [powers, setPowers] = useState({})
+  const [loading, setLoading] = useState(true)
+
+  const loadPowers = useCallback(async () => {
+    try {
+      const registry = await invoke('get_powers_registry')
+      setPowers(registry.powers || {})
+    } catch (e) {
+      console.error('加载 Powers 失败:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadPowers()
+  }, [loadPowers])
+
+  const powerList = Object.entries(powers)
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* 工具栏 */}
+      <div className={`px-6 py-3 border-b ${colors.cardBorder} flex items-center justify-between`}>
+        <span className={`text-sm ${colors.textMuted}`}>{powerList.length} 个已安装</span>
+        <span className={`text-xs ${colors.textMuted}`}>只读 · 在 Kiro IDE 中管理</span>
+      </div>
+
+      {/* 列表 */}
+      <div className="flex-1 overflow-auto p-6">
+        {loading ? (
+          <div className={`text-center py-12 ${colors.textMuted}`}>加载中...</div>
+        ) : powerList.length === 0 ? (
+          <div className="text-center py-12">
+            <Package size={48} className={`mx-auto mb-4 ${colors.textMuted} opacity-50`} />
+            <p className={colors.textMuted}>暂无已安装的 Powers</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {powerList.map(([id, power]) => (
+              <PowerCard key={id} id={id} power={power} isDark={isDark} colors={colors} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PowerCard({ id, power, isDark, colors }) {
+  return (
+    <div className={`${colors.card} border ${colors.cardBorder} rounded-xl p-4`}>
+      <div className="flex items-start gap-3">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-amber-500/20' : 'bg-amber-50'}`}>
+          <Package size={20} className="text-amber-500" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className={`font-semibold ${colors.text} truncate`}>{power.name || id}</h3>
+          {power.description && (
+            <p className={`text-sm ${colors.textMuted} mt-0.5 line-clamp-2`}>{power.description}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1">
+        {power.version && (
+          <div className={`flex items-center gap-2 text-xs ${colors.textMuted}`}>
+            <Tag size={12} /><span>v{power.version}</span>
+          </div>
+        )}
+        {power.publisher && (
+          <div className={`flex items-center gap-2 text-xs ${colors.textMuted}`}>
+            <User size={12} /><span>{power.publisher}</span>
+          </div>
+        )}
+        {power.installedAt && (
+          <div className={`flex items-center gap-2 text-xs ${colors.textMuted}`}>
+            <Calendar size={12} /><span>{new Date(power.installedAt).toLocaleDateString()}</span>
+          </div>
+        )}
+      </div>
+
+      {power.keywords?.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {power.keywords.slice(0, 3).map((kw, i) => (
+            <span key={i} className={`text-xs px-2 py-0.5 rounded ${isDark ? 'bg-white/10 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+              {kw}
+            </span>
+          ))}
+          {power.keywords.length > 3 && (
+            <span className={`text-xs ${colors.textMuted}`}>+{power.keywords.length - 3}</span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default PowersPanel

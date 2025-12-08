@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { getVersion } from '@tauri-apps/api/app'
-import { Home, Key, Settings, Info, User, LogIn, Globe, Sun, Moon, Palette } from 'lucide-react'
+import { Home, Key, Settings, Info, User, LogIn, Globe, Sun, Moon, Palette, Settings2 } from 'lucide-react'
 import { useTheme, themes } from '../contexts/ThemeContext'
 
 const menuItems = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'token', label: '账号管理', icon: Key },
+  { id: 'kiro-config', label: 'Kiro 配置', icon: Settings2 },
   { id: 'login', label: 'Desktop OAuth', icon: LogIn, desc: 'Social + IdC' },
   { id: 'web-oauth', label: 'Web Portal OAuth', icon: Globe, desc: 'WebView 窗口登录' },
   { id: 'settings', label: '设置', icon: Settings },

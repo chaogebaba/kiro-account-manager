@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar'
 import Home from './components/Home'
 import AccountManager from './components/AccountManager/index'
 import Settings from './components/Settings'
+import KiroConfig from './components/KiroConfig/index'
 import About from './components/About'
 import Login from './components/Login'
 import WebOAuthLogin from './components/WebOAuthLogin'
@@ -111,6 +112,7 @@ function App() {
     switch (activeMenu) {
       case 'home': return <Home onNavigate={setActiveMenu} />
       case 'token': return <AccountManager />
+      case 'kiro-config': return <KiroConfig />
       case 'login': return <Login onLogin={(user) => { handleLogin(user); setActiveMenu('token'); }} />
       case 'web-oauth': return <WebOAuthLogin onLogin={(user) => { handleLogin(user); setActiveMenu('token'); }} />
       case 'callback': return <AuthCallback />

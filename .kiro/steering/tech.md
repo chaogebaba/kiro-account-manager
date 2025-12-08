@@ -20,6 +20,8 @@
 - `tauri-plugin-process` - 进程管理
 - `tauri-plugin-updater` - 自动更新
 - `tauri-plugin-opener` - 打开 URL/文件
+- `tauri-plugin-dialog` - 系统对话框
+- `tauri-plugin-fs` - 文件系统操作
 
 ## 常用命令
 

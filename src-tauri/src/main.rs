@@ -8,7 +8,9 @@ mod codewhisperer_client;
 mod commands;
 mod kiro;
 mod kiro_auth_client;
+mod mcp;
 mod oauth_callback_server;
+mod powers;
 mod process;
 mod providers;
 mod state;
@@ -22,6 +24,8 @@ use std::sync::Mutex;
 // 导入命令
 use browser::detect_installed_browsers;
 use commands::auth_cmd::*;
+use commands::mcp_cmd::*;
+use commands::powers_cmd::*;
 use commands::settings_cmd::*;
 use commands::account_cmd::*;
 use commands::web_oauth_cmd::*;
@@ -86,7 +90,14 @@ fn main() {
             web_oauth_login,
             web_oauth_close_window,
             // 浏览器检测
-            detect_installed_browsers
+            detect_installed_browsers,
+            // MCP 管理命令
+            get_mcp_config,
+            save_mcp_server,
+            delete_mcp_server,
+            toggle_mcp_server,
+            // Powers 管理命令
+            get_powers_registry
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

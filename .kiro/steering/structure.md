@@ -12,15 +12,30 @@
 │   │   │   ├── index.jsx     # 主容器
 │   │   │   ├── hooks/        # 自定义 hooks
 │   │   │   └── *.jsx         # 子组件
+│   │   ├── KiroConfig/       # Kiro 配置管理
+│   │   │   ├── index.jsx     # 配置主页
+│   │   │   ├── MCPPanel.jsx  # MCP 面板
+│   │   │   └── PowersPanel.jsx # Powers 面板
+│   │   ├── MCPManager/       # MCP 服务器管理
+│   │   │   ├── index.jsx     # MCP 管理主页
+│   │   │   ├── MCPServerCard.jsx # 服务器卡片
+│   │   │   ├── AddMCPModal.jsx   # 添加弹窗
+│   │   │   ├── EditMCPModal.jsx  # 编辑弹窗
+│   │   │   └── MCPTemplates.js   # MCP 模板
+│   │   ├── PowersManager/    # Powers 管理
+│   │   │   └── index.jsx     # Powers 列表
 │   │   ├── Home.jsx          # 首页
 │   │   ├── Login.jsx         # 登录页
 │   │   ├── Settings.jsx      # 设置页
 │   │   ├── Sidebar.jsx       # 侧边栏导航
-│   │   └── ...
+│   │   ├── About.jsx         # 关于页
+│   │   ├── UpdateChecker.jsx # 更新检查
+│   │   └── WebOAuthLogin.jsx # Web OAuth 登录
 │   ├── contexts/             # React Context
 │   │   ├── ThemeContext.jsx  # 主题管理
 │   │   └── DialogContext.jsx # 弹窗管理
 │   └── utils/                # 工具函数
+│       └── accountStats.js   # 账号统计工具
 │
 ├── src-tauri/                # Rust 后端
 │   ├── src/
@@ -30,16 +45,30 @@
 │   │   │   ├── account_cmd.rs    # 账号增删改查
 │   │   │   ├── auth_cmd.rs       # 认证命令
 │   │   │   ├── settings_cmd.rs   # 设置命令
-│   │   │   └── web_oauth_cmd.rs  # Web OAuth 命令
+│   │   │   ├── web_oauth_cmd.rs  # Web OAuth 命令
+│   │   │   ├── mcp_cmd.rs        # MCP 管理命令
+│   │   │   └── powers_cmd.rs     # Powers 管理命令
 │   │   ├── providers/        # 认证提供者实现
+│   │   │   ├── mod.rs        # 模块导出
+│   │   │   ├── base.rs       # 基础 trait
+│   │   │   ├── factory.rs    # 提供者工厂
 │   │   │   ├── social.rs     # Google/GitHub OAuth
 │   │   │   ├── idc.rs        # AWS IAM Identity Center
-│   │   │   └── web_oauth.rs  # Web OAuth 流程
+│   │   │   ├── web_oauth.rs  # Web OAuth 流程
+│   │   │   └── web.rs        # Web 认证
 │   │   ├── account.rs        # 账号模型和存储
 │   │   ├── auth.rs           # 认证工具
+│   │   ├── auth_social.rs    # 社交登录认证
 │   │   ├── state.rs          # 应用状态管理
 │   │   ├── kiro.rs           # Kiro IDE 集成
-│   │   └── ...
+│   │   ├── mcp.rs            # MCP 配置管理
+│   │   ├── powers.rs         # Powers 管理
+│   │   ├── process.rs        # 进程管理
+│   │   ├── browser.rs        # 浏览器操作
+│   │   ├── kiro_auth_client.rs       # Kiro 认证客户端
+│   │   ├── codewhisperer_client.rs   # CodeWhisperer 客户端
+│   │   ├── aws_sso_client.rs         # AWS SSO 客户端
+│   │   └── oauth_callback_server.rs  # OAuth 回调服务器
 │   ├── tauri.conf.json       # Tauri 配置
 │   └── Cargo.toml            # Rust 依赖
 │

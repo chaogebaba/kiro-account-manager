@@ -136,19 +136,71 @@ pub async fn verify_account(
     _access_token: String,
     refresh_token: String,
     _csrf_token: Option<String>,
-    _provider: String,
+    provider: String,
+    // IdC 账号需要的额外参数
+    client_id: Option<String>,
+    client_secret: Option<String>,
+    region: Option<String>,
 ) -> Result<VerifyAccountResponse, String> {
-    let refresh_result = refresh_token_desktop(&refresh_token).await?;
-    let new_access_token = refresh_result.access_token.clone();
-    let new_refresh_token = refresh_result.refresh_token.clone();
-    let usage = get_usage_limits_desktop(&new_access_token).await?;
+    // 判断是否是 IdC 账号
+    let is_idc = provider == "BuilderId" || provider == "Enterprise";
     
-    let (quota, used) = usage.usage_breakdown_list.as_ref()
-        .and_then(|list| list.first())
-        .map(|b| (b.usage_limit, b.current_usage))
-        .unwrap_or((None, None));
+    let (new_access_token, new_refresh_token, quota, used, subscription_type) = if is_idc {
+        // IdC 账号使用 AWS OIDC 刷新
+        // 优先使用传入的参数，否则从数据库查找
+        let (cid, csec, reg) = if client_id.is_some() && client_secret.is_some() {
+            (client_id, client_secret, region)
+        } else {
+            // 从数据库查找
+            let store = state.store.lock().unwrap();
+            store.accounts.iter().find(|a| {
+                a.refresh_token.as_ref() == Some(&refresh_token)
+            }).map(|a| (
+                a.sso_client_id.clone(),
+                a.sso_client_secret.clone(),
+                a.sso_region.clone(),
+            )).unwrap_or((None, None, None))
+        };
+        
+        let cid = cid.ok_or("IdC 账号缺少 client_id，请重新添加账号")?;
+        let csec = csec.ok_or("IdC 账号缺少 client_secret，请重新添加账号")?;
+        
+        let metadata = RefreshMetadata {
+            client_id: Some(cid),
+            client_secret: Some(csec),
+            region: reg.clone(),
+            ..Default::default()
+        };
+        
+        let region_str = reg.as_deref().unwrap_or("us-east-1");
+        let idc_provider = IdcProvider::new(&provider, region_str, None);
+        let auth_result = idc_provider.refresh_token(&refresh_token, metadata).await?;
+        
+        // 使用 CodeWhisperer API 获取 usage
+        let machine_id = get_machine_id();
+        let cw_client = CodeWhispererClient::new(&machine_id);
+        let usage = cw_client.get_usage_limits(&auth_result.access_token).await?;
+        
+        let (q, u) = usage.usage_breakdown_list.as_ref()
+            .and_then(|list| list.first())
+            .map(|b| (b.usage_limit, b.current_usage))
+            .unwrap_or((None, None));
+        
+        (auth_result.access_token, auth_result.refresh_token, q, u, usage.subscription_info.and_then(|s| s.subscription_type))
+    } else {
+        // Social 账号使用 Desktop API 刷新
+        let refresh_result = refresh_token_desktop(&refresh_token).await?;
+        let usage = get_usage_limits_desktop(&refresh_result.access_token).await?;
+        
+        let (q, u) = usage.usage_breakdown_list.as_ref()
+            .and_then(|list| list.first())
+            .map(|b| (b.usage_limit, b.current_usage))
+            .unwrap_or((None, None));
+        
+        (refresh_result.access_token, refresh_result.refresh_token, q, u, usage.subscription_info.and_then(|s| s.subscription_type))
+    };
     
-    // 更新数据库中的 token（通过旧 refresh_token 找到账号）
+    // 更新数据库中的 token
     {
         let mut store = state.store.lock().unwrap();
         if let Some(account) = store.accounts.iter_mut().find(|a| {
@@ -163,7 +215,7 @@ pub async fn verify_account(
     Ok(VerifyAccountResponse {
         usage_limit: quota,
         current_usage: used,
-        subscription_type: usage.subscription_info.and_then(|s| s.subscription_type),
+        subscription_type,
         access_token: new_access_token,
         refresh_token: new_refresh_token,
     })

@@ -26,8 +26,9 @@ const getSubPlan = (a) => a.usageData?.subscriptionInfo?.subscriptionTitle ?? a.
 export function calcAccountStats(accounts) {
   const total = accounts.length
   const active = accounts.filter(a => a.status === '正常' || a.status === '有效').length
-  const totalQuota = accounts.reduce((sum, a) => sum + getQuota(a), 0)
-  const totalUsed = accounts.reduce((sum, a) => sum + getUsed(a), 0)
+  // 使用 Math.round 避免浮点数精度问题
+  const totalQuota = Math.round(accounts.reduce((sum, a) => sum + getQuota(a), 0))
+  const totalUsed = Math.round(accounts.reduce((sum, a) => sum + getUsed(a), 0))
   const proPlus = accounts.filter(a => getSubType(a).includes('PRO+') || getSubPlan(a).includes('PRO+')).length
   const pro = accounts.filter(a => 
     (getSubType(a).includes('PRO') || getSubPlan(a).includes('PRO')) && 
