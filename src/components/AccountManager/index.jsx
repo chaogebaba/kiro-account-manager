@@ -170,7 +170,8 @@ function AccountManager() {
         selectedCount={selectedIds.length}
         onBatchDelete={onBatchDelete}
         onAdd={() => setShowAddModal(true)}
-        onExport={handleExport}
+        onImport={() => {/* TODO: 打开导入弹窗 */}}
+        onExport={() => handleExport(selectedIds)}
         onRefreshAll={() => autoRefreshAll(accounts, true)}
         autoRefreshing={autoRefreshing}
         lastRefreshTime={lastRefreshTime}

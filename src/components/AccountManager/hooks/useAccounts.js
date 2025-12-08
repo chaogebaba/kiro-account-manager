@@ -80,12 +80,27 @@ export function useAccounts() {
     }
   }, [])
 
-  const handleExport = useCallback(async () => {
-    const json = await invoke('export_accounts')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
-    a.download = `kiro-accounts-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
+  const handleExport = useCallback(async (selectedIds = []) => {
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog')
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs')
+      
+      const suffix = selectedIds.length > 0 ? `-${selectedIds.length}` : ''
+      const defaultName = `kiro-accounts${suffix}-${new Date().toISOString().slice(0, 10)}.json`
+      
+      const filePath = await save({
+        defaultPath: defaultName,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        title: '导出账号数据'
+      })
+      
+      if (!filePath) return // 用户取消
+      
+      const json = await invoke('export_accounts', { ids: selectedIds.length > 0 ? selectedIds : null })
+      await writeTextFile(filePath, json)
+    } catch (e) {
+      console.error('导出失败:', e)
+    }
   }, [])
 
   // 注意：handleDelete, handleBatchDelete, handleSwitchAccount 已移动到 AccountManager/index.jsx 中

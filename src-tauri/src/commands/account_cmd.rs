@@ -248,8 +248,21 @@ pub fn import_accounts(state: State<AppState>, json: String) -> Result<usize, St
 }
 
 #[tauri::command]
-pub fn export_accounts(state: State<AppState>) -> String {
-    state.store.lock().unwrap().export_to_json()
+pub fn export_accounts(state: State<AppState>, ids: Option<Vec<String>>) -> String {
+    let store = state.store.lock().unwrap();
+    match ids {
+        Some(id_list) if !id_list.is_empty() => {
+            // 导出选中的账号
+            let selected: Vec<&Account> = store.accounts.iter()
+                .filter(|a| id_list.contains(&a.id))
+                .collect();
+            serde_json::to_string_pretty(&selected).unwrap_or_else(|_| "[]".to_string())
+        }
+        _ => {
+            // 导出全部
+            store.export_to_json()
+        }
+    }
 }
 
 /// 添加本地 Kiro IDE 账号

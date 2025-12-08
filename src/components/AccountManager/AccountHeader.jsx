@@ -1,4 +1,4 @@
-import { Search, Download, RefreshCw, Trash2, Plus, Users, Zap, Shield, Sparkles } from 'lucide-react'
+import { Search, Download, Upload, RefreshCw, Trash2, Plus, Users, Zap, Shield, Sparkles } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
 function AccountHeader({
@@ -8,6 +8,7 @@ function AccountHeader({
   selectedCount,
   onBatchDelete,
   onAdd,
+  onImport,
   onExport,
   onRefreshAll,
   autoRefreshing,
@@ -77,11 +78,20 @@ function AccountHeader({
             <Plus size={16} />添加
           </button>
           <button 
+            onClick={onImport} 
+            className={`btn-icon px-3 py-2 ${colors.card} border ${colors.cardBorder} rounded-xl ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} transition-all flex items-center gap-1.5`} 
+            title="导入"
+          >
+            <Upload size={16} className={colors.textMuted} />
+            <span className={`text-sm ${colors.textMuted}`}>导入</span>
+          </button>
+          <button 
             onClick={onExport} 
-            className={`btn-icon p-2 ${colors.card} border ${colors.cardBorder} rounded-xl ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} transition-all`} 
+            className={`btn-icon px-3 py-2 ${colors.card} border ${colors.cardBorder} rounded-xl ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} transition-all flex items-center gap-1.5`} 
             title="导出"
           >
-            <Download size={18} className={colors.textMuted} />
+            <Download size={16} className={colors.textMuted} />
+            <span className={`text-sm ${colors.textMuted}`}>导出</span>
           </button>
           <button 
             onClick={onRefreshAll} 
