@@ -1,6 +1,6 @@
 import { Users, Plus } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import AccountRow from './AccountRow'
+import AccountCard from './AccountCard'
 
 function AccountTable({
   accounts,
@@ -17,67 +17,76 @@ function AccountTable({
   onAdd,
   refreshingId,
   switchingId,
+  localToken,
 }) {
   const { theme, colors } = useTheme()
   const isDark = theme === 'dark'
 
   return (
     <div className="flex-1 overflow-auto p-6">
-      <div className={`card-glow ${colors.card} rounded-2xl shadow-sm overflow-hidden max-w-6xl border ${colors.cardBorder} animate-scale-in delay-200`}>
-        <table className="w-full table-fixed">
-          <thead>
-            <tr className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} border-b ${colors.cardBorder} text-left text-xs font-medium ${colors.textMuted} uppercase tracking-wider`}>
-              <th className="px-3 py-3 w-10">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.length === filteredAccounts.length && filteredAccounts.length > 0}
-                  onChange={(e) => onSelectAll(e.target.checked)}
-                  className="rounded transition-transform hover:scale-110"
-                />
-              </th>
-              <th className="px-3 py-3 w-[200px]">账号</th>
-              <th className="px-3 py-3 w-[70px]">订阅</th>
-              <th className="px-3 py-3 w-[200px]">配额</th>
-              <th className="px-3 py-3 w-[50px]">状态</th>
-              <th className="px-3 py-3 w-[100px]">Token</th>
-              <th className="px-3 py-3 w-[130px] text-right">操作</th>
-            </tr>
-          </thead>
-          <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-100'}`}>
-            {accounts.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-20 text-center">
-                  <div className={`flex flex-col items-center gap-4 ${colors.textMuted}`}>
-                    <div className={`w-20 h-20 rounded-full ${isDark ? 'bg-white/5' : 'bg-gray-100'} flex items-center justify-center animate-float`}>
-                      <Users size={40} strokeWidth={1} className="opacity-50" />
-                    </div>
-                    <div>
-                      <p className="font-medium mb-1">暂无账号</p>
-                      <p className="text-sm opacity-75">请通过侧边栏登录添加账号</p>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            ) : accounts.map((account, index) => (
-              <AccountRow
-                key={account.id}
-                account={account}
-                index={index}
-                isSelected={selectedIds.includes(account.id)}
-                onSelect={(checked) => onSelectOne(account.id, checked)}
-                copiedId={copiedId}
-                onCopy={onCopy}
-                onSwitch={onSwitch}
-                onRefresh={onRefresh}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                refreshingId={refreshingId}
-                switchingId={switchingId}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* 全选控制栏 */}
+      {accounts.length > 0 && (
+        <div className={`flex items-center gap-3 mb-4 px-1`}>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selectedIds.length === filteredAccounts.length && filteredAccounts.length > 0}
+              onChange={(e) => onSelectAll(e.target.checked)}
+              className="w-4 h-4 rounded transition-transform hover:scale-110"
+            />
+            <span className={`text-sm ${colors.textMuted}`}>
+              {selectedIds.length > 0 ? `已选 ${selectedIds.length} 个` : '全选'}
+            </span>
+          </label>
+        </div>
+      )}
+
+      {/* 卡片网格 */}
+      {accounts.length === 0 ? (
+        <div className={`flex flex-col items-center justify-center py-20 ${colors.textMuted}`}>
+          <div className={`w-20 h-20 rounded-full ${isDark ? 'bg-white/5' : 'bg-gray-100'} flex items-center justify-center animate-float mb-4`}>
+            <Users size={40} strokeWidth={1} className="opacity-50" />
+          </div>
+          <p className="font-medium mb-1">暂无账号</p>
+          <p className="text-sm opacity-75">请通过侧边栏登录添加账号</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {accounts.map((account) => (
+            <AccountCard
+              key={account.id}
+              account={account}
+              isSelected={selectedIds.includes(account.id)}
+              onSelect={(checked) => onSelectOne(account.id, checked)}
+              copiedId={copiedId}
+              onCopy={onCopy}
+              onSwitch={onSwitch}
+              onRefresh={onRefresh}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              refreshingId={refreshingId}
+              switchingId={switchingId}
+              isCurrentAccount={localToken?.refreshToken && account.refreshToken === localToken.refreshToken}
+            />
+          ))}
+          {/* 添加账号卡片 */}
+          <button
+            onClick={onAdd}
+            className={`rounded-2xl border-2 border-dashed transition-all duration-200 min-h-[280px] flex flex-col items-center justify-center gap-3 ${
+              isDark 
+                ? 'border-gray-700 hover:border-gray-500 hover:bg-white/5' 
+                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+            }`}
+          >
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+              isDark ? 'bg-white/10' : 'bg-gray-100'
+            }`}>
+              <Plus size={24} className={colors.textMuted} />
+            </div>
+            <span className={`text-sm font-medium ${colors.textMuted}`}>添加账号</span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }

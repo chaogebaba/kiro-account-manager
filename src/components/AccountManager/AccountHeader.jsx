@@ -1,8 +1,7 @@
-import { Search, Download, Upload, RefreshCw, Trash2, Plus, Users, Zap, Shield, Sparkles } from 'lucide-react'
+import { Search, Download, Upload, RefreshCw, Trash2, Plus, Sparkles } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
 function AccountHeader({
-  stats,
   searchTerm,
   onSearchChange,
   selectedCount,
@@ -34,20 +33,7 @@ function AccountHeader({
             </div>
             <p className={`text-sm ${colors.textMuted}`}>管理你的 Kiro 账号和配额</p>
           </div>
-          <div className="flex gap-3 ml-4">
-            <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-blue-500/20' : 'bg-blue-50'} rounded-xl animate-scale-in delay-100 transition-transform hover:scale-105`}>
-              <Users size={16} className="text-blue-500" />
-              <span className={`text-sm font-medium ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>{stats.total} 账号</span>
-            </div>
-            <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-green-500/20' : 'bg-green-50'} rounded-xl animate-scale-in delay-200 transition-transform hover:scale-105`}>
-              <Shield size={16} className="text-green-500" />
-              <span className={`text-sm font-medium ${isDark ? 'text-green-300' : 'text-green-700'}`}>{stats.active} 正常</span>
-            </div>
-            <div className={`flex items-center gap-2 px-3 py-1.5 ${isDark ? 'bg-purple-500/20' : 'bg-purple-50'} rounded-xl animate-scale-in delay-300 transition-transform hover:scale-105`}>
-              <Zap size={16} className="text-purple-500" />
-              <span className={`text-sm font-medium ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>{stats.totalUsed}/{stats.totalQuota}</span>
-            </div>
-          </div>
+
         </div>
         <div className="flex items-center gap-3 animate-fade-in delay-400">
           {lastRefreshTime && !autoRefreshing && (

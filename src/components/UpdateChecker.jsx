@@ -14,6 +14,7 @@ function UpdateChecker() {
   const [installing, setInstalling] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [update, setUpdate] = useState(null)
+  const [downloadProgress, setDownloadProgress] = useState(null) // { percent, downloaded, total }
 
   const checkForUpdate = async () => {
     setChecking(true)
@@ -36,13 +37,28 @@ function UpdateChecker() {
   const doUpdate = async () => {
     if (!update) return
     setInstalling(true)
+    setDownloadProgress({ percent: 0, downloaded: 0, total: 0 })
     try {
-      await update.downloadAndInstall()
+      await update.downloadAndInstall((event) => {
+        if (event.event === 'Started') {
+          setDownloadProgress({ percent: 0, downloaded: 0, total: event.data.contentLength || 0 })
+        } else if (event.event === 'Progress') {
+          setDownloadProgress(prev => {
+            const downloaded = (prev?.downloaded || 0) + event.data.chunkLength
+            const total = prev?.total || 0
+            const percent = total > 0 ? Math.round((downloaded / total) * 100) : 0
+            return { percent, downloaded, total }
+          })
+        } else if (event.event === 'Finished') {
+          setDownloadProgress({ percent: 100, downloaded: 0, total: 0 })
+        }
+      })
       await relaunch()
     } catch (e) {
       console.error('安装更新失败:', e)
       showError('更新失败', '安装更新失败: ' + e)
       setInstalling(false)
+      setDownloadProgress(null)
     }
   }
 
@@ -92,7 +108,9 @@ function UpdateChecker() {
           className="flex-1 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-1 disabled:opacity-50"
         >
           {installing ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-          {installing ? '更新中...' : '立即更新'}
+          {installing 
+            ? (downloadProgress?.percent != null ? `下载中... ${downloadProgress.percent}%` : '准备中...') 
+            : '立即更新'}
         </button>
       </div>
     </div>

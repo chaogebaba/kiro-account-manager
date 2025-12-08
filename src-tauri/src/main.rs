@@ -83,6 +83,12 @@ fn main() {
             // 应用设置命令
             get_app_settings,
             save_app_settings,
+            // 系统机器码命令
+            get_system_machine_guid,
+            backup_machine_guid,
+            restore_machine_guid,
+            reset_system_machine_guid,
+            get_machine_guid_backup,
             // Web OAuth 命令 (Cognito + CBOR)
             web_oauth_initiate,
             web_oauth_complete,

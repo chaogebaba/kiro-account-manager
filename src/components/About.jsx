@@ -48,11 +48,20 @@ function About() {
     if (!update) return
     setDownloading(true)
     setDownloadProgress(0)
+    let downloaded = 0
+    let total = 0
     try {
       await update.downloadAndInstall((event) => {
-        if (event.event === 'Progress') {
-          const progress = Math.round((event.data.chunkLength / event.data.contentLength) * 100)
-          setDownloadProgress(prev => Math.min(prev + progress, 100))
+        if (event.event === 'Started') {
+          total = event.data.contentLength || 0
+          downloaded = 0
+        } else if (event.event === 'Progress') {
+          downloaded += event.data.chunkLength
+          if (total > 0) {
+            setDownloadProgress(Math.round((downloaded / total) * 100))
+          }
+        } else if (event.event === 'Finished') {
+          setDownloadProgress(100)
         }
       })
       await relaunch()

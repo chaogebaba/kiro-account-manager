@@ -1,9 +1,8 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useDialog } from '../../contexts/DialogContext'
 import { useAccounts } from './hooks/useAccounts'
-import { useAccountStats } from './hooks/useAccountStats'
 import AccountHeader from './AccountHeader'
 import AccountTable from './AccountTable'
 import AccountPagination from './AccountPagination'
@@ -27,6 +26,13 @@ function AccountManager() {
   
   // 切换账号弹窗状态
   const [switchDialog, setSwitchDialog] = useState(null) // { type, title, message, account }
+  
+  // 当前登录的本地 token
+  const [localToken, setLocalToken] = useState(null)
+  
+  useEffect(() => {
+    invoke('get_kiro_local_token').then(setLocalToken).catch(() => setLocalToken(null))
+  }, [])
 
   const {
     accounts,
@@ -41,8 +47,6 @@ function AccountManager() {
     handleRefreshStatus,
     handleExport,
   } = useAccounts()
-
-  const stats = useAccountStats(accounts)
 
   const filteredAccounts = useMemo(() =>
     accounts.filter(a =>
@@ -107,6 +111,10 @@ function AccountManager() {
     setSwitchingId(account.id)
     
     try {
+      // 读取设置，判断是否自动更换机器码
+      const appSettings = await invoke('get_app_settings').catch(() => ({}))
+      const autoChangeMachineId = appSettings.autoChangeMachineId ?? false
+      
       const isIdC = account.provider === 'BuilderId' || account.provider === 'Enterprise' || account.clientIdHash
       const authMethod = isIdC ? 'IdC' : 'social'
       
@@ -116,7 +124,7 @@ function AccountManager() {
         refreshToken: account.refreshToken,
         provider: account.provider || 'Google',
         authMethod,
-        resetMachineId: false,
+        resetMachineId: autoChangeMachineId,
         autoRestart: false
       }
       
@@ -159,7 +167,6 @@ function AccountManager() {
   return (
     <div className={`h-full flex flex-col ${colors.main}`}>
       <AccountHeader
-        stats={stats}
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
         selectedCount={selectedIds.length}
@@ -172,7 +179,7 @@ function AccountManager() {
         lastRefreshTime={lastRefreshTime}
         refreshProgress={refreshProgress}
       />
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-auto">
       <AccountTable
         accounts={paginatedAccounts}
         filteredAccounts={filteredAccounts}
@@ -188,6 +195,7 @@ function AccountManager() {
         onAdd={() => setShowAddModal(true)}
         refreshingId={refreshingId}
         switchingId={switchingId}
+        localToken={localToken}
       />
       </div>
       <div className="animate-slide-in-right delay-200">

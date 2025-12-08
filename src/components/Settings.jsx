@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Database, Settings as SettingsIcon, Clock, Globe, Search } from 'lucide-react'
+import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Database, Settings as SettingsIcon, Clock, Globe, Search, Shield, Download, Upload, Shuffle, AlertTriangle } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useDialog } from '../contexts/DialogContext'
 
@@ -12,6 +12,7 @@ function Settings() {
   const [aiModel, setAiModel] = useState('claude-sonnet-4.5')
   const [lockModel, setLockModel] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [autoChangeMachineId, setAutoChangeMachineId] = useState(false)
   const [httpProxy, setHttpProxy] = useState('')
   const [originalProxy, setOriginalProxy] = useState('') // 原始代理值，用于判断是否修改
   const [savingProxy, setSavingProxy] = useState(false)
@@ -25,17 +26,29 @@ function Settings() {
   // Kiro IDE 信息
   const [telemetryInfo, setTelemetryInfo] = useState(null)
   const [loading, setLoading] = useState(false)
+  
+  // 系统机器码
+  const [systemMachineInfo, setSystemMachineInfo] = useState(null)
+  const [machineGuidBackup, setMachineGuidBackup] = useState(null)
+  const [machineGuidLoading, setMachineGuidLoading] = useState(false)
+  const [machineGuidAction, setMachineGuidAction] = useState(null) // 'backup' | 'restore' | 'reset'
 
   // 加载设置
   const loadSettings = async () => {
     setLoading(true)
     try {
-      const [telemetry, kiroSettings, appSettings] = await Promise.all([
+      const [telemetry, kiroSettings, appSettings, sysMachine] = await Promise.all([
         invoke('get_kiro_telemetry_info').catch(() => null),
         invoke('get_kiro_settings').catch(() => null),
-        invoke('get_app_settings').catch(() => null)
+        invoke('get_app_settings').catch(() => null),
+        invoke('get_system_machine_guid').catch(() => null)
       ])
       setTelemetryInfo(telemetry)
+      setSystemMachineInfo(sysMachine)
+      if (sysMachine?.backupExists) {
+        const backup = await invoke('get_machine_guid_backup').catch(() => null)
+        setMachineGuidBackup(backup)
+      }
       // 从 Kiro IDE 设置读取
       if (kiroSettings) {
         const proxy = kiroSettings.httpProxy || ''
@@ -47,6 +60,7 @@ function Settings() {
       if (appSettings) {
         setLockModel(appSettings.lockModel ?? true)
         setAutoRefresh(appSettings.autoRefresh ?? true)
+        setAutoChangeMachineId(appSettings.autoChangeMachineId ?? false)
         const browser = appSettings.browserPath || ''
         setBrowserPath(browser)
         setOriginalBrowserPath(browser)
@@ -114,6 +128,11 @@ function Settings() {
   const handleAutoRefreshChange = async (checked) => {
     setAutoRefresh(checked)
     await saveAppSettings({ autoRefresh: checked })
+  }
+
+  const handleAutoChangeMachineIdChange = async (checked) => {
+    setAutoChangeMachineId(checked)
+    await saveAppSettings({ autoChangeMachineId: checked })
   }
 
   const handleApplyBrowser = async () => {
@@ -225,6 +244,65 @@ function Settings() {
       checkKiroStatus()
     } catch (err) {
       await showError('操作失败', err.toString())
+    }
+  }
+
+  // 系统机器码操作
+  const handleBackupMachineGuid = async () => {
+    setMachineGuidAction('backup')
+    try {
+      const backup = await invoke('backup_machine_guid')
+      setMachineGuidBackup(backup)
+      setSystemMachineInfo(prev => ({ ...prev, backupExists: true, backupTime: backup.backupTime }))
+      await showSuccess('备份成功', `已备份系统机器码: ${backup.machineGuid}`)
+    } catch (err) {
+      await showError('备份失败', err.toString())
+    } finally {
+      setMachineGuidAction(null)
+    }
+  }
+
+  const handleRestoreMachineGuid = async () => {
+    if (!machineGuidBackup) {
+      await showError('恢复失败', '没有找到备份')
+      return
+    }
+    const confirmed = await showConfirm(
+      '恢复系统机器码',
+      `确定要将系统机器码恢复为备份值吗？\n\n备份值: ${machineGuidBackup.machineGuid}\n备份时间: ${machineGuidBackup.backupTime}\n\n⚠️ 此操作需要管理员权限，可能需要以管理员身份运行程序。`,
+      { confirmText: '恢复', cancelText: '取消' }
+    )
+    if (!confirmed) return
+    
+    setMachineGuidAction('restore')
+    try {
+      const restored = await invoke('restore_machine_guid')
+      setSystemMachineInfo(prev => ({ ...prev, machineGuid: restored }))
+      await showSuccess('恢复成功', `系统机器码已恢复为: ${restored}`)
+    } catch (err) {
+      await showError('恢复失败', err.toString())
+    } finally {
+      setMachineGuidAction(null)
+    }
+  }
+
+  const handleResetSystemMachineGuid = async () => {
+    const confirmed = await showConfirm(
+      '⚠️ 重置系统机器码',
+      '确定要生成新的系统机器码吗？\n\n此操作会：\n• 生成一个新的随机 UUID\n• 写入 Windows 注册表\n• 可能影响某些软件的授权验证\n\n⚠️ 此操作需要管理员权限\n⚠️ 建议先备份当前值',
+      { confirmText: '确定重置', cancelText: '取消' }
+    )
+    if (!confirmed) return
+    
+    setMachineGuidAction('reset')
+    try {
+      const newGuid = await invoke('reset_system_machine_guid')
+      setSystemMachineInfo(prev => ({ ...prev, machineGuid: newGuid }))
+      await showSuccess('重置成功', `新的系统机器码: ${newGuid}`)
+    } catch (err) {
+      await showError('重置失败', err.toString())
+    } finally {
+      setMachineGuidAction(null)
     }
   }
 
@@ -376,7 +454,7 @@ function Settings() {
           <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>账号设置</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>配置账号自动刷新等功能</p>
           
-          <label className={`flex items-start gap-3 cursor-pointer ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl p-4 transition-all hover:scale-[1.01]`}>
+          <label className={`flex items-start gap-3 cursor-pointer ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl p-4 transition-all hover:scale-[1.01] mb-3`}>
             <input
               type="checkbox"
               checked={autoRefresh}
@@ -387,6 +465,20 @@ function Settings() {
             <div>
               <span className={`text-sm font-medium ${colors.text}`}>自动刷新 Token</span>
               <p className={`text-xs ${colors.textMuted} mt-0.5`}>每 50 分钟自动刷新所有账号的 Token，保持账号始终有效</p>
+            </div>
+          </label>
+
+          <label className={`flex items-start gap-3 cursor-pointer ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl p-4 transition-all hover:scale-[1.01]`}>
+            <input
+              type="checkbox"
+              checked={autoChangeMachineId}
+              onChange={(e) => handleAutoChangeMachineIdChange(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded-lg border-gray-300 text-blue-500 focus:ring-blue-500"
+            />
+            <Shuffle size={16} className={`${colors.textMuted} mt-0.5 flex-shrink-0`} />
+            <div>
+              <span className={`text-sm font-medium ${colors.text}`}>切换账号时自动更换机器码</span>
+              <p className={`text-xs ${colors.textMuted} mt-0.5`}>切换账号时自动重置 Kiro IDE 的机器 ID，避免多账号关联</p>
             </div>
           </label>
         </section>
@@ -586,6 +678,110 @@ function Settings() {
           <p className={`text-xs ${colors.textMuted} mt-2`}>
             重置设备标识需要先关闭 Kiro IDE
           </p>
+        </section>
+
+        {/* 系统机器码管理 */}
+        <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 animate-slide-in-left delay-600`}>
+          <div className="flex items-center gap-2 mb-1">
+            <Shield size={18} className="text-orange-500" />
+            <h2 className={`text-lg font-semibold ${colors.text}`}>系统机器码</h2>
+          </div>
+          <p className={`text-sm ${colors.textMuted} mb-5`}>
+            管理 Windows 系统的 MachineGuid（注册表 HKLM\SOFTWARE\Microsoft\Cryptography）
+          </p>
+
+          {/* 当前值 */}
+          <div className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl p-4 mb-4`}>
+            <div className="flex items-center justify-between mb-3">
+              <span className={`text-sm font-medium ${colors.text}`}>当前系统机器码</span>
+              <button 
+                onClick={loadSettings}
+                disabled={loading}
+                className={`btn-icon p-1.5 rounded-lg ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-200'} transition-colors`}
+              >
+                <RefreshCw size={14} className={`${colors.textMuted} ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <code className={`flex-1 text-sm ${isDark ? 'bg-white/10' : 'bg-gray-100'} px-3 py-2 rounded-lg font-mono ${colors.text}`}>
+                {systemMachineInfo?.machineGuid || '加载中...'}
+              </code>
+              {systemMachineInfo?.machineGuid && (
+                <button 
+                  onClick={() => copyToClipboard(systemMachineInfo.machineGuid, 'sysMachineGuid')}
+                  className={`btn-icon p-2 rounded-lg ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} transition-colors`}
+                >
+                  {copiedField === 'sysMachineGuid' ? (
+                    <Check size={16} className="text-green-500" />
+                  ) : (
+                    <Copy size={16} className={colors.textMuted} />
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 备份信息 */}
+          {machineGuidBackup && (
+            <div className={`${isDark ? 'bg-blue-500/10' : 'bg-blue-50'} rounded-xl p-4 mb-4 border ${isDark ? 'border-blue-500/20' : 'border-blue-200'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Download size={14} className="text-blue-500" />
+                <span className={`text-sm font-medium ${colors.text}`}>已有备份</span>
+              </div>
+              <div className={`text-xs ${colors.textMuted} space-y-1`}>
+                <div>备份值: <code className="font-mono">{machineGuidBackup.machineGuid}</code></div>
+                <div>备份时间: {machineGuidBackup.backupTime}</div>
+                {machineGuidBackup.computerName && <div>计算机名: {machineGuidBackup.computerName}</div>}
+              </div>
+            </div>
+          )}
+
+          {/* 警告提示 */}
+          <div className={`flex items-start gap-3 ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'} rounded-xl p-4 mb-4 border ${isDark ? 'border-orange-500/20' : 'border-orange-200'}`}>
+            <AlertTriangle size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
+            <div className={`text-xs ${colors.textMuted}`}>
+              <p className="font-medium text-orange-500 mb-1">注意事项</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>修改系统机器码需要<span className="font-medium">管理员权限</span></li>
+                <li>可能影响某些软件的授权验证</li>
+                <li>建议在修改前先备份当前值</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* 操作按钮 */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleBackupMachineGuid}
+              disabled={machineGuidAction !== null}
+              className={`flex-1 btn-icon px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-all ${
+                isDark ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+              } disabled:opacity-50`}
+            >
+              {machineGuidAction === 'backup' ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
+              备份
+            </button>
+            <button
+              onClick={handleRestoreMachineGuid}
+              disabled={machineGuidAction !== null || !machineGuidBackup}
+              className={`flex-1 btn-icon px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-all ${
+                isDark ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-green-100 text-green-600 hover:bg-green-200'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {machineGuidAction === 'restore' ? <RefreshCw size={16} className="animate-spin" /> : <Upload size={16} />}
+              恢复
+            </button>
+            <button
+              onClick={handleResetSystemMachineGuid}
+              disabled={machineGuidAction !== null}
+              className={`flex-1 btn-icon px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-all ${
+                isDark ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-red-100 text-red-600 hover:bg-red-200'
+              } disabled:opacity-50`}
+            >
+              {machineGuidAction === 'reset' ? <RefreshCw size={16} className="animate-spin" /> : <Shuffle size={16} />}
+              重置
+            </button>
+          </div>
         </section>
       </div>
     </div>

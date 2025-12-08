@@ -116,7 +116,7 @@ function AddAccountModal({ onClose, onSuccess }) {
               className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${addType === 'social' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : `${colors.text} hover:bg-white/10`}`}
             >
               <Key size={14} />
-              SSO Token
+              Google/GitHub
             </button>
             <button 
               type="button" 
@@ -124,7 +124,7 @@ function AddAccountModal({ onClose, onSuccess }) {
               className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${addType === 'idc' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : `${colors.text} hover:bg-white/10`}`}
             >
               <Shield size={14} />
-              OIDC 凭证
+              BuilderId/Enterprise
             </button>
           </div>
 

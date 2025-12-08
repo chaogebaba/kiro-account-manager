@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use chrono::Local;
+use uuid::Uuid;
 
 // ============================================================
 // Kiro IDE 设置 (读写 Kiro IDE 的 settings.json)
@@ -215,4 +217,214 @@ pub fn get_browser_path() -> Option<String> {
     println!("[Settings] browser_path: {:?}", browser_path);
     
     browser_path
+}
+
+// ============================================================
+// 系统机器码管理 (Windows MachineGuid)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemMachineInfo {
+    pub machine_guid: Option<String>,
+    pub backup_exists: bool,
+    pub backup_time: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MachineGuidBackup {
+    pub machine_guid: String,
+    pub backup_time: String,
+    pub computer_name: Option<String>,
+}
+
+fn get_machine_guid_backup_path() -> PathBuf {
+    let data_dir = dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."));
+    data_dir
+        .join(".kiro-account-manager")
+        .join("machine-guid-backup.json")
+}
+
+#[cfg(target_os = "windows")]
+fn get_system_machine_guid_inner() -> Result<SystemMachineInfo, String> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+    
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let crypto_key = hklm.open_subkey("SOFTWARE\\Microsoft\\Cryptography")
+        .map_err(|e| format!("无法打开注册表: {}", e))?;
+    
+    let machine_guid: String = crypto_key.get_value("MachineGuid")
+        .map_err(|e| format!("无法读取 MachineGuid: {}", e))?;
+    
+    // 检查备份
+    let backup_path = get_machine_guid_backup_path();
+    let (backup_exists, backup_time) = if backup_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&backup_path) {
+            if let Ok(backup) = serde_json::from_str::<MachineGuidBackup>(&content) {
+                (true, Some(backup.backup_time))
+            } else {
+                (false, None)
+            }
+        } else {
+            (false, None)
+        }
+    } else {
+        (false, None)
+    };
+    
+    Ok(SystemMachineInfo {
+        machine_guid: Some(machine_guid),
+        backup_exists,
+        backup_time,
+    })
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_system_machine_guid_inner() -> Result<SystemMachineInfo, String> {
+    Err("此功能仅支持 Windows 系统".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn backup_machine_guid_inner() -> Result<MachineGuidBackup, String> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+    
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let crypto_key = hklm.open_subkey("SOFTWARE\\Microsoft\\Cryptography")
+        .map_err(|e| format!("无法打开注册表: {}", e))?;
+    
+    let machine_guid: String = crypto_key.get_value("MachineGuid")
+        .map_err(|e| format!("无法读取 MachineGuid: {}", e))?;
+    
+    let computer_name = std::env::var("COMPUTERNAME").ok();
+    let backup_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    
+    let backup = MachineGuidBackup {
+        machine_guid: machine_guid.clone(),
+        backup_time: backup_time.clone(),
+        computer_name,
+    };
+    
+    let backup_path = get_machine_guid_backup_path();
+    if let Some(parent) = backup_path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    
+    let content = serde_json::to_string_pretty(&backup)
+        .map_err(|e| format!("序列化失败: {}", e))?;
+    std::fs::write(&backup_path, content)
+        .map_err(|e| format!("写入备份失败: {}", e))?;
+    
+    Ok(backup)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn backup_machine_guid_inner() -> Result<MachineGuidBackup, String> {
+    Err("此功能仅支持 Windows 系统".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn restore_machine_guid_inner() -> Result<String, String> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+    
+    let backup_path = get_machine_guid_backup_path();
+    if !backup_path.exists() {
+        return Err("没有找到备份文件".to_string());
+    }
+    
+    let content = std::fs::read_to_string(&backup_path)
+        .map_err(|e| format!("读取备份失败: {}", e))?;
+    let backup: MachineGuidBackup = serde_json::from_str(&content)
+        .map_err(|e| format!("解析备份失败: {}", e))?;
+    
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let crypto_key = hklm.open_subkey_with_flags("SOFTWARE\\Microsoft\\Cryptography", KEY_SET_VALUE)
+        .map_err(|e| format!("无法打开注册表（需要管理员权限）: {}", e))?;
+    
+    crypto_key.set_value("MachineGuid", &backup.machine_guid)
+        .map_err(|e| format!("写入注册表失败（需要管理员权限）: {}", e))?;
+    
+    Ok(backup.machine_guid)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn restore_machine_guid_inner() -> Result<String, String> {
+    Err("此功能仅支持 Windows 系统".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn reset_machine_guid_inner() -> Result<String, String> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+    
+    let new_guid = Uuid::new_v4().to_string().to_uppercase();
+    
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let crypto_key = hklm.open_subkey_with_flags("SOFTWARE\\Microsoft\\Cryptography", KEY_SET_VALUE)
+        .map_err(|e| format!("无法打开注册表（需要管理员权限）: {}", e))?;
+    
+    crypto_key.set_value("MachineGuid", &new_guid)
+        .map_err(|e| format!("写入注册表失败（需要管理员权限）: {}", e))?;
+    
+    Ok(new_guid)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn reset_machine_guid_inner() -> Result<String, String> {
+    Err("此功能仅支持 Windows 系统".to_string())
+}
+
+fn get_machine_guid_backup_inner() -> Result<Option<MachineGuidBackup>, String> {
+    let backup_path = get_machine_guid_backup_path();
+    if !backup_path.exists() {
+        return Ok(None);
+    }
+    
+    let content = std::fs::read_to_string(&backup_path)
+        .map_err(|e| format!("读取备份失败: {}", e))?;
+    let backup: MachineGuidBackup = serde_json::from_str(&content)
+        .map_err(|e| format!("解析备份失败: {}", e))?;
+    
+    Ok(Some(backup))
+}
+
+// ===== 系统机器码 Tauri Commands =====
+
+#[tauri::command]
+pub async fn get_system_machine_guid() -> Result<SystemMachineInfo, String> {
+    tokio::task::spawn_blocking(get_system_machine_guid_inner)
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn backup_machine_guid() -> Result<MachineGuidBackup, String> {
+    tokio::task::spawn_blocking(backup_machine_guid_inner)
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn restore_machine_guid() -> Result<String, String> {
+    tokio::task::spawn_blocking(restore_machine_guid_inner)
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn reset_system_machine_guid() -> Result<String, String> {
+    tokio::task::spawn_blocking(reset_machine_guid_inner)
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn get_machine_guid_backup() -> Result<Option<MachineGuidBackup>, String> {
+    tokio::task::spawn_blocking(get_machine_guid_backup_inner)
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
 }
