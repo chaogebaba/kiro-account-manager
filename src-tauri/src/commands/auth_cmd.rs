@@ -62,11 +62,11 @@ async fn login_social(
 
     let mut store = state.store.lock().unwrap();
     
-    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
+    // 按 email + provider 去重
+    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email && a.provider.as_deref() == Some(&provider_id)) {
         // 更新现有账号
         existing.access_token = Some(auth_result.access_token.clone());
         existing.refresh_token = Some(auth_result.refresh_token.clone());
-        existing.provider = Some(provider_id.clone());
         existing.user_id = user_id;
         existing.expires_at = Some(auth_result.expires_at.clone());
         existing.profile_arn = auth_result.profile_arn;
@@ -131,10 +131,10 @@ async fn login_idc(
 
     let mut store = state.store.lock().unwrap();
     
-    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
+    // 按 email + provider 去重
+    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email && a.provider.as_deref() == Some(&provider_id)) {
         existing.access_token = Some(auth_result.access_token.clone());
         existing.refresh_token = Some(auth_result.refresh_token.clone());
-        existing.provider = Some(provider_id.clone());
         existing.user_id = user_id;
         existing.expires_at = Some(auth_result.expires_at.clone());
         existing.client_id_hash = auth_result.client_id_hash;

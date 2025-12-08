@@ -258,10 +258,10 @@ pub async fn add_account_by_social(
     
     let mut store = state.store.lock().unwrap();
     
-    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
+    // 按 email + provider 去重
+    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email && a.provider.as_deref() == Some(&idp)) {
         existing.access_token = Some(access_token.clone());
         existing.refresh_token = Some(new_refresh_token);
-        existing.provider = Some(idp.clone());
         existing.user_id = user_id;
         existing.usage_data = Some(usage_data);
         existing.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
@@ -331,121 +331,29 @@ pub async fn add_local_kiro_account(state: State<'_, AppState>) -> Result<Accoun
     let auth_method = local_token.auth_method.as_deref().unwrap_or("social");
     let provider = local_token.provider.clone().unwrap_or_else(|| "Google".to_string());
     
-    let (access_token, new_refresh_token, expires_in, client_id, client_secret, client_id_hash, region) = 
-        if auth_method == "IdC" {
-            let hash = local_token.client_id_hash.clone()
-                .ok_or("IdC 账号缺少 clientIdHash")?;
-            let region = local_token.region.clone().unwrap_or_else(|| "us-east-1".to_string());
-            
-            let client_reg = get_client_registration(&hash)
-                .ok_or(format!("未找到客户端注册信息: {}.json", hash))?;
-            
-            let metadata = RefreshMetadata {
-                client_id: Some(client_reg.client_id.clone()),
-                client_secret: Some(client_reg.client_secret.clone()),
-                region: Some(region.clone()),
-                ..Default::default()
-            };
-            
-            let idc_provider = IdcProvider::new("BuilderId", &region, None);
-            let auth_result = idc_provider.refresh_token(&refresh_token, metadata).await?;
-            
-            (auth_result.access_token, auth_result.refresh_token, auth_result.expires_in,
-             Some(client_reg.client_id), Some(client_reg.client_secret), Some(hash), Some(region))
-        } else {
-            let metadata = RefreshMetadata {
-                profile_arn: local_token.profile_arn.clone(),
-                ..Default::default()
-            };
-            
-            let social_provider = SocialProvider::new(&provider);
-            let auth_result = social_provider.refresh_token(&refresh_token, metadata).await?;
-            
-            (auth_result.access_token, auth_result.refresh_token, auth_result.expires_in,
-             None, None, None, None)
-        };
-    
-    // 获取 usage 数据（根据 auth_method 选择不同的 API）
-    let (usage_data, email, user_id, is_banned) = if auth_method == "IdC" {
-        let machine_id = get_machine_id();
-        let cw_client = CodeWhispererClient::new(&machine_id);
-        let usage_call = cw_client.get_usage_limits(&access_token).await;
-        let (usage, is_banned) = match &usage_call {
-            Ok(u) => (Some(u.clone()), false),
-            Err(e) if e.starts_with("BANNED:") => (None, true),
-            Err(_) => (None, false),
-        };
-        let data = serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null);
-        let email = usage.as_ref()
-            .and_then(|u| u.user_info.as_ref())
-            .and_then(|u| u.email.clone())
-            .unwrap_or_else(|| format!("{}@kiro.dev", provider.to_lowercase()));
-        let user_id = usage.as_ref()
-            .and_then(|u| u.user_info.as_ref())
-            .and_then(|u| u.user_id.clone());
-        (data, email, user_id, is_banned)
-    } else {
-        let usage_call = get_usage_limits_desktop(&access_token).await;
-        let (usage, is_banned) = match &usage_call {
-            Ok(u) => (Some(u.clone()), false),
-            Err(e) if e.starts_with("BANNED:") => (None, true),
-            Err(_) => (None, false),
-        };
-        let data = serde_json::to_value(&usage).unwrap_or(serde_json::Value::Null);
-        let email = usage.as_ref()
-            .and_then(|u| u.user_info.as_ref())
-            .and_then(|u| u.email.clone())
-            .unwrap_or_else(|| format!("{}@kiro.dev", provider.to_lowercase()));
-        let user_id = usage.as_ref()
-            .and_then(|u| u.user_info.as_ref())
-            .and_then(|u| u.user_id.clone());
-        (data, email, user_id, is_banned)
-    };
-    
-    let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
-    
-    // 检查是否已存在，存在则更新，不存在则新建
-    let mut store = state.store.lock().unwrap();
-    
-    if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
-        // 更新现有账号
-        existing.access_token = Some(access_token);
-        existing.refresh_token = Some(new_refresh_token);
-        existing.provider = Some(provider);
-        existing.user_id = user_id;
-        existing.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
-        existing.sso_client_id = client_id;
-        existing.sso_client_secret = client_secret;
-        existing.sso_region = region;
-        existing.client_id_hash = client_id_hash;
-        existing.profile_arn = local_token.profile_arn;
-        existing.usage_data = Some(usage_data);
-        existing.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
+    // 根据 auth_method 调用对应的添加函数
+    if auth_method == "IdC" {
+        let hash = local_token.client_id_hash.clone()
+            .ok_or("IdC 账号缺少 clientIdHash")?;
+        let region = local_token.region.clone().unwrap_or_else(|| "us-east-1".to_string());
         
-        let result = existing.clone();
-        store.save_to_file();
-        return Ok(result);
+        let client_reg = get_client_registration(&hash)
+            .ok_or(format!("未找到客户端注册信息: {}.json", hash))?;
+        
+        add_account_by_idc(
+            state,
+            refresh_token,
+            client_reg.client_id,
+            client_reg.client_secret,
+            Some(region),
+        ).await
+    } else {
+        add_account_by_social(
+            state,
+            refresh_token,
+            Some(provider),
+        ).await
     }
-    
-    // 新建账号
-    let mut account = Account::new(email.clone(), format!("Kiro {} 账号", provider));
-    account.access_token = Some(access_token);
-    account.refresh_token = Some(new_refresh_token);
-    account.provider = Some(provider);
-    account.user_id = user_id;
-    account.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
-    account.sso_client_id = client_id;
-    account.sso_client_secret = client_secret;
-    account.sso_region = region;
-    account.client_id_hash = client_id_hash;
-    account.profile_arn = local_token.profile_arn;
-    account.usage_data = Some(usage_data);
-    account.status = if is_banned { "已封禁".to_string() } else { "正常".to_string() };
-    
-    store.accounts.insert(0, account.clone());
-    store.save_to_file();
-    
-    Ok(account)
 }
 
 /// 手动添加 BuilderId 账号
@@ -496,10 +404,10 @@ pub async fn add_account_by_idc(
     
     let mut store = state.store.lock().unwrap();
     
-    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email) {
+    // 按 email + provider 去重
+    let account = if let Some(existing) = store.accounts.iter_mut().find(|a| a.email == email && a.provider.as_deref() == Some("BuilderId")) {
         existing.access_token = Some(auth_result.access_token);
         existing.refresh_token = Some(auth_result.refresh_token);
-        existing.provider = Some("BuilderId".to_string());
         existing.user_id = user_id;
         existing.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
         existing.sso_client_id = Some(client_id);
