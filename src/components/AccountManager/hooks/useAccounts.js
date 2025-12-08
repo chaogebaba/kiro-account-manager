@@ -84,12 +84,14 @@ export function useAccounts() {
     try {
       const { save } = await import('@tauri-apps/plugin-dialog')
       const { writeTextFile } = await import('@tauri-apps/plugin-fs')
+      const { downloadDir } = await import('@tauri-apps/api/path')
       
       const suffix = selectedIds.length > 0 ? `-${selectedIds.length}` : ''
       const defaultName = `kiro-accounts${suffix}-${new Date().toISOString().slice(0, 10)}.json`
+      const defaultDir = await downloadDir()
       
       const filePath = await save({
-        defaultPath: defaultName,
+        defaultPath: `${defaultDir}${defaultName}`,
         filters: [{ name: 'JSON', extensions: ['json'] }],
         title: '导出账号数据'
       })
