@@ -105,7 +105,8 @@ function AccountManager() {
     setSwitchingId(account.id)
     
     try {
-      const usage = await invoke('verify_account', {
+      // verify_account 会刷新 token 并返回新的 token
+      const verifyResult = await invoke('verify_account', {
         accessToken: account.accessToken,
         refreshToken: account.refreshToken,
         csrfToken: account.csrfToken || null,
@@ -115,9 +116,10 @@ function AccountManager() {
       const isIdC = account.provider === 'BuilderId' || account.provider === 'Enterprise' || account.clientIdHash
       const authMethod = isIdC ? 'IdC' : 'social'
       
+      // 使用刷新后的新 token 进行切换
       const params = {
-        accessToken: account.accessToken,
-        refreshToken: account.refreshToken,
+        accessToken: verifyResult.accessToken,
+        refreshToken: verifyResult.refreshToken,
         provider: account.provider || 'Google',
         authMethod,
         resetMachineId: false,
@@ -134,6 +136,8 @@ function AccountManager() {
       }
       
       await invoke('switch_kiro_account', { params })
+      
+      const usage = verifyResult
       
       const used = usage.currentUsage || 0
       const limit = usage.usageLimit || 50

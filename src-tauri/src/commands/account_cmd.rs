@@ -10,17 +10,17 @@ use crate::kiro::get_machine_id;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UsageAndLimitsResponse {
+pub struct VerifyAccountResponse {
     #[serde(rename = "usageLimit")]
     pub usage_limit: Option<i32>,
     #[serde(rename = "currentUsage")]
     pub current_usage: Option<i32>,
-    #[serde(rename = "resetDate")]
-    pub reset_date: Option<String>,
     #[serde(rename = "subscriptionType")]
     pub subscription_type: Option<String>,
-    #[serde(rename = "userId")]
-    pub user_id: Option<String>,
+    #[serde(rename = "accessToken")]
+    pub access_token: String,
+    #[serde(rename = "refreshToken")]
+    pub refresh_token: String,
 }
 
 #[tauri::command]
@@ -132,13 +132,15 @@ pub async fn sync_account(state: State<'_, AppState>, id: String) -> Result<Acco
 
 #[tauri::command]
 pub async fn verify_account(
+    state: State<'_, AppState>,
     _access_token: String,
     refresh_token: String,
     _csrf_token: Option<String>,
     _provider: String,
-) -> Result<UsageAndLimitsResponse, String> {
+) -> Result<VerifyAccountResponse, String> {
     let refresh_result = refresh_token_desktop(&refresh_token).await?;
-    let new_access_token = refresh_result.access_token;
+    let new_access_token = refresh_result.access_token.clone();
+    let new_refresh_token = refresh_result.refresh_token.clone();
     let usage = get_usage_limits_desktop(&new_access_token).await?;
     
     let (quota, used) = usage.usage_breakdown_list.as_ref()
@@ -146,12 +148,24 @@ pub async fn verify_account(
         .map(|b| (b.usage_limit, b.current_usage))
         .unwrap_or((None, None));
     
-    Ok(UsageAndLimitsResponse {
+    // 更新数据库中的 token（通过旧 refresh_token 找到账号）
+    {
+        let mut store = state.store.lock().unwrap();
+        if let Some(account) = store.accounts.iter_mut().find(|a| {
+            a.refresh_token.as_ref() == Some(&refresh_token)
+        }) {
+            account.access_token = Some(new_access_token.clone());
+            account.refresh_token = Some(new_refresh_token.clone());
+            store.save_to_file();
+        }
+    }
+    
+    Ok(VerifyAccountResponse {
         usage_limit: quota,
         current_usage: used,
-        reset_date: None,
         subscription_type: usage.subscription_info.and_then(|s| s.subscription_type),
-        user_id: usage.user_info.and_then(|u| u.user_id),
+        access_token: new_access_token,
+        refresh_token: new_refresh_token,
     })
 }
 
