@@ -1,5 +1,4 @@
-import { RefreshCw, Edit2, Trash2, Copy, Check, Clock, Repeat, MoreHorizontal } from 'lucide-react'
-import { useState } from 'react'
+import { RefreshCw, Edit2, Trash2, Copy, Check, Clock, Repeat } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { getUsagePercent, getProgressBarColor } from './hooks/useAccountStats'
 import { getQuota, getUsed, getSubType, getSubPlan } from '../../utils/accountStats'
@@ -20,7 +19,6 @@ function AccountCard({
 }) {
   const { theme, colors } = useTheme()
   const isDark = theme === 'dark'
-  const [showMenu, setShowMenu] = useState(false)
   
   const quota = getQuota(account)
   const used = getUsed(account)
@@ -29,12 +27,29 @@ function AccountCard({
   const breakdown = account.usageData?.usageBreakdownList?.[0]
   const percent = getUsagePercent(used, quota)
   const isExpired = account.expiresAt && new Date(account.expiresAt.replace(/\//g, '-')) < new Date()
+  const isBanned = account.status === '封禁' || account.status === '已封禁'
+  const isNormal = account.status === '正常' || account.status === '有效'
+
+  // 状态光环颜色
+  const glowColor = isCurrentAccount
+    ? 'shadow-green-500/30 hover:shadow-green-500/50'
+    : isBanned
+      ? 'shadow-red-500/30 hover:shadow-red-500/50'
+      : isNormal
+        ? ''
+        : 'shadow-orange-500/30 hover:shadow-orange-500/50'
 
   return (
-    <div className={`relative rounded-2xl border transition-all duration-200 hover:shadow-lg flex flex-col ${
+    <div className={`relative rounded-2xl border transition-all duration-200 hover:shadow-lg flex flex-col ${glowColor} ${
       isSelected 
         ? (isDark ? 'border-purple-500 bg-purple-500/10' : 'border-purple-400 bg-purple-50') 
-        : (isDark ? 'border-gray-700 bg-gray-800/50 hover:border-gray-600' : 'border-gray-200 bg-white hover:border-gray-300')
+        : isCurrentAccount
+          ? (isDark ? 'border-green-500/50 bg-green-500/5' : 'border-green-400 bg-green-50/50')
+          : isBanned
+            ? (isDark ? 'border-red-500/50 bg-red-500/5' : 'border-red-300 bg-red-50/50')
+            : !isNormal
+              ? (isDark ? 'border-orange-500/50 bg-orange-500/5' : 'border-orange-300 bg-orange-50/50')
+              : (isDark ? 'border-gray-700 bg-gray-800/50 hover:border-gray-600' : 'border-gray-200 bg-white hover:border-gray-300')
     }`}>
       {/* 选择框和当前使用标记 */}
       <div className="absolute top-3 left-3 flex items-center gap-2">

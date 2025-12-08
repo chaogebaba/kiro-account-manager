@@ -139,6 +139,9 @@ function AccountManager() {
       
       await invoke('switch_kiro_account', { params })
       
+      // 更新当前账号标识
+      invoke('get_kiro_local_token').then(setLocalToken).catch(() => setLocalToken(null))
+      
       // 从 usage_data 获取配额信息
       const usageData = account.usageData
       const breakdown = usageData?.usage_breakdown_list?.[0] || usageData?.usageBreakdownList?.[0]
