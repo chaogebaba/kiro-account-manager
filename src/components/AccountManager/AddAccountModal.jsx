@@ -39,10 +39,17 @@ function AddAccountModal({ onClose, onSuccess }) {
       setAddError('请输入 Refresh Token')
       return
     }
-    if (!refreshToken.startsWith('aor')) {
-      setAddError('Token 格式错误，应以 aor 开头')
+    
+    // 根据类型校验 token 格式
+    if (addType === 'social' && !refreshToken.startsWith('aor')) {
+      setAddError('Google/GitHub Token 格式错误，应以 aor 开头')
       return
     }
+    if (addType === 'idc' && !refreshToken.startsWith('eyJ')) {
+      setAddError('BuilderId/Enterprise Token 格式错误，应以 eyJ 开头')
+      return
+    }
+    
     setAddLoading(true)
     setAddError('')
     try {
@@ -134,7 +141,7 @@ function AddAccountModal({ onClose, onSuccess }) {
               <label className={`block text-xs font-medium ${colors.textMuted} mb-1.5`}>Refresh Token</label>
               <input 
                 type="text" 
-                placeholder="aor 开头的 token" 
+                placeholder={addType === 'social' ? 'aor 开头的 token' : 'eyJ 开头的 JWT token'} 
                 value={refreshToken} 
                 onChange={(e) => setRefreshToken(e.target.value)} 
                 className={`w-full px-4 py-3 border rounded-xl text-sm ${colors.text} ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all`} 
