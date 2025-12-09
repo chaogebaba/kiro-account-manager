@@ -4,7 +4,7 @@ import { X, Copy, Check, RefreshCw, User, CreditCard, Key, Clock, ChevronDown, C
 import { useTheme } from '../contexts/ThemeContext'
 import { useDialog } from '../contexts/DialogContext'
 
-function EditAccountModal({ account, onClose, onSuccess }) {
+function AccountDetailModal({ account, onClose }) {
   const { theme, colors } = useTheme()
   const { showError } = useDialog()
   const isDark = theme === 'dark'
@@ -19,16 +19,12 @@ function EditAccountModal({ account, onClose, onSuccess }) {
     accessToken: account.accessToken || '',
     refreshToken: account.refreshToken || '',
   })
-  const [loading, setLoading] = useState(false)
+
   const [refreshing, setRefreshing] = useState(false)
   const [copied, setCopied] = useState(null)
   const [showTokens, setShowTokens] = useState(true)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    // TODO: 编辑功能暂时禁用，需要重新设计
-    onSuccess()
-  }
+
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -91,7 +87,7 @@ function EditAccountModal({ account, onClose, onSuccess }) {
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-4">
             {/* 配额总览 */}
             <div className={`${colors.card} rounded-xl p-5 shadow-sm`}>
@@ -344,23 +340,23 @@ function EditAccountModal({ account, onClose, onSuccess }) {
           {/* Footer */}
           <div className={`flex justify-between items-center px-6 py-4 ${colors.card} border-t ${colors.cardBorder}`}>
             <div className={`text-xs ${colors.textMuted}`}>
-              {account.status === '正常' ? <span className="flex items-center gap-1 text-green-500"><Shield size={12} />账号正常</span> : <span className="flex items-center gap-1 text-red-500"><Shield size={12} />{account.status}</span>}
+              {account.status === '正常' || account.status === '有效' 
+                ? <span className="flex items-center gap-1 text-green-500"><Shield size={12} />账号正常</span> 
+                : account.status === '封禁' || account.status === '已封禁'
+                  ? <span className="flex items-center gap-1 text-red-500"><Shield size={12} />账号已封禁</span>
+                  : <span className="flex items-center gap-1 text-orange-500"><Shield size={12} />{account.status}</span>}
             </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={onClose} className={`px-5 py-2 border ${colors.cardBorder} rounded-lg text-sm font-medium ${colors.textMuted} ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}>取消</button>
-              <button type="submit" disabled={loading} className="px-5 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2">
-                {loading && <RefreshCw size={14} className="animate-spin" />}
-                {loading ? '保存中...' : '保存更改'}
-              </button>
-            </div>
+            <button type="button" onClick={onClose} className="px-5 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600">
+              关闭
+            </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )
 }
 
-export default EditAccountModal
+export default AccountDetailModal
 
 // 添加动画样式
 const style = document.createElement('style')

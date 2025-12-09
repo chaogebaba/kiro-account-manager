@@ -1,4 +1,4 @@
-import { RefreshCw, Edit2, Trash2, Copy, Check, Clock, Repeat } from 'lucide-react'
+import { RefreshCw, Eye, Trash2, Copy, Check, Clock, Repeat } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { getUsagePercent, getProgressBarColor } from './hooks/useAccountStats'
 import { getQuota, getUsed, getSubType, getSubPlan } from '../../utils/accountStats'
@@ -173,9 +173,9 @@ function AccountCard({
           <button 
             onClick={() => onEdit(account)} 
             className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`} 
-            title="编辑"
+            title="查看详情"
           >
-            <Edit2 size={14} className={colors.textMuted} />
+            <Eye size={14} className={colors.textMuted} />
           </button>
           <button 
             onClick={() => onDelete(account.id)} 

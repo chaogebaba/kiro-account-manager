@@ -178,7 +178,7 @@ function AddAccountModal({ onClose, onSuccess }) {
                       onChange={(e) => setRegion(e.target.value)} 
                       className={`w-full px-4 py-3 border rounded-xl text-sm ${colors.text} ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all appearance-none cursor-pointer`}
                     >
-                      {awsRegions.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
+                      {awsRegions.map((r) => (<option key={r.value} value={r.value} className="text-gray-900 bg-white">{r.label}</option>))}
                     </select>
                     <ChevronDown size={16} className={`absolute right-4 top-1/2 -translate-y-1/2 ${colors.textMuted} pointer-events-none`} />
                   </div>

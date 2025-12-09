@@ -9,7 +9,7 @@ import AccountPagination from './AccountPagination'
 import AddAccountModal from './AddAccountModal'
 import ImportAccountModal from './ImportAccountModal'
 import RefreshProgressModal from './RefreshProgressModal'
-import EditAccountModal from '../EditAccountModal'
+import AccountDetailModal from '../AccountDetailModal'
 import ConfirmDialog from './ConfirmDialog'
 
 function AccountManager() {
@@ -212,10 +212,9 @@ function AccountManager() {
       />
       </div>
       {editingAccount && (
-        <EditAccountModal
+        <AccountDetailModal
           account={editingAccount}
-          onClose={() => setEditingAccount(null)}
-          onSuccess={() => { setEditingAccount(null); loadAccounts() }}
+          onClose={() => { setEditingAccount(null); loadAccounts() }}
         />
       )}
       {showAddModal && (<AddAccountModal onClose={() => setShowAddModal(false)} onSuccess={loadAccounts} />)}
