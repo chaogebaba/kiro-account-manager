@@ -98,7 +98,7 @@ function ImportAccountModal({ onClose, onSuccess }) {
       data.forEach((item, index) => {
         const result = validateAccount(item, index)
         if (result.valid) {
-          valid.push({ ...item, _type: result.type, _index: index })
+          valid.push({ ...item, _type: result.type, _index: index, _inferredProvider: result.inferredProvider })
         } else {
           invalid.push({ ...item, _index: index })
           errors.push(...result.errors)
@@ -376,11 +376,10 @@ function ImportAccountModal({ onClose, onSuccess }) {
                 <button
                   onClick={() => {
                     const template = JSON.stringify([{
-                      refreshToken: "aor...",
+                      refreshToken: "",
                       provider: "Google"
                     }], null, 2)
                     setJsonText(template)
-                    parseJson(template)
                   }}
                   className={`flex items-center gap-2 px-3 py-2 ${isDark ? 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-300' : 'bg-blue-50 hover:bg-blue-100 text-blue-600'} rounded-xl transition-colors text-sm`}
                 >
@@ -390,14 +389,13 @@ function ImportAccountModal({ onClose, onSuccess }) {
                 <button
                   onClick={() => {
                     const template = JSON.stringify([{
-                      refreshToken: "aor...",
-                      clientId: "...",
-                      clientSecret: "...",
+                      refreshToken: "",
+                      clientId: "",
+                      clientSecret: "",
                       region: "us-east-1",
                       provider: "BuilderId"
                     }], null, 2)
                     setJsonText(template)
-                    parseJson(template)
                   }}
                   className={`flex items-center gap-2 px-3 py-2 ${isDark ? 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-300' : 'bg-purple-50 hover:bg-purple-100 text-purple-600'} rounded-xl transition-colors text-sm`}
                 >
