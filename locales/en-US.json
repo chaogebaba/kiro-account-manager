@@ -1,10 +1,13 @@
 {
   "nav.home": "Home",
   "nav.accounts": "Accounts",
-  "nav.kiroConfig": "Kiro Config",
+  "nav.kiroConfig": "IDE Config",
+  "nav.desktopOAuth": "Desktop OAuth",
+  "nav.socialIdC": "Google/GitHub/IdC",
+  "nav.webOAuth": "Web OAuth",
+  "nav.webviewLogin": "WebView Login",
   "nav.settings": "Settings",
   "nav.about": "About",
-  "nav.webviewLogin": "WebView Login",
   "nav.kiroConnected": "Kiro IDE Connected",
 
   "home.title": "Kiro Account Manager",

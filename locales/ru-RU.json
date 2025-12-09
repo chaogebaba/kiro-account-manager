@@ -1,10 +1,13 @@
 {
   "nav.home": "Главная",
   "nav.accounts": "Аккаунты",
-  "nav.kiroConfig": "Настройки Kiro",
+  "nav.kiroConfig": "Настройки IDE",
+  "nav.desktopOAuth": "Авторизация",
+  "nav.socialIdC": "Google/GitHub/IdC",
+  "nav.webOAuth": "Веб-авторизация",
+  "nav.webviewLogin": "Вход через WebView",
   "nav.settings": "Настройки",
   "nav.about": "О программе",
-  "nav.webviewLogin": "Вход через WebView",
   "nav.kiroConnected": "Kiro IDE подключен",
 
   "home.title": "Kiro Account Manager",
