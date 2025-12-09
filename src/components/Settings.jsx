@@ -32,6 +32,14 @@ function Settings() {
   const [machineGuidBackup, setMachineGuidBackup] = useState(null)
   const [machineGuidLoading, setMachineGuidLoading] = useState(false)
   const [machineGuidAction, setMachineGuidAction] = useState(null) // 'backup' | 'restore' | 'reset'
+  
+  // 检测操作系统
+  const [isMacOS, setIsMacOS] = useState(false)
+  useEffect(() => {
+    // 通过 navigator.platform 检测
+    const platform = navigator.platform.toLowerCase()
+    setIsMacOS(platform.includes('mac'))
+  }, [])
 
   // 加载设置
   const loadSettings = async () => {
@@ -687,7 +695,9 @@ function Settings() {
             <h2 className={`text-lg font-semibold ${colors.text}`}>系统机器码</h2>
           </div>
           <p className={`text-sm ${colors.textMuted} mb-5`}>
-            管理 Windows 系统的 MachineGuid（注册表 HKLM\SOFTWARE\Microsoft\Cryptography）
+            {isMacOS 
+              ? '查看 macOS 系统的硬件 UUID（IOPlatformUUID）' 
+              : '管理 Windows 系统的 MachineGuid（注册表 HKLM\\SOFTWARE\\Microsoft\\Cryptography）'}
           </p>
 
           {/* 当前值 */}
@@ -736,52 +746,67 @@ function Settings() {
             </div>
           )}
 
-          {/* 警告提示 */}
-          <div className={`flex items-start gap-3 ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'} rounded-xl p-4 mb-4 border ${isDark ? 'border-orange-500/20' : 'border-orange-200'}`}>
-            <AlertTriangle size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
-            <div className={`text-xs ${colors.textMuted}`}>
-              <p className="font-medium text-orange-500 mb-1">注意事项</p>
-              <ul className="list-disc list-inside space-y-0.5">
-                <li>修改系统机器码需要<span className="font-medium">管理员权限</span></li>
-                <li>可能影响某些软件的授权验证</li>
-                <li>建议在修改前先备份当前值</li>
-              </ul>
+          {/* 警告提示 - 仅 Windows 显示 */}
+          {!isMacOS && (
+            <div className={`flex items-start gap-3 ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'} rounded-xl p-4 mb-4 border ${isDark ? 'border-orange-500/20' : 'border-orange-200'}`}>
+              <AlertTriangle size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
+              <div className={`text-xs ${colors.textMuted}`}>
+                <p className="font-medium text-orange-500 mb-1">注意事项</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>修改系统机器码需要<span className="font-medium">管理员权限</span></li>
+                  <li>可能影响某些软件的授权验证</li>
+                  <li>建议在修改前先备份当前值</li>
+                </ul>
+              </div>
             </div>
-          </div>
+          )}
+          
+          {/* macOS 提示 */}
+          {isMacOS && (
+            <div className={`flex items-start gap-3 ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'} rounded-xl p-4 mb-4 border ${isDark ? 'border-blue-500/20' : 'border-blue-200'}`}>
+              <Shield size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
+              <div className={`text-xs ${colors.textMuted}`}>
+                <p className="font-medium text-blue-500 mb-1">macOS 说明</p>
+                <p>macOS 的硬件 UUID 由系统固件管理，无法修改。此值绑定硬件，重装系统也不会改变。</p>
+              </div>
+            </div>
+          )}
 
-          {/* 操作按钮 */}
-          <div className="flex gap-3">
-            <button
-              onClick={handleBackupMachineGuid}
-              disabled={machineGuidAction !== null}
-              className={`flex-1 btn-icon px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-all ${
-                isDark ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-              } disabled:opacity-50`}
-            >
-              {machineGuidAction === 'backup' ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
-              备份
-            </button>
-            <button
-              onClick={handleRestoreMachineGuid}
-              disabled={machineGuidAction !== null || !machineGuidBackup}
-              className={`flex-1 btn-icon px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-all ${
-                isDark ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-green-100 text-green-600 hover:bg-green-200'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              {machineGuidAction === 'restore' ? <RefreshCw size={16} className="animate-spin" /> : <Upload size={16} />}
-              恢复
-            </button>
-            <button
-              onClick={handleResetSystemMachineGuid}
-              disabled={machineGuidAction !== null}
-              className={`flex-1 btn-icon px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-all ${
-                isDark ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-red-100 text-red-600 hover:bg-red-200'
-              } disabled:opacity-50`}
-            >
-              {machineGuidAction === 'reset' ? <RefreshCw size={16} className="animate-spin" /> : <Shuffle size={16} />}
-              重置
-            </button>
-          </div>
+          {/* 操作按钮 - 仅 Windows 显示 */}
+          {!isMacOS && (
+            <div className="flex gap-3">
+              <button
+                onClick={handleBackupMachineGuid}
+                disabled={machineGuidAction !== null}
+                className={`flex-1 btn-icon px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-all ${
+                  isDark ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                } disabled:opacity-50`}
+              >
+                {machineGuidAction === 'backup' ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
+                备份
+              </button>
+              <button
+                onClick={handleRestoreMachineGuid}
+                disabled={machineGuidAction !== null || !machineGuidBackup}
+                className={`flex-1 btn-icon px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-all ${
+                  isDark ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-green-100 text-green-600 hover:bg-green-200'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {machineGuidAction === 'restore' ? <RefreshCw size={16} className="animate-spin" /> : <Upload size={16} />}
+                恢复
+              </button>
+              <button
+                onClick={handleResetSystemMachineGuid}
+                disabled={machineGuidAction !== null}
+                className={`flex-1 btn-icon px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-all ${
+                  isDark ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-red-100 text-red-600 hover:bg-red-200'
+                } disabled:opacity-50`}
+              >
+                {machineGuidAction === 'reset' ? <RefreshCw size={16} className="animate-spin" /> : <Shuffle size={16} />}
+                重置
+              </button>
+            </div>
+          )}
         </section>
       </div>
     </div>

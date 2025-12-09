@@ -53,6 +53,7 @@ fn main() {
             get_accounts,
             delete_account,
             delete_accounts,
+            update_account,
             sync_account,
             verify_account,
             add_account_by_social,

@@ -282,9 +282,55 @@ fn get_system_machine_guid_inner() -> Result<SystemMachineInfo, String> {
     })
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
 fn get_system_machine_guid_inner() -> Result<SystemMachineInfo, String> {
-    Err("此功能仅支持 Windows 系统".to_string())
+    use std::process::Command;
+    
+    // 使用 ioreg 获取硬件 UUID
+    let output = Command::new("ioreg")
+        .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+        .output()
+        .map_err(|e| format!("执行 ioreg 失败: {}", e))?;
+    
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    
+    // 解析 IOPlatformUUID
+    let machine_guid = stdout
+        .lines()
+        .find(|line| line.contains("IOPlatformUUID"))
+        .and_then(|line| {
+            line.split('"')
+                .nth(3)
+                .map(|s| s.to_string())
+        })
+        .ok_or("无法获取 IOPlatformUUID")?;
+    
+    // 检查备份
+    let backup_path = get_machine_guid_backup_path();
+    let (backup_exists, backup_time) = if backup_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&backup_path) {
+            if let Ok(backup) = serde_json::from_str::<MachineGuidBackup>(&content) {
+                (true, Some(backup.backup_time))
+            } else {
+                (false, None)
+            }
+        } else {
+            (false, None)
+        }
+    } else {
+        (false, None)
+    };
+    
+    Ok(SystemMachineInfo {
+        machine_guid: Some(machine_guid),
+        backup_exists,
+        backup_time,
+    })
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+fn get_system_machine_guid_inner() -> Result<SystemMachineInfo, String> {
+    Err("此功能仅支持 Windows 和 macOS 系统".to_string())
 }
 
 #[cfg(target_os = "windows")]
@@ -321,7 +367,12 @@ fn backup_machine_guid_inner() -> Result<MachineGuidBackup, String> {
     Ok(backup)
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+fn backup_machine_guid_inner() -> Result<MachineGuidBackup, String> {
+    Err("macOS 的硬件 UUID 由系统固件管理，无法备份".to_string())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn backup_machine_guid_inner() -> Result<MachineGuidBackup, String> {
     Err("此功能仅支持 Windows 系统".to_string())
 }
@@ -351,7 +402,12 @@ fn restore_machine_guid_inner() -> Result<String, String> {
     Ok(backup.machine_guid)
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+fn restore_machine_guid_inner() -> Result<String, String> {
+    Err("macOS 的硬件 UUID 由系统固件管理，无法恢复".to_string())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn restore_machine_guid_inner() -> Result<String, String> {
     Err("此功能仅支持 Windows 系统".to_string())
 }
@@ -373,7 +429,12 @@ fn reset_machine_guid_inner() -> Result<String, String> {
     Ok(new_guid)
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+fn reset_machine_guid_inner() -> Result<String, String> {
+    Err("macOS 的硬件 UUID 由系统固件管理，无法重置".to_string())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn reset_machine_guid_inner() -> Result<String, String> {
     Err("此功能仅支持 Windows 系统".to_string())
 }

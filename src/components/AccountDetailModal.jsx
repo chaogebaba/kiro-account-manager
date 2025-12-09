@@ -12,7 +12,7 @@ function AccountDetailModal({ account, onClose }) {
   const initUsed = account.usageData?.usageBreakdownList?.[0]?.currentUsage ?? account.used ?? 0
   const [form, setForm] = useState({
     email: account.email,
-    label: account.label,
+    label: account.label || '',
     quota: initQuota,
     used: initUsed,
     status: account.status,
@@ -202,7 +202,13 @@ function AccountDetailModal({ account, onClose }) {
                 </div>
                 <div>
                   <label className={`block text-xs font-medium ${colors.textMuted} mb-1.5`}>备注标签</label>
-                  <input type="text" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="可选" className={`w-full px-3 py-2 border ${colors.cardBorder} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${colors.input} ${colors.text}`} />
+                  <input 
+                    type="text" 
+                    value={form.label} 
+                    readOnly
+                    placeholder="无" 
+                    className={`w-full px-3 py-2 border ${colors.cardBorder} rounded-lg text-sm ${colors.input} ${colors.text} opacity-60`} 
+                  />
                 </div>
               </div>
               

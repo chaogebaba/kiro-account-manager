@@ -10,6 +10,7 @@ import AddAccountModal from './AddAccountModal'
 import ImportAccountModal from './ImportAccountModal'
 import RefreshProgressModal from './RefreshProgressModal'
 import AccountDetailModal from '../AccountDetailModal'
+import EditAccountModal from './EditAccountModal'
 import ConfirmDialog from './ConfirmDialog'
 
 function AccountManager() {
@@ -20,6 +21,7 @@ function AccountManager() {
   const [pageSize, setPageSize] = useState(20)
   const [currentPage, setCurrentPage] = useState(1)
   const [editingAccount, setEditingAccount] = useState(null)
+  const [editingLabelAccount, setEditingLabelAccount] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
@@ -194,6 +196,7 @@ function AccountManager() {
         onSwitch={handleSwitchAccount}
         onRefresh={handleRefreshStatus}
         onEdit={setEditingAccount}
+        onEditLabel={setEditingLabelAccount}
         onDelete={handleDelete}
         onAdd={() => setShowAddModal(true)}
         refreshingId={refreshingId}
@@ -218,6 +221,7 @@ function AccountManager() {
         />
       )}
       {showAddModal && (<AddAccountModal onClose={() => setShowAddModal(false)} onSuccess={loadAccounts} />)}
+      {editingLabelAccount && (<EditAccountModal account={editingLabelAccount} onClose={() => setEditingLabelAccount(null)} onSuccess={loadAccounts} />)}
       {showImportModal && (<ImportAccountModal onClose={() => setShowImportModal(false)} onSuccess={loadAccounts} />)}
       {autoRefreshing && (<RefreshProgressModal refreshProgress={refreshProgress} />)}
       

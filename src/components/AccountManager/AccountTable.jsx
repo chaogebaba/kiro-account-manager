@@ -13,6 +13,7 @@ function AccountTable({
   onSwitch,
   onRefresh,
   onEdit,
+  onEditLabel,
   onDelete,
   onAdd,
   refreshingId,
@@ -63,6 +64,7 @@ function AccountTable({
               onSwitch={onSwitch}
               onRefresh={onRefresh}
               onEdit={onEdit}
+              onEditLabel={onEditLabel}
               onDelete={onDelete}
               refreshingId={refreshingId}
               switchingId={switchingId}

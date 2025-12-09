@@ -24,8 +24,21 @@ pub fn check_kiro_running() -> bool {
 
 #[cfg(target_os = "macos")]
 pub fn check_kiro_running() -> bool {
+    // 尝试多种方式检测 Kiro 进程
+    // 1. 精确匹配 "Kiro"
     let output = Command::new("pgrep")
         .args(["-x", "Kiro"])
+        .output();
+    
+    if let Ok(out) = output {
+        if out.status.success() {
+            return true;
+        }
+    }
+    
+    // 2. 模糊匹配包含 "Kiro" 的进程
+    let output = Command::new("pgrep")
+        .args(["-f", "Kiro.app"])
         .output();
     
     match output {

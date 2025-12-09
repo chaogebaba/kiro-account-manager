@@ -442,3 +442,45 @@ pub async fn add_account_by_idc(
     
     Ok(account)
 }
+
+/// 更新账号信息（支持修改 label、token、SSO Client ID/Secret）
+#[tauri::command]
+pub fn update_account(
+    state: State<AppState>,
+    id: String,
+    label: Option<String>,
+    access_token: Option<String>,
+    refresh_token: Option<String>,
+    // BuilderId SSO 字段
+    sso_client_id: Option<String>,
+    sso_client_secret: Option<String>,
+) -> Result<Account, String> {
+    let mut store = state.store.lock().unwrap();
+    
+    // 先找到索引，避免借用冲突
+    let idx = store.accounts.iter().position(|a| a.id == id);
+    
+    if let Some(idx) = idx {
+        if let Some(l) = label {
+            store.accounts[idx].label = l;
+        }
+        if let Some(at) = access_token {
+            store.accounts[idx].access_token = Some(at);
+        }
+        if let Some(rt) = refresh_token {
+            store.accounts[idx].refresh_token = Some(rt);
+        }
+        // BuilderId SSO 字段
+        if let Some(cid) = sso_client_id {
+            store.accounts[idx].sso_client_id = Some(cid);
+        }
+        if let Some(csec) = sso_client_secret {
+            store.accounts[idx].sso_client_secret = Some(csec);
+        }
+        let result = store.accounts[idx].clone();
+        store.save_to_file();
+        Ok(result)
+    } else {
+        Err("账号不存在".to_string())
+    }
+}
