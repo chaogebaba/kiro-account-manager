@@ -1,24 +1,31 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { getVersion } from '@tauri-apps/api/app'
-import { Home, Key, Settings, Info, User, LogIn, Globe, Sun, Moon, Palette, Settings2 } from 'lucide-react'
+import { Home, Key, Settings, Info, User, LogIn, Globe, Sun, Moon, Palette, Settings2, Languages } from 'lucide-react'
 import { useTheme, themes } from '../contexts/ThemeContext'
+import { useI18n, locales } from '../i18n.jsx'
 
-const menuItems = [
-  { id: 'home', label: '首页', icon: Home },
-  { id: 'token', label: '账号管理', icon: Key },
-  { id: 'kiro-config', label: 'Kiro 配置', icon: Settings2 },
-  { id: 'login', label: 'Desktop OAuth', icon: LogIn, desc: 'Social + IdC' },
-  { id: 'web-oauth', label: 'Web Portal OAuth', icon: Globe, desc: 'WebView 窗口登录' },
-  { id: 'settings', label: '设置', icon: Settings },
-  { id: 'about', label: '关于', icon: Info },
-]
+function useMenuItems() {
+  const { t } = useI18n()
+  return [
+    { id: 'home', label: t('nav.home'), icon: Home },
+    { id: 'token', label: t('nav.accounts'), icon: Key },
+    { id: 'kiro-config', label: t('nav.kiroConfig'), icon: Settings2 },
+    { id: 'login', label: t('nav.desktopOAuth'), icon: LogIn, desc: t('nav.socialIdC') },
+    { id: 'web-oauth', label: t('nav.webOAuth'), icon: Globe, desc: t('nav.webviewLogin') },
+    { id: 'settings', label: t('nav.settings'), icon: Settings },
+    { id: 'about', label: t('nav.about'), icon: Info },
+  ]
+}
 
 function Sidebar({ activeMenu, onMenuChange }) {
   const [localToken, setLocalToken] = useState(null)
   const [showThemeMenu, setShowThemeMenu] = useState(false)
+  const [showLangMenu, setShowLangMenu] = useState(false)
   const [version, setVersion] = useState('')
   const { theme, setTheme, colors } = useTheme()
+  const { locale, setLocale, loading: langLoading } = useI18n()
+  const menuItems = useMenuItems()
 
   useEffect(() => {
     invoke('get_kiro_local_token').then(setLocalToken).catch(() => {})
@@ -95,15 +102,15 @@ function Sidebar({ activeMenu, onMenuChange }) {
         </div>
       )}
 
-      {/* Theme & Version */}
-      <div className={`px-3 pb-3 flex items-center justify-between`}>
+      {/* Theme & Language & Version */}
+      <div className={`px-3 pb-3 flex items-center justify-between gap-2`}>
+        {/* 主题切换 */}
         <div className="relative">
           <button
             onClick={() => setShowThemeMenu(!showThemeMenu)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 ${colors.sidebarCard} rounded-lg text-xs ${colors.sidebarMuted} hover:text-white transition-all hover:scale-105`}
+            className={`flex items-center gap-1.5 px-2 py-1.5 ${colors.sidebarCard} rounded-lg text-xs ${colors.sidebarMuted} hover:text-white transition-all hover:scale-105`}
           >
             <ThemeIcon size={14} />
-            <span>{themes[theme].name}</span>
           </button>
           
           {showThemeMenu && (
@@ -129,8 +136,39 @@ function Sidebar({ activeMenu, onMenuChange }) {
             </>
           )}
         </div>
+
+        {/* 语言切换 */}
+        <div className="relative">
+          <button
+            onClick={() => setShowLangMenu(!showLangMenu)}
+            disabled={langLoading}
+            className={`flex items-center gap-1.5 px-2 py-1.5 ${colors.sidebarCard} rounded-lg text-xs ${colors.sidebarMuted} hover:text-white transition-all hover:scale-105 disabled:opacity-50`}
+          >
+            <Languages size={14} />
+            <span>{locales[locale]?.substring(0, 2) || '中'}</span>
+          </button>
+          
+          {showLangMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowLangMenu(false)} />
+              <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[120px] z-50 animate-scale-in">
+                {Object.entries(locales).map(([key, name]) => (
+                  <button
+                    key={key}
+                    onClick={() => { setLocale(key); setShowLangMenu(false) }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                      locale === key ? 'text-blue-600 font-medium' : 'text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
         
-        <span className={`text-xs ${colors.sidebarMuted}`}>v{version || '...'}</span>
+        <span className={`text-xs ${colors.sidebarMuted} ml-auto`}>v{version || '...'}</span>
       </div>
     </div>
   )

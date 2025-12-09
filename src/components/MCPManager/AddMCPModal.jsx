@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { X, Plus, Minus } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useI18n } from '../../i18n'
 import { MCP_TEMPLATES } from './MCPTemplates'
 
 function AddMCPModal({ onClose, onSuccess }) {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
 
   const [name, setName] = useState('')
@@ -42,11 +44,11 @@ function AddMCPModal({ onClose, onSuccess }) {
   // 保存
   const handleSave = async () => {
     if (!name.trim()) {
-      setError('请输入服务器名称')
+      setError(t('mcpManager.errorNoName'))
       return
     }
     if (!command.trim()) {
-      setError('请输入启动命令')
+      setError(t('mcpManager.errorNoCommand'))
       return
     }
 
@@ -82,7 +84,7 @@ function AddMCPModal({ onClose, onSuccess }) {
       >
         {/* 标题 */}
         <div className={`flex items-center justify-between px-6 py-4 border-b ${colors.cardBorder}`}>
-          <h2 className={`text-lg font-semibold ${colors.text}`}>添加 MCP 服务器</h2>
+          <h2 className={`text-lg font-semibold ${colors.text}`}>{t('mcpManager.addMCPServer')}</h2>
           <button onClick={onClose} className={`p-1 rounded-lg ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}>
             <X size={20} className={colors.textMuted} />
           </button>
@@ -92,7 +94,7 @@ function AddMCPModal({ onClose, onSuccess }) {
         <div className="flex-1 overflow-auto p-6 space-y-4">
           {/* 快速添加模板 */}
           <div>
-            <label className={`block text-sm font-medium ${colors.text} mb-2`}>快速添加</label>
+            <label className={`block text-sm font-medium ${colors.text} mb-2`}>{t('mcpManager.quickAdd')}</label>
             <div className="flex flex-wrap gap-2">
               {MCP_TEMPLATES.map(t => (
                 <button
@@ -112,36 +114,36 @@ function AddMCPModal({ onClose, onSuccess }) {
 
           {/* 服务器名称 */}
           <div>
-            <label className={`block text-sm font-medium ${colors.text} mb-1`}>服务器名称</label>
+            <label className={`block text-sm font-medium ${colors.text} mb-1`}>{t('mcpManager.serverName')}</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="例如: fetch"
+              placeholder={t('mcpManager.serverNamePlaceholder')}
               className={`w-full px-3 py-2 rounded-lg border ${colors.cardBorder} ${isDark ? 'bg-white/5' : 'bg-gray-50'} ${colors.text} focus:outline-none focus:ring-2 focus:ring-purple-500/30`}
             />
           </div>
 
           {/* 启动命令 */}
           <div>
-            <label className={`block text-sm font-medium ${colors.text} mb-1`}>启动命令</label>
+            <label className={`block text-sm font-medium ${colors.text} mb-1`}>{t('mcpManager.command')}</label>
             <input
               type="text"
               value={command}
               onChange={e => setCommand(e.target.value)}
-              placeholder="例如: uvx, npx"
+              placeholder={t('mcpManager.commandPlaceholder')}
               className={`w-full px-3 py-2 rounded-lg border ${colors.cardBorder} ${isDark ? 'bg-white/5' : 'bg-gray-50'} ${colors.text} focus:outline-none focus:ring-2 focus:ring-purple-500/30`}
             />
           </div>
 
           {/* 参数 */}
           <div>
-            <label className={`block text-sm font-medium ${colors.text} mb-1`}>参数（空格分隔）</label>
+            <label className={`block text-sm font-medium ${colors.text} mb-1`}>{t('mcpManager.args')}</label>
             <input
               type="text"
               value={args}
               onChange={e => setArgs(e.target.value)}
-              placeholder="例如: mcp-server-fetch"
+              placeholder={t('mcpManager.argsPlaceholder')}
               className={`w-full px-3 py-2 rounded-lg border ${colors.cardBorder} ${isDark ? 'bg-white/5' : 'bg-gray-50'} ${colors.text} focus:outline-none focus:ring-2 focus:ring-purple-500/30`}
             />
           </div>
@@ -149,12 +151,12 @@ function AddMCPModal({ onClose, onSuccess }) {
           {/* 环境变量 */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className={`text-sm font-medium ${colors.text}`}>环境变量</label>
+              <label className={`text-sm font-medium ${colors.text}`}>{t('mcpManager.envVars')}</label>
               <button
                 onClick={addEnv}
                 className={`text-sm ${isDark ? 'text-purple-400 hover:text-purple-300' : 'text-purple-600 hover:text-purple-700'} flex items-center gap-1`}
               >
-                <Plus size={14} />添加
+                <Plus size={14} />{t('common.add')}
               </button>
             </div>
             {envList.map((env, i) => (
@@ -193,14 +195,14 @@ function AddMCPModal({ onClose, onSuccess }) {
             onClick={onClose}
             className={`px-4 py-2 rounded-lg ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} ${colors.text}`}
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-700 disabled:opacity-50"
           >
-            {saving ? '保存中...' : '添加'}
+            {saving ? t('common.saving') : t('common.add')}
           </button>
         </div>
       </div>

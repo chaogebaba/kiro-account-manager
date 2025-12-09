@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::browser::open_browser;
 use reqwest::Client;
 use serde::Deserialize;
@@ -35,14 +33,6 @@ impl KiroAuthServiceClient {
 
     fn refresh_token_url(&self) -> String {
         format!("{}/refreshToken", self.endpoint)
-    }
-
-    fn logout_url(&self) -> String {
-        format!("{}/logout", self.endpoint)
-    }
-
-    fn delete_account_url(&self) -> String {
-        format!("{}/account", self.endpoint)
     }
 
     /// 打开浏览器到登录页面
@@ -214,67 +204,5 @@ impl KiroAuthServiceClient {
             "Kiro Auth Service token refresh parse failed: {}",
             e
         ))
-    }
-
-    /// 注销并失效 refresh token
-    pub async fn logout(&self, refresh_token: &str) -> Result<(), String> {
-        #[derive(serde::Serialize)]
-        struct Body<'a> {
-            #[serde(rename = "refreshToken")]
-            refresh_token: &'a str,
-        }
-
-        let body = Body { refresh_token };
-
-        let resp = self
-            .client
-            .post(self.logout_url())
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| format!("Kiro Auth Service request failed: {}", e))?;
-
-        let status = resp.status();
-        if !status.is_success() {
-            let bytes = resp
-                .bytes()
-                .await
-                .map_err(|e| format!("Kiro Auth Service read body failed: {}", e))?;
-            let body_str = String::from_utf8_lossy(&bytes);
-            return Err(format!(
-                "Kiro Auth Service logout failed: {} - {}",
-                status,
-                body_str
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// 删除用户账号
-    pub async fn delete_account(&self, access_token: &str) -> Result<(), String> {
-        let resp = self
-            .client
-            .delete(self.delete_account_url())
-            .bearer_auth(access_token)
-            .send()
-            .await
-            .map_err(|e| format!("Kiro Auth Service request failed: {}", e))?;
-
-        let status = resp.status();
-        if !status.is_success() {
-            let bytes = resp
-                .bytes()
-                .await
-                .map_err(|e| format!("Kiro Auth Service read body failed: {}", e))?;
-            let body_str = String::from_utf8_lossy(&bytes);
-            return Err(format!(
-                "Kiro Auth Service account deletion failed: {} - {}",
-                status,
-                body_str
-            ));
-        }
-
-        Ok(())
     }
 }

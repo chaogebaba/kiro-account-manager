@@ -18,8 +18,8 @@ export function DialogProvider({ children }) {
         type: 'confirm',
         title,
         message,
-        confirmText: options.confirmText || '确定',
-        cancelText: options.cancelText || '取消',
+        confirmText: options.confirmText,
+        cancelText: options.cancelText,
       })
     })
   }, [])
@@ -32,7 +32,6 @@ export function DialogProvider({ children }) {
         type: 'success',
         title,
         message,
-        confirmText: '确定',
       })
     })
   }, [])
@@ -45,7 +44,6 @@ export function DialogProvider({ children }) {
         type: 'error',
         title,
         message,
-        confirmText: '确定',
       })
     })
   }, [])
@@ -58,7 +56,6 @@ export function DialogProvider({ children }) {
         type: 'info',
         title,
         message,
-        confirmText: '确定',
       })
     })
   }, [])

@@ -41,11 +41,12 @@ export function useAccounts() {
       setRefreshProgress(prev => ({ ...prev, currentEmail: account.email }))
       let success = false, message = ''
       try {
-        const updated = await invoke('sync_account', { id: account.id })
+        // 只刷新 token，不获取 usage
+        const updated = await invoke('refresh_account_token', { id: account.id })
         const idx = updatedAccounts.findIndex(a => a.id === account.id)
         if (idx !== -1) updatedAccounts[idx] = updated
         success = true
-        message = `${getUsed(updated)}/${getQuota(updated)}`
+        message = 'Token 已刷新'
       } catch (e) {
         message = String(e).slice(0, 30)
       }

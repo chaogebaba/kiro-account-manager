@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Database, Settings as SettingsIcon, Clock, Globe, Search, Shield, Download, Upload, Shuffle, AlertTriangle } from 'lucide-react'
+import { emit } from '@tauri-apps/api/event'
+import { Lock, Copy, Sun, Moon, Palette, Check, RefreshCw, Settings as SettingsIcon, Clock, Globe, Search, Shield, Download, Upload, Shuffle, AlertTriangle } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useDialog } from '../contexts/DialogContext'
+import { useI18n } from '../i18n.jsx'
 
 function Settings() {
   const { theme, setTheme, colors } = useTheme()
   const { showConfirm, showError, showSuccess } = useDialog()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
   
   const [aiModel, setAiModel] = useState('claude-sonnet-4.5')
   const [lockModel, setLockModel] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(50) // 分钟
   const [autoChangeMachineId, setAutoChangeMachineId] = useState(false)
+  const [bindMachineIdToAccount, setBindMachineIdToAccount] = useState(false)
   const [httpProxy, setHttpProxy] = useState('')
   const [originalProxy, setOriginalProxy] = useState('') // 原始代理值，用于判断是否修改
   const [savingProxy, setSavingProxy] = useState(false)
@@ -22,9 +27,9 @@ function Settings() {
   const [savingBrowser, setSavingBrowser] = useState(false)
   const [detectedBrowsers, setDetectedBrowsers] = useState([])
   const [showBrowserList, setShowBrowserList] = useState(false)
+  const [detectingProxy, setDetectingProxy] = useState(false)
   
-  // Kiro IDE 信息
-  const [telemetryInfo, setTelemetryInfo] = useState(null)
+  // Kiro IDE 状态
   const [loading, setLoading] = useState(false)
   
   // 系统机器码
@@ -33,25 +38,17 @@ function Settings() {
   const [machineGuidLoading, setMachineGuidLoading] = useState(false)
   const [machineGuidAction, setMachineGuidAction] = useState(null) // 'backup' | 'restore' | 'reset'
   
-  // 检测操作系统
-  const [isMacOS, setIsMacOS] = useState(false)
-  useEffect(() => {
-    // 通过 navigator.platform 检测
-    const platform = navigator.platform.toLowerCase()
-    setIsMacOS(platform.includes('mac'))
-  }, [])
+
 
   // 加载设置
   const loadSettings = async () => {
     setLoading(true)
     try {
-      const [telemetry, kiroSettings, appSettings, sysMachine] = await Promise.all([
-        invoke('get_kiro_telemetry_info').catch(() => null),
+      const [kiroSettings, appSettings, sysMachine] = await Promise.all([
         invoke('get_kiro_settings').catch(() => null),
         invoke('get_app_settings').catch(() => null),
         invoke('get_system_machine_guid').catch(() => null)
       ])
-      setTelemetryInfo(telemetry)
       setSystemMachineInfo(sysMachine)
       if (sysMachine?.backupExists) {
         const backup = await invoke('get_machine_guid_backup').catch(() => null)
@@ -68,7 +65,9 @@ function Settings() {
       if (appSettings) {
         setLockModel(appSettings.lockModel ?? true)
         setAutoRefresh(appSettings.autoRefresh ?? true)
+        setAutoRefreshInterval(appSettings.autoRefreshInterval ?? 50)
         setAutoChangeMachineId(appSettings.autoChangeMachineId ?? false)
+        setBindMachineIdToAccount(appSettings.bindMachineIdToAccount ?? false)
         const browser = appSettings.browserPath || ''
         setBrowserPath(browser)
         setOriginalBrowserPath(browser)
@@ -85,14 +84,16 @@ function Settings() {
     loadSettings()
   }, [])
 
-  // 保存应用设置
-  const saveAppSettings = async (updates) => {
+  // 保存应用设置（后端已实现增量更新，直接传入要更新的字段）
+  const saveAppSettings = async (updates, notifyChange = false) => {
     try {
-      const current = await invoke('get_app_settings').catch(() => ({}))
-      await invoke('save_app_settings', { settings: { ...current, ...updates } })
+      await invoke('save_app_settings', { settings: updates })
+      if (notifyChange) {
+        await emit('settings-changed')
+      }
     } catch (err) {
       console.error('Failed to save app settings:', err)
-      await showError('保存失败', '保存设置失败: ' + err)
+      await showError(t('settings.saveFailed'), t('settings.saveFailed') + ': ' + err)
     }
   }
 
@@ -101,9 +102,9 @@ function Settings() {
     try {
       await invoke('set_kiro_proxy', { proxy: httpProxy })
       setOriginalProxy(httpProxy) // 保存成功后更新原始值
-      await showSuccess('保存成功', httpProxy ? '代理设置已应用' : '代理已清除')
+      await showSuccess(t('settings.saveSuccess'), httpProxy ? t('settings.proxyApplied') : t('settings.proxyCleared'))
     } catch (err) {
-      await showError('保存失败', '保存代理设置失败: ' + err)
+      await showError(t('settings.saveFailed'), t('settings.saveFailed') + ': ' + err)
     } finally {
       setSavingProxy(false)
     }
@@ -122,7 +123,7 @@ function Settings() {
         await saveAppSettings({ locked_model: model })
       }
     } catch (err) {
-      await showError('保存失败', '保存模型设置失败: ' + err)
+      await showError(t('settings.saveFailed'), t('settings.saveFailed') + ': ' + err)
     } finally {
       setSavingModel(false)
     }
@@ -135,7 +136,14 @@ function Settings() {
 
   const handleAutoRefreshChange = async (checked) => {
     setAutoRefresh(checked)
-    await saveAppSettings({ autoRefresh: checked })
+    await saveAppSettings({ autoRefresh: checked }, true)
+  }
+
+  const handleAutoRefreshIntervalChange = async (value) => {
+    const interval = parseInt(value) || 50
+    setAutoRefreshInterval(interval)
+    await saveAppSettings({ autoRefreshInterval: interval }, true)
+    await saveAppSettings({ autoRefreshInterval: interval })
   }
 
   const handleAutoChangeMachineIdChange = async (checked) => {
@@ -143,14 +151,19 @@ function Settings() {
     await saveAppSettings({ autoChangeMachineId: checked })
   }
 
+  const handleBindMachineIdChange = async (checked) => {
+    setBindMachineIdToAccount(checked)
+    await saveAppSettings({ bindMachineIdToAccount: checked })
+  }
+
   const handleApplyBrowser = async () => {
     setSavingBrowser(true)
     try {
       await saveAppSettings({ browserPath: browserPath })
       setOriginalBrowserPath(browserPath)
-      await showSuccess('保存成功', browserPath ? '浏览器路径已保存' : '已恢复使用系统默认浏览器')
+      await showSuccess(t('settings.saveSuccess'), browserPath ? t('settings.browserSaved') : t('settings.defaultBrowser'))
     } catch (err) {
-      await showError('保存失败', '保存浏览器路径失败: ' + err)
+      await showError(t('settings.saveFailed'), t('settings.saveFailed') + ': ' + err)
     } finally {
       setSavingBrowser(false)
     }
@@ -164,10 +177,35 @@ function Settings() {
       setDetectedBrowsers(browsers)
       setShowBrowserList(true)
       if (browsers.length === 0) {
-        await showError('未检测到浏览器', '未在常见路径中检测到浏览器，请手动输入路径')
+        await showError(t('settings.detectFailed'), t('settings.noBrowserFound'))
       }
     } catch (err) {
-      await showError('检测失败', '检测浏览器失败: ' + err)
+      await showError(t('settings.detectFailed'), t('settings.detectFailed') + ': ' + err)
+    }
+  }
+
+  // 检测系统代理
+  const handleDetectProxy = async () => {
+    setDetectingProxy(true)
+    try {
+      const proxyInfo = await invoke('detect_system_proxy')
+      if (proxyInfo.enabled && proxyInfo.httpProxy) {
+        setHttpProxy(proxyInfo.httpProxy)
+        await showSuccess(t('settings.detectSuccess'), `${t('settings.systemProxyDetected')}: ${proxyInfo.httpProxy}`)
+      } else if (proxyInfo.proxyServer) {
+        // 代理已配置但未启用
+        const useIt = await showConfirm(t('settings.proxyConfigured'), `${t('settings.proxyNotEnabled')}: ${proxyInfo.proxyServer}\n\n${t('settings.useThisProxy')}`)
+        if (useIt) {
+          const proxy = proxyInfo.proxyServer.startsWith('http') ? proxyInfo.proxyServer : `http://${proxyInfo.proxyServer}`
+          setHttpProxy(proxy)
+        }
+      } else {
+        await showError(t('settings.noProxyDetected'), t('settings.noProxyConfigured'))
+      }
+    } catch (err) {
+      await showError(t('settings.detectFailed'), t('settings.detectFailed') + ': ' + err)
+    } finally {
+      setDetectingProxy(false)
     }
   }
 
@@ -179,7 +217,6 @@ function Settings() {
     setShowBrowserList(false)
   }
 
-  const [resetting, setResetting] = useState(false)
   const [kiroRunning, setKiroRunning] = useState(false)
 
   // 检查 Kiro IDE 运行状态
@@ -200,45 +237,6 @@ function Settings() {
     }, 30000)
     return () => clearInterval(interval)
   }, [])
-  
-  const handleResetMachineId = async () => {
-    // 检查 Kiro IDE 是否运行
-    const running = await invoke('is_kiro_ide_running')
-    if (running) {
-      const confirmed = await showConfirm('关闭 Kiro IDE', '检测到 Kiro IDE 正在运行，需要先关闭才能重置机器 ID。\n\n是否关闭 Kiro IDE 并继续？', { confirmText: '关闭并继续', cancelText: '取消' })
-      if (!confirmed) return
-      // 关闭 Kiro IDE
-      try {
-        await invoke('close_kiro_ide')
-        // 等待进程完全退出
-        await new Promise(r => setTimeout(r, 1000))
-      } catch (err) {
-        await showError('操作失败', '关闭 Kiro IDE 失败: ' + err)
-        return
-      }
-    } else {
-      const confirmed = await showConfirm('重置机器 ID', '确定要重置所有机器 ID 吗？')
-      if (!confirmed) return
-    }
-    
-    setResetting(true)
-    try {
-      const newInfo = await invoke('reset_kiro_machine_id')
-      setTelemetryInfo(newInfo)
-      
-      // 询问是否重新启动
-      const shouldStart = await showConfirm('重置成功', '机器 ID 已重置！\n\n是否立即启动 Kiro IDE？', { confirmText: '启动', cancelText: '稍后' })
-      if (shouldStart) {
-        await invoke('start_kiro_ide')
-      }
-    } catch (err) {
-      console.error('Failed to reset machine ID:', err)
-      await showError('重置失败', '重置机器 ID 失败: ' + err)
-    } finally {
-      setResetting(false)
-      checkKiroStatus()
-    }
-  }
 
   // 手动关闭/启动 Kiro IDE
   const handleToggleKiro = async () => {
@@ -251,7 +249,7 @@ function Settings() {
       await new Promise(r => setTimeout(r, 500))
       checkKiroStatus()
     } catch (err) {
-      await showError('操作失败', err.toString())
+      await showError(t('common.error'), err.toString())
     }
   }
 
@@ -262,9 +260,9 @@ function Settings() {
       const backup = await invoke('backup_machine_guid')
       setMachineGuidBackup(backup)
       setSystemMachineInfo(prev => ({ ...prev, backupExists: true, backupTime: backup.backupTime }))
-      await showSuccess('备份成功', `已备份系统机器码: ${backup.machineGuid}`)
+      await showSuccess(t('settings.backupSuccess'), `${t('settings.machineGuidBackedUp')}: ${backup.machineGuid}`)
     } catch (err) {
-      await showError('备份失败', err.toString())
+      await showError(t('settings.backupFailed'), err.toString())
     } finally {
       setMachineGuidAction(null)
     }
@@ -272,13 +270,13 @@ function Settings() {
 
   const handleRestoreMachineGuid = async () => {
     if (!machineGuidBackup) {
-      await showError('恢复失败', '没有找到备份')
+      await showError(t('settings.restoreFailed'), t('settings.noBackupFound'))
       return
     }
     const confirmed = await showConfirm(
-      '恢复系统机器码',
-      `确定要将系统机器码恢复为备份值吗？\n\n备份值: ${machineGuidBackup.machineGuid}\n备份时间: ${machineGuidBackup.backupTime}\n\n⚠️ 此操作需要管理员权限，可能需要以管理员身份运行程序。`,
-      { confirmText: '恢复', cancelText: '取消' }
+      t('settings.restoreMachineGuid'),
+      `${t('settings.confirmRestoreMachineGuid')}\n\n${t('settings.backupValue')}: ${machineGuidBackup.machineGuid}\n${t('settings.backupTime')}: ${machineGuidBackup.backupTime}\n\n⚠️ ${t('settings.requiresAdmin')}`,
+      { confirmText: t('settings.restore'), cancelText: t('common.cancel') }
     )
     if (!confirmed) return
     
@@ -286,9 +284,9 @@ function Settings() {
     try {
       const restored = await invoke('restore_machine_guid')
       setSystemMachineInfo(prev => ({ ...prev, machineGuid: restored }))
-      await showSuccess('恢复成功', `系统机器码已恢复为: ${restored}`)
+      await showSuccess(t('settings.restoreSuccess'), `${t('settings.machineGuidRestored')}: ${restored}`)
     } catch (err) {
-      await showError('恢复失败', err.toString())
+      await showError(t('settings.restoreFailed'), err.toString())
     } finally {
       setMachineGuidAction(null)
     }
@@ -296,9 +294,9 @@ function Settings() {
 
   const handleResetSystemMachineGuid = async () => {
     const confirmed = await showConfirm(
-      '⚠️ 重置系统机器码',
-      '确定要生成新的系统机器码吗？\n\n此操作会：\n• 生成一个新的随机 UUID\n• 写入 Windows 注册表\n• 可能影响某些软件的授权验证\n\n⚠️ 此操作需要管理员权限\n⚠️ 建议先备份当前值',
-      { confirmText: '确定重置', cancelText: '取消' }
+      `⚠️ ${t('settings.resetSystemMachineGuid')}`,
+      t('settings.confirmResetSystemMachineGuid'),
+      { confirmText: t('settings.confirmReset'), cancelText: t('common.cancel') }
     )
     if (!confirmed) return
     
@@ -306,9 +304,9 @@ function Settings() {
     try {
       const newGuid = await invoke('reset_system_machine_guid')
       setSystemMachineInfo(prev => ({ ...prev, machineGuid: newGuid }))
-      await showSuccess('重置成功', `新的系统机器码: ${newGuid}`)
+      await showSuccess(t('settings.resetSuccess'), `${t('settings.newMachineGuid')}: ${newGuid}`)
     } catch (err) {
-      await showError('重置失败', err.toString())
+      await showError(t('settings.resetFailed'), err.toString())
     } finally {
       setMachineGuidAction(null)
     }
@@ -322,10 +320,10 @@ function Settings() {
   }
 
   const themeOptions = [
-    { key: 'light', name: '浅色', icon: Sun, color: 'from-blue-400 to-blue-600' },
-    { key: 'dark', name: '深色', icon: Moon, color: 'from-gray-700 to-gray-900' },
-    { key: 'purple', name: '紫色', icon: Palette, color: 'from-purple-500 to-purple-700' },
-    { key: 'green', name: '绿色', icon: Palette, color: 'from-emerald-500 to-emerald-700' },
+    { key: 'light', name: t('settings.light'), icon: Sun, color: 'from-blue-400 to-blue-600' },
+    { key: 'dark', name: t('settings.dark'), icon: Moon, color: 'from-gray-700 to-gray-900' },
+    { key: 'purple', name: t('settings.purple'), icon: Palette, color: 'from-purple-500 to-purple-700' },
+    { key: 'green', name: t('settings.green'), icon: Palette, color: 'from-emerald-500 to-emerald-700' },
   ]
 
   // 复制到剪贴板
@@ -374,16 +372,16 @@ function Settings() {
               <SettingsIcon size={24} className="text-white" />
             </div>
             <div>
-              <h1 className={`text-2xl font-bold ${colors.text}`}>Kiro 设置</h1>
-              <p className={colors.textMuted}>配置 Kiro IDE 的模型、代理等设置，修改后即时生效</p>
+              <h1 className={`text-2xl font-bold ${colors.text}`}>{t('settings.title')}</h1>
+              <p className={colors.textMuted}>{t('settings.subtitle')}</p>
             </div>
           </div>
         </div>
 
         {/* 主题设置 */}
         <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 animate-slide-in-left delay-100`}>
-          <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>主题设置</h2>
-          <p className={`text-sm ${colors.textMuted} mb-5`}>选择你喜欢的界面主题</p>
+          <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>{t('settings.theme')}</h2>
+          <p className={`text-sm ${colors.textMuted} mb-5`}>{t('settings.themeDesc')}</p>
           
           <div className="grid grid-cols-4 gap-3">
             {themeOptions.map((opt, index) => {
@@ -417,11 +415,11 @@ function Settings() {
 
         {/* 模型设置 */}
         <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 animate-slide-in-left delay-200`}>
-          <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>模型设置</h2>
-          <p className={`text-sm ${colors.textMuted} mb-5`}>选择默认使用的 AI 模型，并可选择锁定模型防止被修改</p>
+          <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>{t('settings.model')}</h2>
+          <p className={`text-sm ${colors.textMuted} mb-5`}>{t('settings.modelDesc')}</p>
           
           <div className="mb-5">
-            <label className={`block text-sm ${colors.textMuted} mb-2`}>AI 模型 {savingModel && <span className="text-blue-500 text-xs ml-2">保存中...</span>}</label>
+            <label className={`block text-sm ${colors.textMuted} mb-2`}>{t('settings.aiModel')} {savingModel && <span className="text-blue-500 text-xs ml-2">{t('settings.saving')}</span>}</label>
             <div className="relative">
               <select
                 value={aiModel}
@@ -429,7 +427,7 @@ function Settings() {
                 disabled={savingModel}
                 className={`w-full px-4 py-3 border rounded-xl ${colors.text} ${colors.input} ${colors.inputFocus} focus:ring-2 appearance-none cursor-pointer disabled:opacity-50 transition-all`}
               >
-                <option value="claude-sonnet-4.5">Claude Sonnet 4.5 - 1.3x (⭐ 推荐)</option>
+                <option value="claude-sonnet-4.5">Claude Sonnet 4.5 - 1.3x (⭐ {t('common.recommended')})</option>
                 <option value="claude-sonnet-4">Claude Sonnet 4 - 1.3x</option>
                 <option value="claude-haiku-4.5">Claude Haiku 4.5 - 0.4x</option>
                 <option value="claude-opus-4.5">Claude Opus 4.5 - 2.2x</option>
@@ -451,16 +449,16 @@ function Settings() {
             />
             <Lock size={16} className={`${colors.textMuted} mt-0.5 flex-shrink-0`} />
             <div>
-              <span className={`text-sm font-medium ${colors.text}`}>锁定模型</span>
-              <p className={`text-xs ${colors.textMuted} mt-0.5`}>启用后，将自动监控并恢复 Kiro 配置中的模型设置，防止被其他操作修改</p>
+              <span className={`text-sm font-medium ${colors.text}`}>{t('settings.lockModel')}</span>
+              <p className={`text-xs ${colors.textMuted} mt-0.5`}>{t('settings.lockModelDesc')}</p>
             </div>
           </label>
         </section>
 
         {/* 账号设置 */}
         <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 animate-slide-in-left delay-300`}>
-          <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>账号设置</h2>
-          <p className={`text-sm ${colors.textMuted} mb-5`}>配置账号自动刷新等功能</p>
+          <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>{t('settings.account')}</h2>
+          <p className={`text-sm ${colors.textMuted} mb-5`}>{t('settings.accountDesc')}</p>
           
           <label className={`flex items-start gap-3 cursor-pointer ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl p-4 transition-all hover:scale-[1.01] mb-3`}>
             <input
@@ -470,13 +468,29 @@ function Settings() {
               className="mt-0.5 w-4 h-4 rounded-lg border-gray-300 text-blue-500 focus:ring-blue-500"
             />
             <Clock size={16} className={`${colors.textMuted} mt-0.5 flex-shrink-0`} />
-            <div>
-              <span className={`text-sm font-medium ${colors.text}`}>自动刷新 Token</span>
-              <p className={`text-xs ${colors.textMuted} mt-0.5`}>每 50 分钟自动刷新所有账号的 Token，保持账号始终有效</p>
+            <div className="flex-1">
+              <span className={`text-sm font-medium ${colors.text}`}>{t('settings.autoRefresh')}</span>
+              <p className={`text-xs ${colors.textMuted} mt-0.5`}>{t('settings.autoRefreshDesc')}</p>
             </div>
           </label>
 
-          <label className={`flex items-start gap-3 cursor-pointer ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl p-4 transition-all hover:scale-[1.01]`}>
+          {autoRefresh && (
+            <div className={`ml-7 mb-3 p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+              <label className={`block text-sm ${colors.textMuted} mb-2`}>{t('settings.refreshInterval')}</label>
+              <select
+                value={autoRefreshInterval}
+                onChange={(e) => handleAutoRefreshIntervalChange(e.target.value)}
+                className={`w-full px-4 py-2 border rounded-xl ${colors.text} ${colors.input} ${colors.inputFocus} focus:ring-2 appearance-none cursor-pointer transition-all`}
+              >
+                <option value="30">30 {t('common.minutes')}</option>
+                <option value="50">50 {t('common.minutes')} ({t('common.recommended')})</option>
+                <option value="60">60 {t('common.minutes')}</option>
+                <option value="120">2 {t('common.hours')}</option>
+              </select>
+            </div>
+          )}
+
+          <label className={`flex items-start gap-3 cursor-pointer ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl p-4 transition-all hover:scale-[1.01] mb-3`}>
             <input
               type="checkbox"
               checked={autoChangeMachineId}
@@ -485,39 +499,55 @@ function Settings() {
             />
             <Shuffle size={16} className={`${colors.textMuted} mt-0.5 flex-shrink-0`} />
             <div>
-              <span className={`text-sm font-medium ${colors.text}`}>切换账号时自动更换机器码</span>
-              <p className={`text-xs ${colors.textMuted} mt-0.5`}>切换账号时自动重置 Kiro IDE 的机器 ID，避免多账号关联</p>
+              <span className={`text-sm font-medium ${colors.text}`}>{t('settings.autoChangeMachineId')}</span>
+              <p className={`text-xs ${colors.textMuted} mt-0.5`}>{t('settings.autoChangeMachineIdDesc')}</p>
             </div>
           </label>
+
+          {autoChangeMachineId && (
+            <label className={`flex items-start gap-3 cursor-pointer ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl p-4 transition-all hover:scale-[1.01] ml-7`}>
+              <input
+                type="checkbox"
+                checked={bindMachineIdToAccount}
+                onChange={(e) => handleBindMachineIdChange(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded-lg border-gray-300 text-blue-500 focus:ring-blue-500"
+              />
+              <Lock size={16} className={`${colors.textMuted} mt-0.5 flex-shrink-0`} />
+              <div>
+                <span className={`text-sm font-medium ${colors.text}`}>{t('settings.bindMachineId')}</span>
+                <p className={`text-xs ${colors.textMuted} mt-0.5`}>{t('settings.bindMachineIdDesc')}</p>
+              </div>
+            </label>
+          )}
         </section>
 
         {/* 浏览器设置 */}
         <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 animate-slide-in-left delay-350`}>
           <div className="flex items-center gap-2 mb-1">
             <Globe size={18} className="text-blue-500" />
-            <h2 className={`text-lg font-semibold ${colors.text}`}>浏览器设置</h2>
+            <h2 className={`text-lg font-semibold ${colors.text}`}>{t('settings.browser')}</h2>
           </div>
           <p className={`text-sm ${colors.textMuted} mb-5`}>
-            配置 OAuth 登录时使用的浏览器，可指定无痕模式等参数
+            {t('settings.browserDesc')}
           </p>
           
           <div className="mb-3">
-            <label className={`block text-sm ${colors.textMuted} mb-2`}>浏览器路径</label>
+            <label className={`block text-sm ${colors.textMuted} mb-2`}>{t('settings.browserPath')}</label>
             <div className="flex gap-3">
               <input
                 type="text"
                 value={browserPath}
                 onChange={(e) => setBrowserPath(e.target.value)}
-                placeholder="留空使用系统默认浏览器"
+                placeholder={t('settings.browserPlaceholder')}
                 className={`flex-1 px-4 py-3 border rounded-xl ${colors.text} ${colors.input} ${colors.inputFocus} focus:ring-2 transition-all`}
               />
               <button
                 onClick={handleDetectBrowsers}
                 className={`btn-icon px-4 py-3 border rounded-xl ${isDark ? 'border-gray-700 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'} ${colors.text} transition-all flex items-center gap-2`}
-                title="自动检测已安装的浏览器"
+                title={t('settings.detectBrowsersTitle')}
               >
                 <Search size={16} />
-                检测
+                {t('settings.detect')}
               </button>
               <button
                 onClick={handleApplyBrowser}
@@ -529,7 +559,7 @@ function Settings() {
                 }`}
               >
                 {savingBrowser ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
-                {savingBrowser ? '保存中...' : '应用'}
+                {savingBrowser ? t('settings.saving') : t('settings.apply')}
               </button>
             </div>
           </div>
@@ -538,12 +568,12 @@ function Settings() {
           {showBrowserList && detectedBrowsers.length > 0 && (
             <div className={`mt-4 p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
               <div className="flex items-center justify-between mb-3">
-                <span className={`text-sm font-medium ${colors.text}`}>检测到的浏览器</span>
+                <span className={`text-sm font-medium ${colors.text}`}>{t('settings.detectedBrowsers')}</span>
                 <button 
                   onClick={() => setShowBrowserList(false)}
                   className={`text-xs ${colors.textMuted} hover:underline`}
                 >
-                  关闭
+                  {t('settings.close')}
                 </button>
               </div>
               <div className="space-y-2">
@@ -559,14 +589,14 @@ function Settings() {
                           onClick={() => handleSelectBrowser(browser, true)}
                           className="btn-icon px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                         >
-                          无痕模式
+                          {t('settings.incognitoMode')}
                         </button>
                       )}
                       <button
                         onClick={() => handleSelectBrowser(browser, false)}
                         className={`btn-icon px-3 py-1.5 text-xs rounded-lg transition-colors ${isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-200 hover:bg-gray-300'} ${colors.text}`}
                       >
-                        普通模式
+                        {t('settings.normalMode')}
                       </button>
                     </div>
                   </div>
@@ -576,19 +606,19 @@ function Settings() {
           )}
 
           <p className={`text-xs ${colors.textMuted} mt-3`}>
-            留空表示使用系统默认浏览器。点击"检测"可自动查找已安装的浏览器
+            {t('settings.browserTip')}
           </p>
         </section>
 
         {/* 代理设置 */}
         <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 animate-slide-in-left delay-400`}>
-          <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>代理设置</h2>
+          <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>{t('settings.proxy')}</h2>
           <p className={`text-sm ${colors.textMuted} mb-5`}>
-            配置 Kiro IDE 的 HTTP 代理（与 settings.json 中的 http.proxy 同步）
+            {t('settings.proxyDesc')}
           </p>
           
           <div className="mb-3">
-            <label className={`block text-sm ${colors.textMuted} mb-2`}>HTTP 代理</label>
+            <label className={`block text-sm ${colors.textMuted} mb-2`}>{t('settings.httpProxy')}</label>
             <div className="flex gap-3">
               <input
                 type="text"
@@ -597,6 +627,15 @@ function Settings() {
                 placeholder="http://127.0.0.1:7897"
                 className={`flex-1 px-4 py-3 border rounded-xl ${colors.text} ${colors.input} ${colors.inputFocus} focus:ring-2 transition-all`}
               />
+              <button
+                onClick={handleDetectProxy}
+                disabled={detectingProxy}
+                className={`btn-icon px-4 py-3 border rounded-xl ${isDark ? 'border-gray-700 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'} ${colors.text} transition-all flex items-center gap-2`}
+                title={t('settings.detectProxyTitle')}
+              >
+                {detectingProxy ? <RefreshCw size={16} className="animate-spin" /> : <Search size={16} />}
+                {t('settings.detect')}
+              </button>
               <button
                 onClick={handleApplyProxy}
                 disabled={savingProxy || !proxyChanged}
@@ -607,7 +646,7 @@ function Settings() {
                 }`}
               >
                 {savingProxy ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
-                {savingProxy ? '保存中...' : '应用'}
+                {savingProxy ? t('settings.saving') : t('settings.apply')}
               </button>
               <button 
                 onClick={loadSettings}
@@ -618,16 +657,16 @@ function Settings() {
             </div>
           </div>
           <p className={`text-xs ${colors.textMuted}`}>
-            留空表示不使用代理。格式: http://host:port 或 https://host:port。修改后点击"应用"按钮生效
+            {t('settings.proxyTip')}
           </p>
         </section>
 
-        {/* Kiro IDE 信息 */}
+        {/* Kiro IDE 状态 */}
         <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 animate-slide-in-left delay-500`}>
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>Kiro IDE 信息</h2>
-              <p className={`text-sm ${colors.textMuted}`}>从本地 Kiro IDE 读取的设备和会话信息</p>
+              <h2 className={`text-lg font-semibold ${colors.text} mb-1`}>{t('settings.kiroInfo')}</h2>
+              <p className={`text-sm ${colors.textMuted}`}>{t('settings.kiroInfoDesc')}</p>
             </div>
             <button
               onClick={loadSettings}
@@ -638,28 +677,6 @@ function Settings() {
             </button>
           </div>
 
-          {/* 设备标识 */}
-          <div className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl p-4 mb-4`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Database size={16} className="text-blue-500" />
-                <span className={`text-sm font-medium ${colors.text}`}>设备标识</span>
-              </div>
-              <button 
-                onClick={handleResetMachineId} 
-                disabled={resetting}
-                className="btn-icon text-xs text-red-500 hover:underline font-medium disabled:opacity-50 transition-all"
-              >
-                {resetting ? '重置中...' : '重置全部'}
-              </button>
-            </div>
-            <InfoItem label="Machine ID" value={telemetryInfo?.machineId} copyable fieldKey="machineId" />
-            <InfoItem label="SQM ID" value={telemetryInfo?.sqmId} copyable fieldKey="sqmId" />
-            <InfoItem label="Dev Device ID" value={telemetryInfo?.devDeviceId} copyable fieldKey="devDeviceId" />
-            <InfoItem label="Service Machine ID" value={telemetryInfo?.serviceMachineId} copyable fieldKey="serviceMachineId" />
-          </div>
-
-          {/* Kiro IDE 状态 */}
           <div className={`flex items-center justify-between ${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl p-4`}>
             <div className="flex items-center gap-3">
               <div className={`w-2.5 h-2.5 rounded-full ${kiroRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
@@ -669,7 +686,7 @@ function Settings() {
                   ? 'bg-green-500/20 text-green-500' 
                   : `${isDark ? 'bg-white/10 text-gray-400' : 'bg-gray-200 text-gray-500'}`
               }`}>
-                {kiroRunning ? '运行中' : '未运行'}
+                {kiroRunning ? t('settings.running') : t('settings.notRunning')}
               </span>
             </div>
             <button
@@ -680,30 +697,34 @@ function Settings() {
                   : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
               }`}
             >
-              {kiroRunning ? '关闭' : '启动'}
+              {kiroRunning ? t('settings.stop') : t('settings.start')}
             </button>
           </div>
-          <p className={`text-xs ${colors.textMuted} mt-2`}>
-            重置设备标识需要先关闭 Kiro IDE
-          </p>
         </section>
 
         {/* 系统机器码管理 */}
         <section className={`card-glow ${colors.card} rounded-2xl p-6 shadow-sm border ${colors.cardBorder} mb-6 animate-slide-in-left delay-600`}>
           <div className="flex items-center gap-2 mb-1">
             <Shield size={18} className="text-orange-500" />
-            <h2 className={`text-lg font-semibold ${colors.text}`}>系统机器码</h2>
+            <h2 className={`text-lg font-semibold ${colors.text}`}>{t('settings.systemMachineGuid')}</h2>
+            {systemMachineInfo?.osType && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? 'bg-white/10' : 'bg-gray-200'} ${colors.textMuted}`}>
+                {systemMachineInfo.osType === 'windows' ? 'Windows' : systemMachineInfo.osType === 'macos' ? 'macOS' : 'Linux'}
+              </span>
+            )}
           </div>
           <p className={`text-sm ${colors.textMuted} mb-5`}>
-            {isMacOS 
-              ? '查看 macOS 系统的硬件 UUID（IOPlatformUUID）' 
-              : '管理 Windows 系统的 MachineGuid（注册表 HKLM\\SOFTWARE\\Microsoft\\Cryptography）'}
+            {systemMachineInfo?.osType === 'macos' 
+              ? t('settings.machineGuidDescMac')
+              : systemMachineInfo?.osType === 'linux'
+              ? t('settings.machineGuidDescLinux')
+              : t('settings.machineGuidDescWin')}
           </p>
 
           {/* 当前值 */}
           <div className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl p-4 mb-4`}>
             <div className="flex items-center justify-between mb-3">
-              <span className={`text-sm font-medium ${colors.text}`}>当前系统机器码</span>
+              <span className={`text-sm font-medium ${colors.text}`}>{t('settings.currentMachineGuid')}</span>
               <button 
                 onClick={loadSettings}
                 disabled={loading}
@@ -714,7 +735,7 @@ function Settings() {
             </div>
             <div className="flex items-center gap-2">
               <code className={`flex-1 text-sm ${isDark ? 'bg-white/10' : 'bg-gray-100'} px-3 py-2 rounded-lg font-mono ${colors.text}`}>
-                {systemMachineInfo?.machineGuid || '加载中...'}
+                {systemMachineInfo?.machineGuid || t('common.loading')}
               </code>
               {systemMachineInfo?.machineGuid && (
                 <button 
@@ -736,44 +757,44 @@ function Settings() {
             <div className={`${isDark ? 'bg-blue-500/10' : 'bg-blue-50'} rounded-xl p-4 mb-4 border ${isDark ? 'border-blue-500/20' : 'border-blue-200'}`}>
               <div className="flex items-center gap-2 mb-2">
                 <Download size={14} className="text-blue-500" />
-                <span className={`text-sm font-medium ${colors.text}`}>已有备份</span>
+                <span className={`text-sm font-medium ${colors.text}`}>{t('settings.hasBackup')}</span>
               </div>
               <div className={`text-xs ${colors.textMuted} space-y-1`}>
-                <div>备份值: <code className="font-mono">{machineGuidBackup.machineGuid}</code></div>
-                <div>备份时间: {machineGuidBackup.backupTime}</div>
-                {machineGuidBackup.computerName && <div>计算机名: {machineGuidBackup.computerName}</div>}
+                <div>{t('settings.backupValue')}: <code className="font-mono">{machineGuidBackup.machineGuid}</code></div>
+                <div>{t('settings.backupTime')}: {machineGuidBackup.backupTime}</div>
+                {machineGuidBackup.computerName && <div>{t('settings.computerName')}: {machineGuidBackup.computerName}</div>}
               </div>
             </div>
           )}
 
-          {/* 警告提示 - 仅 Windows 显示 */}
-          {!isMacOS && (
+          {/* 警告提示 - 需要管理员权限时显示 */}
+          {systemMachineInfo?.requiresAdmin && (
             <div className={`flex items-start gap-3 ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'} rounded-xl p-4 mb-4 border ${isDark ? 'border-orange-500/20' : 'border-orange-200'}`}>
               <AlertTriangle size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
               <div className={`text-xs ${colors.textMuted}`}>
-                <p className="font-medium text-orange-500 mb-1">注意事项</p>
+                <p className="font-medium text-orange-500 mb-1">{t('settings.adminWarningTitle')}</p>
                 <ul className="list-disc list-inside space-y-0.5">
-                  <li>修改系统机器码需要<span className="font-medium">管理员权限</span></li>
-                  <li>可能影响某些软件的授权验证</li>
-                  <li>建议在修改前先备份当前值</li>
+                  <li>{t('settings.adminWarning1')}</li>
+                  <li>{t('settings.adminWarning2')}</li>
+                  <li>{t('settings.adminWarning3')}</li>
                 </ul>
               </div>
             </div>
           )}
           
           {/* macOS 提示 */}
-          {isMacOS && (
+          {systemMachineInfo?.osType === 'macos' && (
             <div className={`flex items-start gap-3 ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'} rounded-xl p-4 mb-4 border ${isDark ? 'border-blue-500/20' : 'border-blue-200'}`}>
               <Shield size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
               <div className={`text-xs ${colors.textMuted}`}>
-                <p className="font-medium text-blue-500 mb-1">macOS 说明</p>
-                <p>macOS 的硬件 UUID 由系统固件管理，无法修改。此值绑定硬件，重装系统也不会改变。</p>
+                <p className="font-medium text-blue-500 mb-1">{t('settings.macOSNote')}</p>
+                <p>{t('settings.macOSNoteDesc')}</p>
               </div>
             </div>
           )}
 
-          {/* 操作按钮 - 仅 Windows 显示 */}
-          {!isMacOS && (
+          {/* 操作按钮 - 可修改时显示 */}
+          {systemMachineInfo?.canModify && (
             <div className="flex gap-3">
               <button
                 onClick={handleBackupMachineGuid}
@@ -783,7 +804,7 @@ function Settings() {
                 } disabled:opacity-50`}
               >
                 {machineGuidAction === 'backup' ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
-                备份
+                {t('settings.backup')}
               </button>
               <button
                 onClick={handleRestoreMachineGuid}
@@ -793,7 +814,7 @@ function Settings() {
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {machineGuidAction === 'restore' ? <RefreshCw size={16} className="animate-spin" /> : <Upload size={16} />}
-                恢复
+                {t('settings.restore')}
               </button>
               <button
                 onClick={handleResetSystemMachineGuid}
@@ -803,7 +824,7 @@ function Settings() {
                 } disabled:opacity-50`}
               >
                 {machineGuidAction === 'reset' ? <RefreshCw size={16} className="animate-spin" /> : <Shuffle size={16} />}
-                重置
+                {t('common.reset')}
               </button>
             </div>
           )}

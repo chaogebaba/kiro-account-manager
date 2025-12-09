@@ -4,6 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import App from './App.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
 import { DialogProvider } from './contexts/DialogContext.jsx'
+import { I18nProvider } from './i18n.jsx'
 import './index.css'
 
 // 生产环境禁用浏览器快捷键
@@ -46,11 +47,13 @@ if (import.meta.env.PROD) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <DialogProvider>
-        <App />
-      </DialogProvider>
-    </ThemeProvider>
+    <I18nProvider>
+      <ThemeProvider>
+        <DialogProvider>
+          <App />
+        </DialogProvider>
+      </ThemeProvider>
+    </I18nProvider>
   </React.StrictMode>,
 )
 

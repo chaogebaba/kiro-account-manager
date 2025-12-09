@@ -1,12 +1,12 @@
 // IdC Provider - BuilderId/Enterprise 登录
-// 参考 kiro-batch-login/src/providers/idc-provider.js
+// 使用设备授权流程 (Device Authorization Flow)
 
-use crate::aws_sso_client::AWSSSOClient;
+use crate::aws_sso_client::{AWSSSOClient, DevicePollResult};
 use crate::browser::open_browser;
-use crate::oauth_callback_server::OAuthCallbackServer;
 use sha2::{Digest, Sha256};
 use super::{AuthResult, AuthProvider, RefreshMetadata};
 use async_trait::async_trait;
+use std::time::Duration;
 
 const BUILDER_ID_START_URL: &str = "https://view.awsapps.com/start";
 
@@ -46,65 +46,76 @@ impl AuthProvider for IdcProvider {
         let region = &self.region;
         let start_url = self.get_start_url();
 
-        println!("\n[IdC] Starting {} authentication...", provider);
+        println!("\n[IdC] Starting {} authentication (Device Flow)...", provider);
         println!("Region: {}", region);
         println!("Start URL: {}", start_url);
 
         // Step 1: 创建 AWS SSO 客户端
         let sso_client = AWSSSOClient::new(region);
 
-        // Step 2: 注册 OAuth 客户端
-        println!("[IdC] Registering OAuth client...");
-        let client_reg = sso_client.register_client(start_url).await?;
+        // Step 2: 注册支持设备授权的客户端
+        println!("[IdC] Registering device client...");
+        let client_reg = sso_client.register_device_client(start_url).await?;
         println!("Client ID: {}", client_reg.client_id);
 
-        // Step 3: 启动 OAuth 回调服务器
-        let mut server = OAuthCallbackServer::new_random("127.0.0.1");
-        let redirect_uri = server
-            .start()
-            .map_err(|e| format!("Failed to start OAuth callback server: {}", e))?;
-        println!("Redirect URI: {}", redirect_uri);
-
-        // Step 4: 生成 PKCE 参数
-        let pkce = AWSSSOClient::generate_pkce();
-        let state = AWSSSOClient::generate_state();
-        println!("State: {}", state);
-
-        // Step 5: 构建授权 URL
-        let auth_url = sso_client.build_authorization_url(
-            &client_reg.client_id,
-            &redirect_uri,
-            &state,
-            &pkce.code_challenge,
-        );
-
-        // Step 6: 打开浏览器
-        println!("[IdC] Opening browser...");
-        open_browser(&auth_url)?;
-
-        // Step 7: 等待回调
-        println!("[IdC] Waiting for callback...");
-        let callback = tokio::task::spawn_blocking(move || server.wait_for_callback())
-            .await
-            .map_err(|e| format!("Failed to join callback waiter: {}", e))?
-            .map_err(|e| format!("OAuth callback failed: {}", e))?;
-
-        // Step 8: 验证 state
-        if callback.state != state {
-            return Err("State mismatch - possible CSRF attack".to_string());
-        }
-
-        // Step 9: 交换 token
-        println!("[IdC] Exchanging code for tokens...");
-        let token_response = sso_client.create_token(
+        // Step 3: 发起设备授权
+        println!("[IdC] Starting device authorization...");
+        let device_auth = sso_client.start_device_authorization(
             &client_reg.client_id,
             &client_reg.client_secret,
-            &callback.code,
-            &pkce.code_verifier,
-            &redirect_uri,
+            start_url,
         ).await?;
+        
+        println!("[IdC] User Code: {}", device_auth.user_code);
+        println!("[IdC] Verification URI: {}", device_auth.verification_uri);
 
-        // Step 10: 构建 AuthResult
+        // Step 4: 打开浏览器让用户输入 user_code
+        let verification_url = device_auth.verification_uri_complete
+            .as_ref()
+            .unwrap_or(&device_auth.verification_uri);
+        println!("[IdC] Opening browser: {}", verification_url);
+        open_browser(verification_url)?;
+
+        // Step 5: 轮询等待用户授权
+        println!("[IdC] Waiting for user authorization...");
+        let mut interval = device_auth.interval.unwrap_or(5) as u64;
+        let timeout = std::time::Instant::now() + Duration::from_secs(device_auth.expires_in as u64);
+
+        let token_response = loop {
+            if std::time::Instant::now() > timeout {
+                return Err("设备授权超时，请重试".to_string());
+            }
+
+            tokio::time::sleep(Duration::from_secs(interval)).await;
+
+            match sso_client.poll_device_token(
+                &client_reg.client_id,
+                &client_reg.client_secret,
+                &device_auth.device_code,
+            ).await? {
+                DevicePollResult::Success(token) => {
+                    println!("[IdC] Authorization successful!");
+                    break token;
+                }
+                DevicePollResult::Pending => {
+                    // 继续轮询
+                    continue;
+                }
+                DevicePollResult::SlowDown => {
+                    // 增加轮询间隔
+                    interval += 5;
+                    continue;
+                }
+                DevicePollResult::Expired => {
+                    return Err("设备码已过期，请重试".to_string());
+                }
+                DevicePollResult::Denied => {
+                    return Err("用户拒绝授权".to_string());
+                }
+            }
+        };
+
+        // Step 6: 构建 AuthResult
         let expires_at = chrono::Local::now() + chrono::Duration::seconds(token_response.expires_in);
         let client_id_hash = Self::compute_client_id_hash(start_url);
 

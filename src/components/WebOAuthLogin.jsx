@@ -3,9 +3,11 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { Loader, ClipboardPaste, Globe, Sparkles, ArrowRight, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useI18n } from '../i18n.jsx'
 
 function WebOAuthLogin({ onLogin }) {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
   const [step, setStep] = useState('idle') // idle, webview, completing
   const [loadingProvider, setLoadingProvider] = useState(null)
@@ -30,7 +32,7 @@ function WebOAuthLogin({ onLogin }) {
         await invoke('web_oauth_complete', { callbackUrl: event.payload })
       } catch (e) {
         console.error('Auto complete failed:', e)
-        setError(typeof e === 'string' ? e : e.message || '自动登录失败')
+        setError(typeof e === 'string' ? e : e.message || t('login.failed'))
         setCallbackUrl(event.payload)
         setStep('webview')
       }
@@ -52,7 +54,7 @@ function WebOAuthLogin({ onLogin }) {
       setWindowLabel(result.windowLabel)
     } catch (e) {
       console.error('Web OAuth login error:', e)
-      setError(typeof e === 'string' ? e : e.message || '发起登录失败')
+      setError(typeof e === 'string' ? e : e.message || t('login.failed'))
       setStep('idle')
       setLoadingProvider(null)
     }
@@ -60,7 +62,7 @@ function WebOAuthLogin({ onLogin }) {
 
   const handleComplete = async () => {
     if (!callbackUrl.trim()) {
-      setError('请粘贴回调 URL')
+      setError(t('webOAuth.manualInput'))
       return
     }
     setStep('completing')
@@ -76,7 +78,7 @@ function WebOAuthLogin({ onLogin }) {
       await invoke('web_oauth_complete', { callbackUrl: callbackUrl.trim() })
     } catch (e) {
       console.error('Web OAuth complete error:', e)
-      setError(typeof e === 'string' ? e : e.message || '完成登录失败')
+      setError(typeof e === 'string' ? e : e.message || t('login.failed'))
       setStep('webview')
     }
   }
@@ -149,8 +151,8 @@ function WebOAuthLogin({ onLogin }) {
           `}>
             <Globe size={40} className="text-white" strokeWidth={1.5} />
           </div>
-          <h1 className={`${colors.text} text-2xl font-bold mb-2`}>Web OAuth 登录</h1>
-          <p className={`${colors.textMuted} text-sm`}>通过浏览器安全登录 Kiro</p>
+          <h1 className={`${colors.text} text-2xl font-bold mb-2`}>{t('webOAuth.title')}</h1>
+          <p className={`${colors.textMuted} text-sm`}>{t('webOAuth.subtitle')}</p>
         </div>
 
         {/* Error */}
@@ -183,7 +185,7 @@ function WebOAuthLogin({ onLogin }) {
                 {provider.icon}
                 <span className={`${colors.text} font-semibold`}>{provider.name}</span>
                 <span className={`absolute right-5 ${colors.textMuted} text-sm opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1`}>
-                  Sign in <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  {t('login.signIn')} <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </span>
               </button>
             ))}
@@ -205,13 +207,13 @@ function WebOAuthLogin({ onLogin }) {
                   <ExternalLink size={24} className="text-white" />
                 </div>
               </div>
-              <h3 className={`${colors.text} font-semibold text-lg mb-2`}>请在弹出窗口中完成授权</h3>
+              <h3 className={`${colors.text} font-semibold text-lg mb-2`}>{t('webOAuth.authorizing')}</h3>
               <p className={`${colors.textMuted} text-sm mb-4`}>
-                使用 <span className="font-medium text-purple-500">{loadingProvider}</span> 登录中...
+                {t('webOAuth.loggingWith', { provider: loadingProvider })}
               </p>
               <div className="flex items-center justify-center gap-2 text-xs text-purple-500">
                 <Loader size={14} className="animate-spin" />
-                <span>等待授权回调...</span>
+                <span>{t('webOAuth.waitingCallback')}</span>
               </div>
             </div>
 
@@ -222,7 +224,7 @@ function WebOAuthLogin({ onLogin }) {
             `}>
               <p className={`${colors.textMuted} text-xs mb-3 flex items-center gap-2`}>
                 <Sparkles size={12} />
-                自动登录失败？手动粘贴回调 URL
+                {t('webOAuth.manualInput')}
               </p>
               <div className="flex gap-2 mb-3">
                 <input
@@ -257,7 +259,7 @@ function WebOAuthLogin({ onLogin }) {
                     border
                   `}
                 >
-                  取消
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleComplete}
@@ -269,7 +271,7 @@ function WebOAuthLogin({ onLogin }) {
                     shadow-lg shadow-purple-500/25
                   `}
                 >
-                  完成登录
+                  {t('webOAuth.complete')}
                 </button>
               </div>
             </div>
@@ -289,15 +291,15 @@ function WebOAuthLogin({ onLogin }) {
                 <CheckCircle2 size={32} className="text-white" />
               </div>
             </div>
-            <h3 className={`${colors.text} font-semibold text-lg mb-2`}>正在完成登录...</h3>
-            <p className={`${colors.textMuted} text-sm`}>验证授权信息中</p>
+            <h3 className={`${colors.text} font-semibold text-lg mb-2`}>{t('webOAuth.completing')}</h3>
+            <p className={`${colors.textMuted} text-sm`}>{t('webOAuth.verifying')}</p>
           </div>
         )}
       </div>
 
       {/* Footer */}
       <p className={`absolute bottom-6 text-xs ${colors.textMuted} text-center animate-blur-in delay-300`}>
-        通过 Cognito + KiroWebPortalService 安全登录
+        {t('webOAuth.footer')}
       </p>
     </div>
   )

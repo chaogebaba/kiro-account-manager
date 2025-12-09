@@ -1,18 +1,22 @@
 import { useState } from 'react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { Server, Sparkles, Settings2 } from 'lucide-react'
+import { useI18n } from '../../i18n.jsx'
+import { Server, Sparkles, Settings2, FileText } from 'lucide-react'
 import MCPPanel from './MCPPanel'
 import PowersPanel from './PowersPanel'
-
-const TABS = [
-  { id: 'mcp', label: 'MCP 服务器', icon: Server },
-  { id: 'powers', label: 'Powers', icon: Sparkles },
-]
+import SteeringPanel from './SteeringPanel'
 
 function KiroConfig() {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
   const [activeTab, setActiveTab] = useState('mcp')
+
+  const TABS = [
+    { id: 'mcp', label: t('kiroConfig.mcp'), icon: Server },
+    { id: 'powers', label: t('kiroConfig.powers'), icon: Sparkles },
+    { id: 'steering', label: t('kiroConfig.steering'), icon: FileText },
+  ]
 
   return (
     <div className={`h-full flex flex-col ${colors.main}`}>
@@ -23,9 +27,9 @@ function KiroConfig() {
             <Settings2 size={20} className="text-white" />
           </div>
           <div>
-            <h1 className={`text-xl font-bold ${colors.text}`}>Kiro 配置</h1>
+            <h1 className={`text-xl font-bold ${colors.text}`}>{t('kiroConfig.title')}</h1>
             <p className={`text-sm ${colors.textMuted}`}>
-              管理 <code className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10">~/.kiro/settings/mcp.json</code> 和查看 <code className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10">~/.kiro/powers/registry.json</code>
+              {t('kiroConfig.subtitle')}
             </p>
           </div>
         </div>
@@ -57,6 +61,7 @@ function KiroConfig() {
       <div className="flex-1 overflow-hidden">
         {activeTab === 'mcp' && <MCPPanel />}
         {activeTab === 'powers' && <PowersPanel />}
+        {activeTab === 'steering' && <SteeringPanel />}
       </div>
     </div>
   )

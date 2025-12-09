@@ -1,5 +1,6 @@
 import { RefreshCw, Edit2, Trash2, Copy, Check, Clock, Repeat } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useI18n } from '../../i18n'
 import { getUsagePercent, getProgressBarColor } from './hooks/useAccountStats'
 import { getQuota, getUsed, getSubType, getSubPlan } from '../../utils/accountStats'
 
@@ -18,6 +19,7 @@ function AccountRow({
   index = 0,
 }) {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
   
   // 从 usageData 读取配额信息
@@ -60,7 +62,7 @@ function AccountRow({
                 {copiedId === account.id ? <Check size={12} className="text-green-500" /> : <Copy size={12} className="text-gray-400" />}
               </button>
             </div>
-            <div className={`text-xs ${colors.textMuted}`}>{account.provider || '未知'} · {account.label || '无标签'}</div>
+            <div className={`text-xs ${colors.textMuted}`}>{account.provider || t('common.unknown')} · {account.label || t('common.noLabel')}</div>
           </div>
         </div>
       </td>
@@ -80,7 +82,7 @@ function AccountRow({
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               <span className={`font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{used}/{quota}</span>
-              <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'}`}>剩余 {quota - used}</span>
+              <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t('common.remaining')} {quota - used}</span>
             </div>
             <span className={`font-semibold stat-number ${percent > 80 ? 'text-red-500' : percent > 50 ? 'text-yellow-500' : 'text-green-500'}`}>{Math.round(percent)}%</span>
           </div>
@@ -92,7 +94,7 @@ function AccountRow({
           </div>
           {breakdown?.nextDateReset && (
             <div className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-              {new Date(breakdown.nextDateReset * 1000).toLocaleDateString()} 重置
+              {new Date(breakdown.nextDateReset * 1000).toLocaleDateString()} {t('common.reset')}
             </div>
           )}
         </div>
@@ -118,7 +120,7 @@ function AccountRow({
             onClick={() => onSwitch(account)} 
             disabled={switchingId === account.id} 
             className={`btn-icon p-1.5 ${isDark ? 'bg-blue-500/20 hover:bg-blue-500/30' : 'bg-blue-50 hover:bg-blue-100'} rounded-lg disabled:opacity-50 transition-all`} 
-            title="切换账号"
+            title={t('accountCard.switchAccount')}
           >
             <Repeat size={14} className={`text-blue-500 ${switchingId === account.id ? 'animate-spin' : ''}`} />
           </button>
@@ -126,21 +128,21 @@ function AccountRow({
             onClick={() => onRefresh(account.id)} 
             disabled={refreshingId === account.id} 
             className={`btn-icon p-1.5 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-lg transition-all`} 
-            title="刷新"
+            title={t('accountCard.refresh')}
           >
             <RefreshCw size={14} className={`${colors.textMuted} ${refreshingId === account.id ? 'animate-spin' : ''}`} />
           </button>
           <button 
             onClick={() => onEdit(account)} 
             className={`btn-icon p-1.5 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-lg transition-all`} 
-            title="编辑"
+            title={t('common.edit')}
           >
             <Edit2 size={14} className={colors.textMuted} />
           </button>
           <button 
             onClick={() => onDelete(account.id)} 
             className={`btn-icon p-1.5 ${isDark ? 'hover:bg-red-500/20' : 'hover:bg-red-50'} rounded-lg transition-all`} 
-            title="删除"
+            title={t('common.delete')}
           >
             <Trash2 size={14} className="text-red-400" />
           </button>

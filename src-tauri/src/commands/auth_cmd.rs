@@ -138,9 +138,9 @@ async fn login_idc(
         existing.user_id = user_id;
         existing.expires_at = Some(auth_result.expires_at.clone());
         existing.client_id_hash = auth_result.client_id_hash;
-        existing.sso_client_id = auth_result.client_id;
-        existing.sso_client_secret = auth_result.client_secret;
-        existing.sso_region = auth_result.region;
+        existing.client_id = auth_result.client_id;
+        existing.client_secret = auth_result.client_secret;
+        existing.region = auth_result.region;
         existing.sso_session_id = auth_result.sso_session_id;
         existing.id_token = auth_result.id_token;
         existing.profile_arn = auth_result.profile_arn;
@@ -155,9 +155,9 @@ async fn login_idc(
         account.user_id = user_id;
         account.expires_at = Some(auth_result.expires_at.clone());
         account.client_id_hash = auth_result.client_id_hash;
-        account.sso_client_id = auth_result.client_id;
-        account.sso_client_secret = auth_result.client_secret;
-        account.sso_region = auth_result.region;
+        account.client_id = auth_result.client_id;
+        account.client_secret = auth_result.client_secret;
+        account.region = auth_result.region;
         account.sso_session_id = auth_result.sso_session_id;
         account.id_token = auth_result.id_token;
         account.profile_arn = auth_result.profile_arn;

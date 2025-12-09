@@ -1,5 +1,6 @@
 import { Users, Plus } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useI18n } from '../../i18n.jsx'
 import AccountCard from './AccountCard'
 
 function AccountTable({
@@ -21,6 +22,7 @@ function AccountTable({
   localToken,
 }) {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
 
   return (
@@ -36,7 +38,7 @@ function AccountTable({
               className="w-4 h-4 rounded transition-transform hover:scale-110"
             />
             <span className={`text-sm ${colors.textMuted}`}>
-              {selectedIds.length > 0 ? `已选 ${selectedIds.length} 个` : '全选'}
+              {selectedIds.length > 0 ? `${t('common.selected')} ${selectedIds.length}` : t('common.selectAll')}
             </span>
           </label>
         </div>
@@ -48,8 +50,8 @@ function AccountTable({
           <div className={`w-20 h-20 rounded-full ${isDark ? 'bg-white/5' : 'bg-gray-100'} flex items-center justify-center animate-float mb-4`}>
             <Users size={40} strokeWidth={1} className="opacity-50" />
           </div>
-          <p className="font-medium mb-1">暂无账号</p>
-          <p className="text-sm opacity-75">请通过侧边栏登录添加账号</p>
+          <p className="font-medium mb-1">{t('common.noAccounts')}</p>
+          <p className="text-sm opacity-75">{t('common.addAccountHint')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -85,7 +87,7 @@ function AccountTable({
             }`}>
               <Plus size={24} className={colors.textMuted} />
             </div>
-            <span className={`text-sm font-medium ${colors.textMuted}`}>添加账号</span>
+            <span className={`text-sm font-medium ${colors.textMuted}`}>{t('common.addAccount')}</span>
           </button>
         </div>
       )}

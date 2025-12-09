@@ -1,8 +1,10 @@
 import { RefreshCw } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useI18n } from '../../i18n.jsx'
 
 function RefreshProgressModal({ refreshProgress }) {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
 
   if (!refreshProgress || refreshProgress.total === 0) return null
@@ -15,12 +17,12 @@ function RefreshProgressModal({ refreshProgress }) {
       >
         <div className={`px-5 py-4 border-b ${colors.cardBorder} ${isDark ? 'bg-blue-500/20' : 'bg-blue-50'} flex items-center gap-2`}>
           <RefreshCw size={18} className="text-blue-500 animate-spin" />
-          <h2 className={`font-semibold ${colors.text}`}>刷新账号</h2>
+          <h2 className={`font-semibold ${colors.text}`}>{t('refresh.title')}</h2>
         </div>
         <div className="p-5 space-y-4">
           <div>
             <div className={`flex justify-between text-sm mb-2`}>
-              <span className={colors.textMuted}>进度</span>
+              <span className={colors.textMuted}>{t('refresh.progress')}</span>
               <span className="text-blue-500 font-medium">{refreshProgress.current}/{refreshProgress.total}</span>
             </div>
             <div className={`h-2 ${isDark ? 'bg-white/10' : 'bg-gray-200'} rounded-full overflow-hidden`}>
@@ -28,7 +30,7 @@ function RefreshProgressModal({ refreshProgress }) {
             </div>
           </div>
           {refreshProgress.currentEmail && (
-            <div className={`text-sm ${colors.textMuted}`}>正在刷新: <span className={colors.text}>{refreshProgress.currentEmail}</span></div>
+            <div className={`text-sm ${colors.textMuted}`}>{t('refresh.refreshing')}: <span className={colors.text}>{refreshProgress.currentEmail}</span></div>
           )}
           {refreshProgress.results.length > 0 && (
             <div className="max-h-48 overflow-y-auto space-y-1">
@@ -40,7 +42,7 @@ function RefreshProgressModal({ refreshProgress }) {
               ))}
             </div>
           )}
-          {refreshProgress.current === refreshProgress.total && (<div className="text-center text-green-500 font-medium">刷新完成！</div>)}
+          {refreshProgress.current === refreshProgress.total && (<div className="text-center text-green-500 font-medium">{t('refresh.complete')}</div>)}
         </div>
       </div>
     </div>

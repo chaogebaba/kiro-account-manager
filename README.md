@@ -14,14 +14,27 @@
 
 ## ✨ 功能特性
 
+### 账号管理
 - 🔐 **多账号管理** - 支持 Google、GitHub、BuilderId 等多种登录方式
+- 🎴 **卡片网格布局** - 直观展示账号状态、配额、订阅类型
 - 📊 **配额监控** - 实时查看账号配额使用情况（主配额/试用/奖励）
-- 🔄 **一键切换** - 快速切换 Kiro IDE 账号，自动重置机器 ID
+- 🔄 **一键切换** - 快速切换 Kiro IDE 账号，可选自动重置机器 ID
+- 📦 **批量操作** - 批量刷新、批量删除、批量导入导出
+- ⏰ **Token 自动刷新** - 定时刷新过期 Token，保持账号有效
+
+### IDE 集成
 - ⚙️ **IDE 设置** - 代理/模型设置同步
+- 🔑 **机器 ID 管理** - 重置 Kiro IDE 机器 ID
 - 🛡️ **系统机器码** - 备份/恢复/重置 Windows MachineGuid（需管理员权限）
+
+### 配置管理
+- 🔌 **MCP 服务器管理** - 查看、添加、编辑、启用/禁用 MCP 配置
+- ⚡ **Powers 管理** - 查看、安装、卸载 Powers
+
+### 界面特性
 - 🎨 **主题切换** - 支持浅色、深色、紫色、绿色主题
-- 💾 **数据导出** - 支持账号数据导出备份
-- 🔒 **本地存储** - 所有数据本地存储
+- 🔄 **自动更新** - 检查并下载新版本
+- 🔒 **本地存储** - 所有数据本地存储，隐私安全
 
 ## 📸 截图
 
@@ -56,9 +69,19 @@
 
 ## 🛠️ 技术栈
 
-- **前端**: React 18 + Vite 5 + TailwindCSS 3
-- **后端**: Tauri 2.x + Rust
+- **前端**: React 18 + Vite 5 + TailwindCSS 3 + Lingui (i18n)
+- **后端**: Tauri 2.x + Rust + Tokio
 - **图标**: Lucide React
+- **存储**: JSON 文件本地存储
+
+## 📁 数据存储
+
+| 数据 | 路径 |
+|------|------|
+| 账号数据 | `%APPDATA%\.kiro-account-manager\accounts.json` |
+| 应用设置 | `%APPDATA%\.kiro-account-manager\settings.json` |
+| MCP 配置 | `~/.kiro/settings/mcp.json` |
+| Powers 注册表 | `~/.kiro/powers/registry.json` |
 
 ## 💬 交流反馈
 

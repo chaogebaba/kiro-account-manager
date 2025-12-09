@@ -1,5 +1,6 @@
 import { RefreshCw, Eye, Trash2, Copy, Check, Clock, Repeat, Edit2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useI18n } from '../../i18n.jsx'
 import { getUsagePercent, getProgressBarColor } from './hooks/useAccountStats'
 import { getQuota, getUsed, getSubType, getSubPlan } from '../../utils/accountStats'
 
@@ -19,6 +20,7 @@ function AccountCard({
   isCurrentAccount,
 }) {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
   
   const quota = getQuota(account)
@@ -93,7 +95,7 @@ function AccountCard({
                 {copiedId === account.id ? <Check size={12} className="text-green-500" /> : <Copy size={12} className="text-gray-400" />}
               </button>
             </div>
-            <div className={`text-xs ${colors.textMuted}`}>{account.label || account.provider || '无标签'}</div>
+            <div className={`text-xs ${colors.textMuted}`}>{account.label || account.provider || t('common.noLabel')}</div>
           </div>
         </div>
 
@@ -109,11 +111,11 @@ function AccountCard({
             {subPlan || 'Free'}
           </span>
           <span className={`text-xs px-2 py-1 rounded-lg ${isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
-            {account.provider || '未知'}
+            {account.provider || t('common.unknown')}
           </span>
           {isCurrentAccount && (
             <span className="text-xs px-2 py-1 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium">
-              当前使用
+              {t('common.currentlyUsing')}
             </span>
           )}
         </div>
@@ -121,7 +123,7 @@ function AccountCard({
         {/* 配额进度 */}
         <div className={`p-3 rounded-xl mb-3 ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
           <div className="flex items-center justify-between text-xs mb-2">
-            <span className={colors.textMuted}>使用量</span>
+            <span className={colors.textMuted}>{t('common.usage')}</span>
             <span className={`font-semibold ${percent > 80 ? 'text-red-500' : percent > 50 ? 'text-yellow-500' : 'text-green-500'}`}>
               {Math.round(percent)}%
             </span>
@@ -134,12 +136,12 @@ function AccountCard({
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className={`font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{Math.round(used * 100) / 100} / {quota}</span>
-            <span className={colors.textMuted}>剩余 {Math.round((quota - used) * 100) / 100}</span>
+            <span className={colors.textMuted}>{t('common.remaining')} {Math.round((quota - used) * 100) / 100}</span>
           </div>
           {breakdown?.nextDateReset && (
             <div className={`text-xs ${colors.textMuted} mt-1 flex items-center gap-1`}>
               <Clock size={10} />
-              {new Date(breakdown.nextDateReset * 1000).toLocaleDateString()} 重置
+              {new Date(breakdown.nextDateReset * 1000).toLocaleDateString()} {t('common.reset')}
             </div>
           )}
         </div>
@@ -149,7 +151,7 @@ function AccountCard({
           <div className={`text-xs ${isExpired ? 'text-red-500' : colors.textMuted} mb-3 flex items-center gap-1`}>
             <Clock size={12} />
             Token: {account.expiresAt}
-            {isExpired && <span className="text-red-500 font-medium ml-1">已过期</span>}
+            {isExpired && <span className="text-red-500 font-medium ml-1">{t('accountCard.tokenExpired')}</span>}
           </div>
         )}
 
@@ -159,7 +161,7 @@ function AccountCard({
             onClick={() => onSwitch(account)} 
             disabled={switchingId === account.id} 
             className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} disabled:opacity-50`}
-            title="切换账号"
+            title={t('accountCard.switchAccount')}
           >
             <Repeat size={14} className={`text-blue-500 ${switchingId === account.id ? 'animate-spin' : ''}`} />
           </button>
@@ -167,28 +169,28 @@ function AccountCard({
             onClick={() => onRefresh(account.id)} 
             disabled={refreshingId === account.id} 
             className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`} 
-            title="刷新"
+            title={t('accountCard.refresh')}
           >
             <RefreshCw size={14} className={`${colors.textMuted} ${refreshingId === account.id ? 'animate-spin' : ''}`} />
           </button>
           <button 
             onClick={() => onEdit(account)} 
             className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`} 
-            title="查看详情"
+            title={t('accountCard.viewDetails')}
           >
             <Eye size={14} className={colors.textMuted} />
           </button>
           <button 
             onClick={() => onEditLabel(account)} 
             className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`} 
-            title="编辑备注"
+            title={t('accountCard.editRemark')}
           >
             <Edit2 size={14} className={colors.textMuted} />
           </button>
           <button 
             onClick={() => onDelete(account.id)} 
             className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-red-500/20' : 'hover:bg-red-50'}`} 
-            title="删除"
+            title={t('accountCard.delete')}
           >
             <Trash2 size={14} className="text-red-400" />
           </button>

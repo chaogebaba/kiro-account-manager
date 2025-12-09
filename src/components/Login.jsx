@@ -3,9 +3,11 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { Loader, ArrowRight, X } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useI18n } from '../i18n.jsx'
 
 function Login({ onLogin }) {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
   const [loadingProvider, setLoadingProvider] = useState(null)
   const [error, setError] = useState('')
@@ -26,7 +28,7 @@ function Login({ onLogin }) {
       await invoke('kiro_login', { provider })
     } catch (e) {
       console.error('Login error:', e)
-      setError(typeof e === 'string' ? e : e.message || '登录失败')
+      setError(typeof e === 'string' ? e : e.message || t('login.failed'))
       setLoadingProvider(null)
     }
   }
@@ -84,8 +86,8 @@ function Login({ onLogin }) {
               <path d="M20 4C12 4 6 10 6 18C6 22 8 25 8 25C8 25 7 28 7 30C7 32 8 34 10 34C11 34 12 33 13 32C14 33 16 34 20 34C24 34 26 33 27 32C28 33 29 34 30 34C32 34 33 32 33 30C33 28 32 25 32 25C32 25 34 22 34 18C34 10 28 4 20 4ZM14 20C12.5 20 11 18.5 11 17C11 15.5 12.5 14 14 14C15.5 14 17 15.5 17 17C17 18.5 15.5 20 14 20ZM26 20C24.5 20 23 18.5 23 17C23 15.5 24.5 14 26 14C27.5 14 29 15.5 29 17C29 18.5 27.5 20 26 20Z" fill="white"/>
             </svg>
           </div>
-          <h1 className={`${colors.text} text-2xl font-bold`}>Kiro Desktop</h1>
-          <p className={`${colors.textMuted} text-sm mt-1`}>选择登录方式</p>
+          <h1 className={`${colors.text} text-2xl font-bold`}>{t('login.title')}</h1>
+          <p className={`${colors.textMuted} text-sm mt-1`}>{t('login.subtitle')}</p>
         </div>
 
         {/* Error */}
@@ -112,7 +114,7 @@ function Login({ onLogin }) {
               )}
               <span className={`${colors.text} font-medium`}>{provider.name}</span>
               <span className={`absolute right-5 ${colors.textMuted} text-sm opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1`}>
-                Sign in <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                {t('login.signIn')} <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
               </span>
             </button>
           ))}
@@ -123,17 +125,17 @@ function Login({ onLogin }) {
               onClick={handleCancel}
               className={`w-full px-5 py-3 ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-gray-200 hover:bg-gray-50'} border rounded-xl transition-colors text-sm ${colors.text}`}
             >
-              取消
+              {t('login.cancel')}
             </button>
           )}
         </div>
 
         {/* Footer */}
         <p className={`mt-10 text-xs ${colors.textMuted} text-center leading-relaxed animate-blur-in delay-300`}>
-          登录即表示同意{' '}
-          <a href="https://aws.amazon.com/agreement/" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">AWS 客户协议</a>、
-          <a href="https://aws.amazon.com/service-terms/" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">服务条款</a> 和{' '}
-          <a href="https://aws.amazon.com/privacy/" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">隐私声明</a>
+          {t('login.agreement')}{' '}
+          <a href="https://aws.amazon.com/agreement/" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">{t('login.awsAgreement')}</a>、
+          <a href="https://aws.amazon.com/service-terms/" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">{t('login.serviceTerms')}</a> {t('login.and')}{' '}
+          <a href="https://aws.amazon.com/privacy/" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">{t('login.privacy')}</a>
         </p>
       </div>
     </div>

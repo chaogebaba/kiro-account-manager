@@ -4,11 +4,13 @@ import { getVersion } from '@tauri-apps/api/app'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { useTheme } from '../contexts/ThemeContext'
+import { useI18n } from '../i18n.jsx'
 import alipayQR from '../assets/donate/alipay.jpg'
 import wechatQR from '../assets/donate/wechat.jpg'
 
 function About() {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
   const [version, setVersion] = useState('')
   const [checking, setChecking] = useState(false)
@@ -37,7 +39,8 @@ function About() {
       }
     } catch (e) {
       console.error('检查更新失败:', e)
-      setUpdateStatus({ type: 'error', message: '检查失败，请稍后重试' })
+      // 网络错误等情况，静默处理，显示为已是最新版本
+      setUpdateStatus({ type: 'latest', message: '已是最新版本' })
     } finally {
       setChecking(false)
     }
@@ -73,9 +76,9 @@ function About() {
   }
 
   const techStack = [
-    { icon: Code2, label: '前端', value: 'React + Vite', color: 'text-cyan-500' },
-    { icon: Palette, label: 'UI', value: 'TailwindCSS', color: 'text-pink-500' },
-    { icon: Cpu, label: '后端', value: 'Tauri + Rust', color: 'text-orange-500' },
+    { icon: Code2, label: t('about.frontend'), value: 'React + Vite', color: 'text-cyan-500' },
+    { icon: Palette, label: t('about.ui'), value: 'TailwindCSS', color: 'text-pink-500' },
+    { icon: Cpu, label: t('about.backend'), value: 'Tauri + Rust', color: 'text-orange-500' },
   ]
 
   return (
@@ -101,7 +104,7 @@ function About() {
             </div>
           </div>
 
-          <h1 className={`text-2xl font-bold ${colors.text} mb-3`}>Kiro Account Manager</h1>
+          <h1 className={`text-2xl font-bold ${colors.text} mb-3`}>{t('about.appName')}</h1>
           
           <div className="flex items-center justify-center gap-3 mb-4">
             <span className={`px-3 py-1 ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'} rounded-full text-sm font-medium`}>
@@ -113,7 +116,7 @@ function About() {
               className={`btn-icon px-3 py-1 ${isDark ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-green-100 text-green-600 hover:bg-green-200'} rounded-full text-sm font-medium flex items-center gap-1.5 transition-colors`}
             >
               <RefreshCw size={12} className={checking ? 'animate-spin' : ''} />
-              {checking ? '检查中' : '检查更新'}
+              {checking ? t('about.checking') : t('about.checkUpdate')}
             </button>
           </div>
 
@@ -124,17 +127,19 @@ function About() {
               (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600')
             }`}>
               {downloading ? (
-                <span>下载中... {downloadProgress}%</span>
+                <span>{t('about.downloading')} {downloadProgress}%</span>
               ) : (
                 <>
-                  {updateStatus.message}
+                  {updateStatus.type === 'latest' ? t('about.upToDate') : 
+                   updateStatus.type === 'update' ? t('about.newVersion', { version: updateInfo?.version || updateStatus.update?.version }) :
+                   t('about.updateFailed')}
                   {updateStatus.type === 'update' && (updateInfo || updateStatus.update) && (
                     <button 
                       onClick={doUpdate} 
                       className="ml-3 px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors inline-flex items-center gap-1"
                     >
                       <Download size={12} />
-                      立即更新
+                      {t('about.download')}
                     </button>
                   )}
                 </>
@@ -142,14 +147,14 @@ function About() {
             </div>
           )}
 
-          <p className={`${colors.textMuted} text-sm`}>智能管理 Kiro 访问令牌，一键切换，配额监控</p>
+          <p className={`${colors.textMuted} text-sm`}>{t('about.appDesc')}</p>
         </div>
 
         {/* 技术栈 + 链接 */}
         <div className="grid grid-cols-2 gap-6 mb-6">
           {/* 技术栈 */}
           <div className={`card-glow ${colors.card} rounded-2xl p-6 shadow-lg border ${colors.cardBorder} opacity-0 animate-fade-in-up delay-100`}>
-            <h3 className={`text-sm font-medium ${colors.text} mb-4 text-center`}>技术栈</h3>
+            <h3 className={`text-sm font-medium ${colors.text} mb-4 text-center`}>{t('about.techStack')}</h3>
             <div className="space-y-3">
               {techStack.map(({ icon: Icon, label, value, color }) => (
                 <div key={label} className={`flex items-center gap-3 ${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl p-3`}>
@@ -163,7 +168,7 @@ function About() {
 
           {/* 链接 */}
           <div className={`card-glow ${colors.card} rounded-2xl p-6 shadow-lg border ${colors.cardBorder} opacity-0 animate-fade-in-up delay-200`}>
-            <h3 className={`text-sm font-medium ${colors.text} mb-4 text-center`}>链接</h3>
+            <h3 className={`text-sm font-medium ${colors.text} mb-4 text-center`}>{t('about.links')}</h3>
             <div className="space-y-3">
               <a 
                 href="https://github.com/hj01857655/kiro-account-manager" 
@@ -184,7 +189,7 @@ function About() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
                   <path d="M12.003 2c-2.265 0-6.29 1.364-6.29 7.325v1.195S3.55 14.96 3.55 17.474c0 .665.17 1.025.281 1.025.114 0 .902-.484 1.748-2.072 0 0-.18 2.197 1.904 3.967 0 0-1.77.495-1.77 1.182 0 .686 4.078.43 6.29.43 2.213 0 6.29.256 6.29-.43 0-.687-1.77-1.182-1.77-1.182 2.085-1.77 1.905-3.967 1.905-3.967.845 1.588 1.634 2.072 1.746 2.072.111 0 .283-.36.283-1.025 0-2.514-2.166-6.954-2.166-6.954V9.325C18.29 3.364 14.268 2 12.003 2z"/>
                 </svg>
-                <span className="text-white text-sm font-medium">QQ群: 1020204332</span>
+                <span className="text-white text-sm font-medium">{t('about.qqGroup')}: 1020204332</span>
                 <ExternalLink size={14} className="text-white/50 ml-auto group-hover:text-white" />
               </a>
             </div>
@@ -195,26 +200,26 @@ function About() {
         <div className={`card-glow ${colors.card} rounded-2xl p-6 shadow-lg border ${colors.cardBorder} mb-6 opacity-0 animate-fade-in-up delay-300`}>
           <div className="flex items-center justify-center gap-2 mb-5">
             <Coffee size={18} className="text-amber-500" />
-            <span className={`text-base font-medium ${colors.text}`}>请作者喝杯咖啡</span>
+            <span className={`text-base font-medium ${colors.text}`}>{t('about.donate')}</span>
           </div>
           <div className="flex justify-center gap-10">
             <div className="text-center cursor-pointer group" onClick={() => setPreviewImg(alipayQR)}>
-              <img src={alipayQR} alt="支付宝" className="w-28 h-28 rounded-xl object-cover mb-2 group-hover:scale-105 transition-transform shadow-lg" />
-              <span className={`text-sm ${colors.textMuted}`}>支付宝</span>
+              <img src={alipayQR} alt={t('about.alipay')} className="w-28 h-28 rounded-xl object-cover mb-2 group-hover:scale-105 transition-transform shadow-lg" />
+              <span className={`text-sm ${colors.textMuted}`}>{t('about.alipay')}</span>
             </div>
             <div className="text-center cursor-pointer group" onClick={() => setPreviewImg(wechatQR)}>
-              <img src={wechatQR} alt="微信" className="w-28 h-28 rounded-xl object-cover mb-2 group-hover:scale-105 transition-transform shadow-lg" />
-              <span className={`text-sm ${colors.textMuted}`}>微信支付</span>
+              <img src={wechatQR} alt={t('about.wechat')} className="w-28 h-28 rounded-xl object-cover mb-2 group-hover:scale-105 transition-transform shadow-lg" />
+              <span className={`text-sm ${colors.textMuted}`}>{t('about.wechat')}</span>
             </div>
           </div>
-          <p className={`text-xs ${colors.textMuted} text-center mt-4`}>点击图片可放大查看</p>
+          <p className={`text-xs ${colors.textMuted} text-center mt-4`}>{t('about.clickToEnlarge')}</p>
         </div>
 
         {/* 底部 */}
         <div className={`flex items-center justify-center gap-2 text-sm ${colors.textMuted} opacity-0 animate-fade-in delay-400`}>
-          <span>Made with</span>
+          <span>{t('about.madeWith')}</span>
           <Heart size={14} className="text-red-500 fill-red-500" />
-          <span>by hj01857655</span>
+          <span>{t('about.by')} hj01857655</span>
           <span className="mx-1">·</span>
           <span>© 2025</span>
         </div>

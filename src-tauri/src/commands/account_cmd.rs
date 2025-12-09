@@ -56,9 +56,9 @@ pub async fn sync_account(state: State<'_, AppState>, id: String) -> Result<Acco
         if provider_str == "BuilderId" {
             // BuilderId -> AWS OIDC
             let metadata = RefreshMetadata {
-                client_id: account.sso_client_id.clone(),
-                client_secret: account.sso_client_secret.clone(),
-                region: account.sso_region.clone(),
+                client_id: account.client_id.clone(),
+                client_secret: account.client_secret.clone(),
+                region: account.region.clone(),
                 ..Default::default()
             };
             let idc_provider = IdcProvider::new("BuilderId", metadata.region.as_deref().unwrap_or("us-east-1"), None);
@@ -128,7 +128,59 @@ pub async fn sync_account(state: State<'_, AppState>, id: String) -> Result<Acco
     Err("Account not found after update".to_string())
 }
 
+/// 只刷新 token，不获取 usage（启动时快速刷新用）
+#[tauri::command]
+pub async fn refresh_account_token(state: State<'_, AppState>, id: String) -> Result<Account, String> {
+    let account = {
+        let store = state.store.lock().unwrap();
+        store.accounts.iter().find(|a| a.id == id).cloned()
+    }.ok_or("Account not found")?;
 
+    let provider_str = account.provider.as_deref().unwrap_or("Google");
+    let refresh_token_str = account.refresh_token.as_ref().ok_or("No refresh token")?;
+    
+    println!("[refresh_token] Refreshing {} token only", provider_str);
+    
+    let (new_access_token, new_refresh_token, expires_in) = 
+        if provider_str == "BuilderId" {
+            let metadata = RefreshMetadata {
+                client_id: account.client_id.clone(),
+                client_secret: account.client_secret.clone(),
+                region: account.region.clone(),
+                ..Default::default()
+            };
+            let idc_provider = IdcProvider::new("BuilderId", metadata.region.as_deref().unwrap_or("us-east-1"), None);
+            let auth_result = idc_provider.refresh_token(refresh_token_str, metadata).await?;
+            (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in)
+        } else {
+            let metadata = RefreshMetadata {
+                profile_arn: account.profile_arn.clone(),
+                ..Default::default()
+            };
+            let social_provider = SocialProvider::new(provider_str);
+            let auth_result = social_provider.refresh_token(refresh_token_str, metadata).await?;
+            (auth_result.access_token, Some(auth_result.refresh_token), auth_result.expires_in)
+        };
+
+    let expires_at = chrono::Local::now() + chrono::Duration::seconds(expires_in);
+    let expires_at_str = expires_at.format("%Y/%m/%d %H:%M:%S").to_string();
+
+    let mut store = state.store.lock().unwrap();
+    if let Some(a) = store.accounts.iter_mut().find(|a| a.id == id) {
+        a.access_token = Some(new_access_token);
+        if let Some(rt) = new_refresh_token {
+            a.refresh_token = Some(rt);
+        }
+        a.expires_at = Some(expires_at_str);
+        
+        let result = a.clone();
+        store.save_to_file();
+        println!("[refresh_token] {} token refreshed", provider_str);
+        return Ok(result);
+    }
+
+    Err("Account not found after update".to_string())
+}
 
 #[tauri::command]
 pub async fn verify_account(
@@ -156,9 +208,9 @@ pub async fn verify_account(
             store.accounts.iter().find(|a| {
                 a.refresh_token.as_ref() == Some(&refresh_token)
             }).map(|a| (
-                a.sso_client_id.clone(),
-                a.sso_client_secret.clone(),
-                a.sso_region.clone(),
+                a.client_id.clone(),
+                a.client_secret.clone(),
+                a.region.clone(),
             )).unwrap_or((None, None, None))
         };
         
@@ -410,9 +462,9 @@ pub async fn add_account_by_idc(
         existing.refresh_token = Some(auth_result.refresh_token);
         existing.user_id = user_id;
         existing.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
-        existing.sso_client_id = Some(client_id);
-        existing.sso_client_secret = Some(client_secret);
-        existing.sso_region = Some(region);
+        existing.client_id = Some(client_id);
+        existing.client_secret = Some(client_secret);
+        existing.region = Some(region);
         existing.client_id_hash = Some(client_id_hash);
         existing.id_token = auth_result.id_token;
         existing.sso_session_id = auth_result.sso_session_id;
@@ -426,9 +478,9 @@ pub async fn add_account_by_idc(
         account.provider = Some("BuilderId".to_string());
         account.user_id = user_id;
         account.expires_at = Some(expires_at.format("%Y/%m/%d %H:%M:%S").to_string());
-        account.sso_client_id = Some(client_id);
-        account.sso_client_secret = Some(client_secret);
-        account.sso_region = Some(region);
+        account.client_id = Some(client_id);
+        account.client_secret = Some(client_secret);
+        account.region = Some(region);
         account.client_id_hash = Some(client_id_hash);
         account.id_token = auth_result.id_token;
         account.sso_session_id = auth_result.sso_session_id;
@@ -452,8 +504,8 @@ pub fn update_account(
     access_token: Option<String>,
     refresh_token: Option<String>,
     // BuilderId SSO 字段
-    sso_client_id: Option<String>,
-    sso_client_secret: Option<String>,
+    client_id: Option<String>,
+    client_secret: Option<String>,
 ) -> Result<Account, String> {
     let mut store = state.store.lock().unwrap();
     
@@ -471,11 +523,11 @@ pub fn update_account(
             store.accounts[idx].refresh_token = Some(rt);
         }
         // BuilderId SSO 字段
-        if let Some(cid) = sso_client_id {
-            store.accounts[idx].sso_client_id = Some(cid);
+        if let Some(cid) = client_id {
+            store.accounts[idx].client_id = Some(cid);
         }
-        if let Some(csec) = sso_client_secret {
-            store.accounts[idx].sso_client_secret = Some(csec);
+        if let Some(csec) = client_secret {
+            store.accounts[idx].client_secret = Some(csec);
         }
         let result = store.accounts[idx].clone();
         store.save_to_file();

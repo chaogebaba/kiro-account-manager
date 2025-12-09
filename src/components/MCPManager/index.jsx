@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useDialog } from '../../contexts/DialogContext'
+import { useI18n } from '../../i18n'
 import { Server, Plus, Sparkles } from 'lucide-react'
 import MCPServerCard from './MCPServerCard'
 import AddMCPModal from './AddMCPModal'
@@ -10,6 +11,7 @@ import EditMCPModal from './EditMCPModal'
 function MCPManager() {
   const { colors } = useTheme()
   const { showConfirm } = useDialog()
+  const { t } = useI18n()
   const [servers, setServers] = useState({})
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -46,7 +48,7 @@ function MCPManager() {
 
   // 删除服务器
   const handleDelete = async (name) => {
-    const confirmed = await showConfirm('删除服务器', `确定删除 ${name}？`)
+    const confirmed = await showConfirm(t('mcpManager.deleteServer'), `${t('mcpManager.confirmDelete')} ${name}？`)
     if (confirmed) {
       try {
         await invoke('delete_mcp_server', { name })
@@ -73,15 +75,15 @@ function MCPManager() {
               <Sparkles size={20} className="text-white" />
             </div>
             <div>
-              <h1 className={`text-xl font-bold ${colors.text}`}>MCP 服务器</h1>
-              <p className={`text-sm ${colors.textMuted}`}>管理 Kiro IDE 的 MCP 服务器配置</p>
+              <h1 className={`text-xl font-bold ${colors.text}`}>{t('mcpManager.title')}</h1>
+              <p className={`text-sm ${colors.textMuted}`}>{t('mcpManager.subtitle')}</p>
             </div>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
             className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl text-sm font-medium hover:from-purple-600 hover:to-pink-700 flex items-center gap-1.5 shadow-lg shadow-purple-500/25"
           >
-            <Plus size={16} />添加服务器
+            <Plus size={16} />{t('mcpManager.addServer')}
           </button>
         </div>
       </div>
@@ -90,12 +92,12 @@ function MCPManager() {
       {/* 列表 */}
       <div className="flex-1 overflow-auto p-6">
         {loading ? (
-          <div className={`text-center py-12 ${colors.textMuted}`}>加载中...</div>
+          <div className={`text-center py-12 ${colors.textMuted}`}>{t('common.loading')}</div>
         ) : serverList.length === 0 ? (
           <div className="text-center py-12">
             <Server size={48} className={`mx-auto mb-4 ${colors.textMuted} opacity-50`} />
-            <p className={colors.textMuted}>暂无 MCP 服务器配置</p>
-            <p className={`text-sm ${colors.textMuted} mt-1`}>点击"添加服务器"开始配置</p>
+            <p className={colors.textMuted}>{t('mcpManager.noServers')}</p>
+            <p className={`text-sm ${colors.textMuted} mt-1`}>{t('mcpManager.addFirst')}</p>
           </div>
         ) : (
           <div className="grid gap-4">

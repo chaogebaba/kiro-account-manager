@@ -53,9 +53,6 @@ struct InitiateLoginRequest {
 pub struct InitiateLoginResponse {
     #[serde(rename = "redirectUrl")]
     redirect_url: Option<String>,
-    #[allow(dead_code)]
-    #[serde(rename = "clientSecret")]
-    client_secret: Option<String>,
 }
 
 /// ExchangeToken 请求
@@ -460,6 +457,11 @@ impl KiroWebPortalClient {
                 String::from_utf8_lossy(&bytes).to_string()
             };
             println!("[WebOAuth] RefreshToken Error: {}", serde_json::to_string_pretty(&serde_json::json!({"status": status.to_string(), "error": error_msg})).unwrap_or_default());
+            
+            // 423 Locked = AccountSuspendedException = 账号被封禁
+            if status.as_u16() == 423 || error_msg.contains("AccountSuspendedException") {
+                return Err("BANNED: 账号已被封禁".to_string());
+            }
             return Err(format!("RefreshToken failed ({}): {}", status, error_msg));
         }
 
@@ -475,12 +477,12 @@ impl KiroWebPortalClient {
     }
 
     /// 调用 GetUserInfo 接口 (KiroWebPortalService)
-    /// 使用 Cookie 认证: AccessToken, SessionToken/RefreshToken, Idp
+    /// 使用 Cookie 认证: AccessToken, Idp (不需要 csrfToken)
     pub async fn get_user_info(
         &self,
         access_token: &str,
-        csrf_token: &str,
-        session_token: &str,
+        _csrf_token: &str,  // 保留参数兼容性，但不再使用
+        _session_token: &str,
         idp: &str,
     ) -> Result<GetUserInfoResponse, String> {
         let url = format!(
@@ -498,10 +500,8 @@ impl KiroWebPortalClient {
         };
 
         let body = cbor_encode(&request)?;
-        let cookie = format!(
-            "AccessToken={}; RefreshToken={}; Idp={}", 
-            access_token, session_token, idp
-        );
+        // 简化 Cookie，只需要 Idp 和 AccessToken
+        let cookie = format!("Idp={}; AccessToken={}", idp, access_token);
 
         println!("[WebOAuth] GetUserInfo Request: {}", serde_json::to_string_pretty(&serde_json::json!({
             "url": url,
@@ -514,7 +514,7 @@ impl KiroWebPortalClient {
             .header("Accept", "application/cbor")
             .header("smithy-protocol", "rpc-v2-cbor")
             .header("authorization", format!("Bearer {}", access_token))
-            .header("x-csrf-token", csrf_token)
+            // 不再需要 x-csrf-token
             .header("Cookie", cookie)
             .body(body)
             .send()
@@ -532,6 +532,11 @@ impl KiroWebPortalClient {
                 String::from_utf8_lossy(&bytes).to_string()
             };
             println!("[WebOAuth] GetUserInfo Error: {}", serde_json::to_string_pretty(&serde_json::json!({"status": status.to_string(), "error": error_msg})).unwrap_or_default());
+            
+            // 423 Locked = AccountSuspendedException = 账号被封禁
+            if status.as_u16() == 423 || error_msg.contains("AccountSuspendedException") {
+                return Err("BANNED: 账号已被封禁".to_string());
+            }
             return Err(format!("GetUserInfo failed ({}): {}", status, error_msg));
         }
 
@@ -548,12 +553,12 @@ impl KiroWebPortalClient {
     }
 
     /// 调用 GetUserUsageAndLimits 接口 (KiroWebPortalService)
-    /// 使用 Cookie 认证: AccessToken, SessionToken/RefreshToken, Idp
+    /// 使用 Cookie 认证: AccessToken, Idp (不需要 csrfToken)
     pub async fn get_user_usage_and_limits(
         &self,
         access_token: &str,
-        csrf_token: &str,
-        session_token: &str,
+        _csrf_token: &str,  // 保留参数兼容性，但不再使用
+        _session_token: &str,
         idp: &str,
     ) -> Result<GetUserUsageAndLimitsResponse, String> {
         let url = format!(
@@ -567,10 +572,8 @@ impl KiroWebPortalClient {
         };
 
         let body = cbor_encode(&request)?;
-        let cookie = format!(
-            "AccessToken={}; RefreshToken={}; Idp={}", 
-            access_token, session_token, idp
-        );
+        // 简化 Cookie，只需要 Idp 和 AccessToken
+        let cookie = format!("Idp={}; AccessToken={}", idp, access_token);
 
         println!("[WebOAuth] GetUserUsageAndLimits Request: {}", serde_json::to_string_pretty(&serde_json::json!({
             "url": url,
@@ -583,7 +586,7 @@ impl KiroWebPortalClient {
             .header("Accept", "application/cbor")
             .header("smithy-protocol", "rpc-v2-cbor")
             .header("authorization", format!("Bearer {}", access_token))
-            .header("x-csrf-token", csrf_token)
+            // 不再需要 x-csrf-token
             .header("Cookie", cookie)
             .body(body)
             .send()
@@ -601,6 +604,11 @@ impl KiroWebPortalClient {
                 String::from_utf8_lossy(&bytes).to_string()
             };
             println!("[WebOAuth] GetUserUsageAndLimits Error: {}", serde_json::to_string_pretty(&serde_json::json!({"status": status.to_string(), "error": error_msg})).unwrap_or_default());
+            
+            // 423 Locked = AccountSuspendedException = 账号被封禁
+            if status.as_u16() == 423 || error_msg.contains("AccountSuspendedException") {
+                return Err("BANNED: 账号已被封禁".to_string());
+            }
             return Err(format!("GetUserUsageAndLimits failed ({}): {}", status, error_msg));
         }
 

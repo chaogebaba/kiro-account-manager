@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { RefreshCw, Users, Zap, Shield, Clock, TrendingUp, Sparkles } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useDialog } from '../contexts/DialogContext'
+import { useI18n } from '../i18n.jsx'
 import { calcAccountStats, getQuota, getUsed } from '../utils/accountStats'
 
 // 骨架屏组件
@@ -104,6 +105,7 @@ function StatCard({ icon: Icon, iconBg, value, label, delay, isDark }) {
 function Home() {
   const { theme, colors } = useTheme()
   const { showError } = useDialog()
+  const { t } = useI18n()
   const [tokens, setTokens] = useState([])
   const [localToken, setLocalToken] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -153,10 +155,10 @@ function Home() {
   }
 
   const statCards = [
-    { icon: Users, iconBg: isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600', value: stats.total, label: '总账号数', delay: 'delay-100' },
-    { icon: Shield, iconBg: isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600', value: stats.active, label: '正常账号', delay: 'delay-200' },
-    { icon: Zap, iconBg: isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-600', value: stats.proPlus + stats.pro, label: 'PRO 账号', delay: 'delay-300' },
-    { icon: TrendingUp, iconBg: isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-600', value: `${stats.usagePercent}%`, label: '配额使用率', delay: 'delay-400' },
+    { icon: Users, iconBg: isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600', value: stats.total, label: t('home.totalAccounts'), delay: 'delay-100' },
+    { icon: Shield, iconBg: isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600', value: stats.active, label: t('home.activeAccounts'), delay: 'delay-200' },
+    { icon: Zap, iconBg: isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-600', value: stats.proPlus + stats.pro, label: t('home.proAccounts'), delay: 'delay-300' },
+    { icon: TrendingUp, iconBg: isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-600', value: `${stats.usagePercent}%`, label: t('home.usagePercent'), delay: 'delay-400' },
   ]
 
   return (
@@ -172,9 +174,9 @@ function Home() {
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25 animate-float">
               <Sparkles size={24} className="text-white" />
             </div>
-            <h1 className={`text-2xl font-bold ${colors.text}`}>Kiro Account Manager</h1>
+            <h1 className={`text-2xl font-bold ${colors.text}`}>{t('home.title')}</h1>
           </div>
-          <p className={colors.textMuted}>管理你的 Kiro IDE 账号，智能切换，配额监控</p>
+          <p className={colors.textMuted}>{t('home.subtitle')}</p>
         </div>
 
         {/* 统计卡片 */}
@@ -188,7 +190,7 @@ function Home() {
           {/* 本地 Kiro 账号 */}
           <div className={`card-glow ${colors.card} rounded-2xl shadow-sm border ${colors.cardBorder} overflow-hidden animate-scale-in delay-300`}>
             <div className={`px-6 py-4 border-b ${colors.cardBorder} flex items-center justify-between`}>
-              <h2 className={`font-semibold ${colors.text}`}>当前登录账号</h2>
+              <h2 className={`font-semibold ${colors.text}`}>{t('home.currentAccount')}</h2>
               <button 
                 onClick={handleRefresh} 
                 className={`btn-icon p-2 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-xl ${refreshing ? 'spinning' : ''}`}
@@ -210,7 +212,7 @@ function Home() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className={`font-semibold ${colors.text} text-lg`}>{localToken.provider || '未知'}</span>
-                        <span className={`px-2.5 py-1 ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'} rounded-full text-xs font-medium pulse-ring`}>已登录</span>
+                        <span className={`px-2.5 py-1 ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'} rounded-full text-xs font-medium pulse-ring`}>{t('home.loggedIn')}</span>
                       </div>
                       <div className={`text-sm ${colors.textMuted} mt-1`}>{localToken.authMethod || 'social'}</div>
                     </div>
@@ -253,7 +255,7 @@ function Home() {
                       </div>
                     )}
                     <div className="flex items-center justify-between text-sm">
-                      <span className={colors.textMuted}>过期时间</span>
+                      <span className={colors.textMuted}>{t('home.expiresAt')}</span>
                       <span className={`${colors.text} flex items-center gap-1`}>
                         <Clock size={12} />
                         {localToken.expiresAt ? new Date(localToken.expiresAt).toLocaleString() : '未知'}
@@ -266,8 +268,8 @@ function Home() {
                   <div className={`w-20 h-20 ${isDark ? 'bg-white/10' : 'bg-gray-100'} rounded-full flex items-center justify-center mx-auto mb-4 animate-float`}>
                     <Users size={32} className={colors.textMuted} />
                   </div>
-                  <div className={`${colors.textMuted} mb-1 font-medium`}>Kiro IDE 未登录</div>
-                  <div className={`text-sm ${colors.textMuted}`}>在账号管理中点击"切换"</div>
+                  <div className={`${colors.textMuted} mb-1 font-medium`}>{t('home.notLoggedIn')}</div>
+                  <div className={`text-sm ${colors.textMuted}`}>{t('home.clickToSwitch')}</div>
                 </div>
               )}
             </div>
@@ -279,7 +281,7 @@ function Home() {
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
                 <TrendingUp size={20} className="text-emerald-500" />
               </div>
-              <h2 className={`font-semibold ${colors.text}`}>配额总览</h2>
+              <h2 className={`font-semibold ${colors.text}`}>{t('home.quotaOverview')}</h2>
             </div>
             <div className="flex items-center gap-4 mb-3">
               <div className="flex-1">
@@ -305,7 +307,7 @@ function Home() {
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className={colors.textMuted}>已用 / 总量</span>
+              <span className={colors.textMuted}>{t('home.usedTotal')}</span>
               <span className={`font-medium ${colors.text}`}>{stats.totalUsed} / {stats.totalQuota}</span>
             </div>
           </div>
@@ -350,7 +352,7 @@ function Home() {
                       </span>
                     )}
                   </div>
-                  <div className={`text-xs ${colors.textMuted} mt-0.5`}>{currentAccount.provider} · {daysUntilReset} 天后重置</div>
+                  <div className={`text-xs ${colors.textMuted} mt-0.5`}>{currentAccount.provider} · {daysUntilReset} {t('home.daysUntilReset')}</div>
                 </div>
               </div>
               
@@ -358,7 +360,7 @@ function Home() {
                 {/* 本月用量进度 - 突出显示 */}
                 <div className={`${isDark ? 'bg-gradient-to-r from-blue-500/10 to-purple-500/10' : 'bg-gradient-to-r from-blue-50 to-purple-50'} rounded-xl p-4 mb-4`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className={`text-sm font-medium ${colors.text}`}>本月用量</span>
+                    <span className={`text-sm font-medium ${colors.text}`}>{t('home.monthlyUsage')}</span>
                     <div className="flex items-center gap-2">
                       <span className={`text-lg font-bold ${
                         currentPercent > 80 ? 'text-red-500' : currentPercent > 50 ? 'text-amber-500' : (isDark ? 'text-blue-400' : 'text-blue-600')
@@ -383,29 +385,29 @@ function Home() {
                   {/* 订阅详情 */}
                   {subInfo && (
                     <div className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-lg p-3`}>
-                      <div className={`text-[10px] font-medium ${isDark ? 'text-blue-400' : 'text-blue-600'} mb-2 uppercase tracking-wide`}>订阅详情</div>
+                      <div className={`text-[10px] font-medium ${isDark ? 'text-blue-400' : 'text-blue-600'} mb-2 uppercase tracking-wide`}>{t('home.subscriptionDetails')}</div>
                       <div className="space-y-1.5 text-xs">
                         <div className="flex justify-between">
-                          <span className={colors.textMuted}>类型</span>
+                          <span className={colors.textMuted}>{t('home.type')}</span>
                           <span className={colors.text}>{subInfo.subscriptionTitle || '-'}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className={colors.textMuted}>超额</span>
+                          <span className={colors.textMuted}>{t('home.overage')}</span>
                           <span className={`${subInfo.overageCapability === 'OVERAGE_CAPABLE' ? 'text-green-500' : colors.textMuted}`}>
                             {subInfo.overageCapability === 'OVERAGE_CAPABLE' ? '✓' : '✗'}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className={colors.textMuted}>升级</span>
+                          <span className={colors.textMuted}>{t('home.upgrade')}</span>
                           <span className={`${subInfo.upgradeCapability === 'UPGRADE_CAPABLE' ? 'text-green-500' : colors.textMuted}`}>
                             {subInfo.upgradeCapability === 'UPGRADE_CAPABLE' ? '✓' : '✗'}
                           </span>
                         </div>
                         {overageConfig && (
                           <div className="flex justify-between">
-                            <span className={colors.textMuted}>状态</span>
+                            <span className={colors.textMuted}>{t('home.status')}</span>
                             <span className={`${overageConfig.overageStatus === 'ENABLED' ? 'text-green-500' : colors.textMuted}`}>
-                              {overageConfig.overageStatus === 'ENABLED' ? '已启用' : '未启用'}
+                              {overageConfig.overageStatus === 'ENABLED' ? t('home.enabled') : t('home.disabled')}
                             </span>
                           </div>
                         )}
@@ -415,19 +417,19 @@ function Home() {
 
                   {/* 账户信息 */}
                   <div className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-lg p-3`}>
-                    <div className={`text-[10px] font-medium ${isDark ? 'text-purple-400' : 'text-purple-600'} mb-2 uppercase tracking-wide`}>账户信息</div>
+                    <div className={`text-[10px] font-medium ${isDark ? 'text-purple-400' : 'text-purple-600'} mb-2 uppercase tracking-wide`}>{t('home.accountInfo')}</div>
                     <div className="space-y-1.5 text-xs">
                       <div className="flex justify-between">
                         <span className={colors.textMuted}>IDP</span>
                         <span className={colors.text}>{currentAccount.provider || '-'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className={colors.textMuted}>重置</span>
+                        <span className={colors.textMuted}>{t('home.reset')}</span>
                         <span className={colors.text}>{nextDateReset ? new Date(nextDateReset * 1000).toLocaleDateString() : '-'}</span>
                       </div>
                       {breakdown?.overageRate && (
                         <div className="flex justify-between">
-                          <span className={colors.textMuted}>费率</span>
+                          <span className={colors.textMuted}>{t('home.rate')}</span>
                           <span className={colors.text}>${breakdown.overageRate}/次</span>
                         </div>
                       )}
@@ -441,12 +443,12 @@ function Home() {
 
                 {/* 额度明细 - 紧凑横向布局 */}
                 <div className={`${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-lg p-3`}>
-                  <div className={`text-[10px] font-medium ${colors.text} mb-2 uppercase tracking-wide`}>额度明细</div>
+                  <div className={`text-[10px] font-medium ${colors.text} mb-2 uppercase tracking-wide`}>{t('home.quotaDetails')}</div>
                   <div className="space-y-2">
                     {/* 基础额度 */}
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                      <span className={`text-xs ${colors.textMuted} w-14 shrink-0`}>基础</span>
+                      <span className={`text-xs ${colors.textMuted} w-14 shrink-0`}>{t('home.base')}</span>
                       <div className={`flex-1 h-1.5 ${isDark ? 'bg-white/10' : 'bg-gray-200'} rounded-full overflow-hidden`}>
                         <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${mainPercent}%` }} />
                       </div>
@@ -457,7 +459,7 @@ function Home() {
                     {freeTrial && freeTrial.usageLimit > 0 && (
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
-                        <span className={`text-xs text-purple-500 w-14 shrink-0`}>试用</span>
+                        <span className={`text-xs text-purple-500 w-14 shrink-0`}>{t('home.trial')}</span>
                         <div className={`flex-1 h-1.5 ${isDark ? 'bg-purple-500/20' : 'bg-purple-100'} rounded-full overflow-hidden`}>
                           <div className="h-full rounded-full bg-purple-500 transition-all" style={{ width: `${freeTrial.usageLimit > 0 ? ((freeTrial.currentUsage ?? 0) / freeTrial.usageLimit * 100) : 0}%` }} />
                         </div>

@@ -3,10 +3,12 @@ import { invoke } from '@tauri-apps/api/core'
 import { X, Key, Copy, Check, Shield, ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useDialog } from '../../contexts/DialogContext'
+import { useI18n } from '../../i18n.jsx'
 
 function EditAccountModal({ account, onClose, onSuccess }) {
   const { theme, colors } = useTheme()
   const { showError } = useDialog()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
   
   const [form, setForm] = useState({
@@ -14,8 +16,8 @@ function EditAccountModal({ account, onClose, onSuccess }) {
     accessToken: account.accessToken || '',
     refreshToken: account.refreshToken || '',
     // BuilderId SSO 字段
-    ssoClientId: account.ssoClientId || '',
-    ssoClientSecret: account.ssoClientSecret || '',
+    clientId: account.clientId || '',
+    clientSecret: account.clientSecret || '',
   })
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(null)
@@ -38,14 +40,14 @@ function EditAccountModal({ account, onClose, onSuccess }) {
       }
       // BuilderId 专用字段
       if (account.provider === 'BuilderId') {
-        params.ssoClientId = form.ssoClientId || null
-        params.ssoClientSecret = form.ssoClientSecret || null
+        params.clientId = form.clientId || null
+        params.clientSecret = form.clientSecret || null
       }
       await invoke('update_account', params)
       onSuccess?.()
       onClose()
     } catch (e) {
-      await showError('保存失败', e.toString())
+      await showError(t('editAccount.saveFailed'), e.toString())
     } finally {
       setSaving(false)
     }
@@ -67,7 +69,7 @@ function EditAccountModal({ account, onClose, onSuccess }) {
               <span className="text-sm font-bold">{account.email[0].toUpperCase()}</span>
             </div>
             <div>
-              <h3 className={`font-medium ${colors.text}`}>编辑账号</h3>
+              <h3 className={`font-medium ${colors.text}`}>{t('editAccount.title')}</h3>
               <p className={`text-xs ${colors.textMuted}`}>{account.email}</p>
             </div>
           </div>
@@ -79,12 +81,12 @@ function EditAccountModal({ account, onClose, onSuccess }) {
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {/* 备注标签 */}
           <div>
-            <label className={`block text-sm font-medium ${colors.textMuted} mb-2`}>备注标签</label>
+            <label className={`block text-sm font-medium ${colors.textMuted} mb-2`}>{t('accounts.remark')}</label>
             <input
               type="text"
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
-              placeholder="输入备注，方便识别账号"
+              placeholder={t('editAccount.labelPlaceholder')}
               className={`w-full px-3 py-2 border ${colors.cardBorder} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${colors.input} ${colors.text}`}
             />
           </div>
@@ -97,7 +99,7 @@ function EditAccountModal({ account, onClose, onSuccess }) {
             >
               <div className="flex items-center gap-2">
                 <Key size={16} className={colors.textMuted} />
-                <span className={`text-sm font-medium ${colors.text}`}>Token 凭证</span>
+                <span className={`text-sm font-medium ${colors.text}`}>{t('editAccount.tokenCredentials')}</span>
               </div>
               <div className="flex items-center gap-2">
                 {account.expiresAt && (
@@ -113,31 +115,31 @@ function EditAccountModal({ account, onClose, onSuccess }) {
               <div className={`px-4 pb-4 space-y-3 border-t ${colors.cardBorder} pt-3`}>
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-xs font-medium ${colors.textMuted}`}>Access Token</span>
+                    <span className={`text-xs font-medium ${colors.textMuted}`}>{t('editAccount.accessToken')}</span>
                     <button type="button" onClick={() => handleCopy(form.accessToken, 'access')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
                       {copied === 'access' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-                      {copied === 'access' ? '已复制' : '复制'}
+                      {copied === 'access' ? t('common.copied') : t('common.copy')}
                     </button>
                   </div>
                   <textarea 
                     value={form.accessToken} 
                     onChange={(e) => setForm({ ...form, accessToken: e.target.value })} 
-                    placeholder="eyJ 开头"
+                    placeholder="eyJ..."
                     className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} 
                   />
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-xs font-medium ${colors.textMuted}`}>Refresh Token</span>
+                    <span className={`text-xs font-medium ${colors.textMuted}`}>{t('editAccount.refreshToken')}</span>
                     <button type="button" onClick={() => handleCopy(form.refreshToken, 'refresh')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
                       {copied === 'refresh' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-                      {copied === 'refresh' ? '已复制' : '复制'}
+                      {copied === 'refresh' ? t('common.copied') : t('common.copy')}
                     </button>
                   </div>
                   <textarea 
                     value={form.refreshToken} 
                     onChange={(e) => setForm({ ...form, refreshToken: e.target.value })} 
-                    placeholder="aor 开头"
+                    placeholder="aor..."
                     className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${colors.text}`} 
                   />
                 </div>
@@ -147,7 +149,7 @@ function EditAccountModal({ account, onClose, onSuccess }) {
                   <div className={`pt-3 border-t ${colors.cardBorder} space-y-3`}>
                     <div className={`text-xs font-medium ${colors.textMuted} flex items-center gap-1`}>
                       <Shield size={12} />
-                      AWS SSO OIDC 凭证
+                      {t('editAccount.ssoCredentials')}
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
@@ -161,7 +163,7 @@ function EditAccountModal({ account, onClose, onSuccess }) {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={`block text-xs ${colors.textMuted} mb-1`}>Region</label>
-                        <input type="text" value={account.ssoRegion || 'us-east-1'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
+                        <input type="text" value={account.region || 'us-east-1'} readOnly className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} opacity-60`} />
                       </div>
                       <div>
                         <label className={`block text-xs ${colors.textMuted} mb-1`}>Session ID</label>
@@ -171,27 +173,27 @@ function EditAccountModal({ account, onClose, onSuccess }) {
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className={`text-xs ${colors.textMuted}`}>Client ID</label>
-                        <button type="button" onClick={() => handleCopy(form.ssoClientId, 'ssoClientId')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
-                          {copied === 'ssoClientId' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                        <button type="button" onClick={() => handleCopy(form.clientId, 'clientId')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                          {copied === 'clientId' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                         </button>
                       </div>
                       <input 
                         type="text" 
-                        value={form.ssoClientId} 
-                        onChange={(e) => setForm({ ...form, ssoClientId: e.target.value })}
+                        value={form.clientId} 
+                        onChange={(e) => setForm({ ...form, clientId: e.target.value })}
                         className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg ${colors.text} focus:outline-none focus:ring-2 focus:ring-blue-500/20`} 
                       />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className={`text-xs ${colors.textMuted}`}>Client Secret</label>
-                        <button type="button" onClick={() => handleCopy(form.ssoClientSecret, 'ssoClientSecret')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
-                          {copied === 'ssoClientSecret' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                        <button type="button" onClick={() => handleCopy(form.clientSecret, 'clientSecret')} className={`text-xs ${colors.textMuted} hover:text-blue-500 flex items-center gap-1`}>
+                          {copied === 'clientSecret' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                         </button>
                       </div>
                       <textarea 
-                        value={form.ssoClientSecret} 
-                        onChange={(e) => setForm({ ...form, ssoClientSecret: e.target.value })}
+                        value={form.clientSecret} 
+                        onChange={(e) => setForm({ ...form, clientSecret: e.target.value })}
                         className={`w-full px-3 py-2 text-xs font-mono ${isDark ? 'bg-white/5' : 'bg-gray-50'} border ${colors.cardBorder} rounded-lg resize-none h-14 ${colors.text} focus:outline-none focus:ring-2 focus:ring-blue-500/20`} 
                       />
                     </div>
@@ -224,14 +226,14 @@ function EditAccountModal({ account, onClose, onSuccess }) {
         
         <div className={`flex justify-end gap-3 px-5 py-4 border-t ${colors.cardBorder}`}>
           <button onClick={onClose} className={`px-4 py-2 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-lg text-sm ${colors.text}`}>
-            取消
+            {t('common.cancel')}
           </button>
           <button 
             onClick={handleSave} 
             disabled={saving}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50"
           >
-            {saving ? '保存中...' : '保存'}
+            {saving ? t('settings.saving') : t('common.save')}
           </button>
         </div>
       </div>

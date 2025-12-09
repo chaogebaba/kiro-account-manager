@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle, XCircle, Info, X } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useI18n } from '../../i18n'
 
 /**
  * 通用确认/提示对话框
@@ -17,12 +18,17 @@ function ConfirmDialog({
   message,
   onConfirm,
   onCancel,
-  confirmText = '确定',
-  cancelText = '取消',
+  confirmText,
+  cancelText,
   loading = false,
 }) {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
+  
+  // Use i18n defaults if not provided
+  const finalConfirmText = confirmText || t('common.ok')
+  const finalCancelText = cancelText || t('common.cancel')
 
   const config = {
     confirm: {
@@ -137,7 +143,7 @@ function ConfirmDialog({
                 transition-all duration-200 active:scale-[0.98]
               `}
             >
-              {cancelText}
+              {finalCancelText}
             </button>
           )}
           <button
@@ -154,7 +160,7 @@ function ConfirmDialog({
             `}
           >
             {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-            {confirmText}
+            {finalConfirmText}
           </button>
         </div>
       </div>

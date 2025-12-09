@@ -14,8 +14,8 @@ import UpdateChecker from './components/UpdateChecker'
 
 import { useTheme } from './contexts/ThemeContext'
 
-// 自动刷新间隔：50分钟
-const AUTO_REFRESH_INTERVAL = 50 * 60 * 1000
+// 默认自动刷新间隔：50分钟
+const DEFAULT_REFRESH_INTERVAL = 50 * 60 * 1000
 
 function App() {
   const [user, setUser] = useState(null)
@@ -24,8 +24,8 @@ function App() {
   const { colors } = useTheme()
   const refreshTimerRef = useRef(null)
 
-  // 自动刷新所有账号
-  const autoRefreshAccounts = async () => {
+  // 启动时只刷新 token（不获取 usage，快速启动）
+  const refreshExpiredTokensOnly = async () => {
     try {
       const settings = await invoke('get_app_settings').catch(() => ({}))
       if (!settings.autoRefresh) return
@@ -33,28 +33,101 @@ function App() {
       const accounts = await invoke('get_accounts')
       if (!accounts || accounts.length === 0) return
       
-      console.log(`[AutoRefresh] 开始刷新 ${accounts.length} 个账号...`)
+      const now = new Date()
+      const refreshThreshold = 5 * 60 * 1000 // 提前 5 分钟
       
-      for (const account of accounts) {
-        try {
-          await invoke('sync_account', { id: account.id })
-        } catch (e) {
-          console.warn(`[AutoRefresh] 刷新 ${account.email} 失败:`, e)
-        }
+      const expiredAccounts = accounts.filter(acc => {
+        // 跳过已封禁账号
+        if (acc.status === '已封禁' || acc.status === '封禁') return false
+        if (!acc.expiresAt) return false
+        const expiresAt = new Date(acc.expiresAt.replace(/\//g, '-'))
+        return (expiresAt.getTime() - now.getTime()) < refreshThreshold
+      })
+      
+      if (expiredAccounts.length === 0) {
+        console.log('[AutoRefresh] 没有需要刷新的 token')
+        return
       }
       
-      console.log('[AutoRefresh] 刷新完成')
+      console.log(`[AutoRefresh] 刷新 ${expiredAccounts.length} 个过期 token...`)
+      
+      // 并发刷新
+      await Promise.allSettled(
+        expiredAccounts.map(async (account) => {
+          try {
+            await invoke('refresh_account_token', { id: account.id })
+            console.log(`[AutoRefresh] ${account.email} token 刷新成功`)
+          } catch (e) {
+            console.warn(`[AutoRefresh] ${account.email} token 刷新失败:`, e)
+          }
+        })
+      )
+      
+      console.log('[AutoRefresh] token 刷新完成')
     } catch (e) {
-      console.error('[AutoRefresh] 自动刷新失败:', e)
+      console.error('[AutoRefresh] 刷新失败:', e)
+    }
+  }
+
+  // 定时刷新：只刷新 token
+  const checkAndRefreshExpiringTokens = async () => {
+    try {
+      const settings = await invoke('get_app_settings').catch(() => ({}))
+      if (!settings.autoRefresh) return
+      
+      const accounts = await invoke('get_accounts')
+      if (!accounts || accounts.length === 0) return
+      
+      const now = new Date()
+      const refreshThreshold = 5 * 60 * 1000
+      
+      const expiredAccounts = accounts.filter(acc => {
+        // 跳过已封禁账号
+        if (acc.status === '已封禁' || acc.status === '封禁') return false
+        if (!acc.expiresAt) return false
+        const expiresAt = new Date(acc.expiresAt.replace(/\//g, '-'))
+        return (expiresAt.getTime() - now.getTime()) < refreshThreshold
+      })
+      
+      if (expiredAccounts.length === 0) {
+        console.log('[AutoRefresh] 没有需要刷新的 token')
+        return
+      }
+      
+      console.log(`[AutoRefresh] 刷新 ${expiredAccounts.length} 个 token...`)
+      
+      await Promise.allSettled(
+        expiredAccounts.map(async (account) => {
+          try {
+            await invoke('refresh_account_token', { id: account.id })
+            console.log(`[AutoRefresh] ${account.email} token 刷新成功`)
+          } catch (e) {
+            console.warn(`[AutoRefresh] ${account.email} token 刷新失败:`, e)
+          }
+        })
+      )
+      
+      console.log('[AutoRefresh] token 刷新完成')
+    } catch (e) {
+      console.error('[AutoRefresh] 刷新失败:', e)
     }
   }
 
   // 启动自动刷新定时器
-  const startAutoRefreshTimer = () => {
+  const startAutoRefreshTimer = async () => {
     if (refreshTimerRef.current) {
       clearInterval(refreshTimerRef.current)
     }
-    refreshTimerRef.current = setInterval(autoRefreshAccounts, AUTO_REFRESH_INTERVAL)
+    
+    // 启动时只刷新 token（快速启动）
+    refreshExpiredTokensOnly()
+    
+    // 从设置读取刷新间隔
+    const settings = await invoke('get_app_settings').catch(() => ({}))
+    const intervalMs = (settings.autoRefreshInterval || 50) * 60 * 1000
+    
+    console.log(`[AutoRefresh] 定时器间隔: ${settings.autoRefreshInterval || 50} 分钟`)
+    refreshTimerRef.current = setInterval(checkAndRefreshExpiringTokens, intervalMs)
   }
 
   useEffect(() => {
@@ -74,11 +147,18 @@ function App() {
       setActiveMenu('token')
     })
     
+    // 监听设置变化，重启定时器
+    const unlistenSettings = listen('settings-changed', () => {
+      console.log('[AutoRefresh] 设置已变化，重启定时器')
+      startAutoRefreshTimer()
+    })
+    
     // 启动自动刷新定时器
     startAutoRefreshTimer()
     
     return () => { 
       unlisten.then(fn => fn())
+      unlistenSettings.then(fn => fn())
       if (refreshTimerRef.current) {
         clearInterval(refreshTimerRef.current)
       }

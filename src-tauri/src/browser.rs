@@ -1,6 +1,6 @@
 // 浏览器打开工具
 
-use crate::commands::settings_cmd::get_browser_path;
+use crate::commands::app_settings_cmd::get_browser_path;
 use serde::Serialize;
 
 /// 打开浏览器访问指定 URL

@@ -29,7 +29,10 @@ pub fn delete_mcp_server(name: String) -> Result<(), String> {
 pub fn toggle_mcp_server(name: String, disabled: bool) -> Result<(), String> {
     let mut mcp_config = McpConfig::load()?;
     if let Some(server) = mcp_config.mcp_servers.get_mut(&name) {
-        server.disabled = disabled;
+        match server {
+            McpServer::Command(cmd) => cmd.disabled = disabled,
+            McpServer::Url(url) => url.disabled = disabled,
+        }
         mcp_config.save()
     } else {
         Err(format!("服务器 {} 不存在", name))

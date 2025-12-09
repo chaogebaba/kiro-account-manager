@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useI18n } from '../../i18n'
 import { Sparkles, Package, Tag, Calendar, User, ExternalLink } from 'lucide-react'
 
 function PowersManager() {
   const { theme, colors } = useTheme()
+  const { t } = useI18n()
   const isDark = theme === 'dark'
   const [powers, setPowers] = useState({})
   const [loading, setLoading] = useState(true)
@@ -36,10 +38,10 @@ function PowersManager() {
           </div>
           <div>
             <h1 className={`text-xl font-bold ${colors.text}`}>Powers</h1>
-            <p className={`text-sm ${colors.textMuted}`}>查看已安装的 Kiro Powers（只读）</p>
+            <p className={`text-sm ${colors.textMuted}`}>{t('powersManager.subtitle')}</p>
           </div>
           <div className={`ml-auto px-3 py-1 rounded-lg ${isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'} text-sm`}>
-            {powerList.length} 个已安装
+            {powerList.length} {t('powersManager.installed')}
           </div>
         </div>
       </div>
@@ -47,12 +49,12 @@ function PowersManager() {
       {/* 列表 */}
       <div className="flex-1 overflow-auto p-6">
         {loading ? (
-          <div className={`text-center py-12 ${colors.textMuted}`}>加载中...</div>
+          <div className={`text-center py-12 ${colors.textMuted}`}>{t('common.loading')}</div>
         ) : powerList.length === 0 ? (
           <div className="text-center py-12">
             <Package size={48} className={`mx-auto mb-4 ${colors.textMuted} opacity-50`} />
-            <p className={colors.textMuted}>暂无已安装的 Powers</p>
-            <p className={`text-sm ${colors.textMuted} mt-1`}>在 Kiro IDE 中安装 Powers</p>
+            <p className={colors.textMuted}>{t('powersManager.noPowers')}</p>
+            <p className={`text-sm ${colors.textMuted} mt-1`}>{t('powersManager.installInKiro')}</p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

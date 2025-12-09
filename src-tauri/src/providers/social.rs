@@ -2,7 +2,7 @@
 // 参考 kiro-batch-login/src/providers/social-provider.js
 
 use crate::kiro_auth_client::KiroAuthServiceClient;
-use crate::oauth_callback_server::OAuthCallbackServer;
+use crate::deep_link_handler::{DeepLinkCallbackWaiter, register_waiter};
 use crate::auth_social;
 use super::{AuthResult, AuthProvider, RefreshMetadata};
 use serde::Deserialize;
@@ -42,9 +42,6 @@ struct SocialRefreshResponse {
     csrf_token: Option<String>,
 }
 
-// Social 登录使用的端口列表
-const SOCIAL_AUTH_PORTS: [u16; 10] = [49153, 50153, 51153, 52153, 53153, 4649, 6588, 9091, 8008, 3128];
-
 pub struct SocialProvider {
     provider_id: String,
 }
@@ -62,11 +59,8 @@ impl AuthProvider for SocialProvider {
     async fn login(&self) -> Result<AuthResult, String> {
         let provider = &self.provider_id;
 
-        // Step 1: 启动 OAuth 回调服务器
-        let mut server = OAuthCallbackServer::new_predefined("localhost", SOCIAL_AUTH_PORTS.to_vec());
-        let redirect_uri = server
-            .start()
-            .map_err(|e| format!("Failed to start OAuth callback server: {}", e))?;
+        // Step 1: 使用 deep link 作为回调 URI
+        let redirect_uri = DeepLinkCallbackWaiter::get_redirect_uri();
 
         // Step 2: 生成 PKCE 参数
         let state = uuid::Uuid::new_v4().to_string();
@@ -77,21 +71,21 @@ impl AuthProvider for SocialProvider {
         println!("Redirect URI: {}", redirect_uri);
         println!("State: {}", state);
 
-        // Step 3: 打开浏览器登录
+        // Step 3: 注册回调等待器
+        let waiter = register_waiter(&state);
+
+        // Step 4: 打开浏览器登录
         let client = KiroAuthServiceClient::new();
         client.login(provider, &redirect_uri, &code_challenge, &state).await?;
 
-        // Step 4: 等待回调
-        println!("[Social] Waiting for callback...");
-        let callback = tokio::task::spawn_blocking(move || server.wait_for_callback())
+        // Step 5: 等待 deep link 回调
+        println!("[Social] Waiting for deep link callback...");
+        let callback = tokio::task::spawn_blocking(move || waiter.wait_for_callback())
             .await
             .map_err(|e| format!("Failed to join callback waiter: {}", e))?
             .map_err(|e| format!("OAuth callback failed: {}", e))?;
-
-        // Step 5: 验证 state
-        if callback.state != state {
-            return Err("State mismatch - possible CSRF attack".to_string());
-        }
+        
+        println!("[Social] Callback received, state: {}", callback.state);
 
         // Step 6: 交换 token
         println!("[Social] Exchanging code for tokens...");

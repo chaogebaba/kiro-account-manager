@@ -3,11 +3,7 @@
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use std::time::Duration;
-
-
 
 /// AWS SSO OIDC 客户端
 pub struct AWSSSOClient {
@@ -46,20 +42,12 @@ pub struct TokenResponse {
     pub token_type: Option<String>,
     #[serde(rename = "expiresIn")]
     pub expires_in: i64,
-    // AWS SSO 特有字段
     #[serde(rename = "aws_sso_app_session_id")]
     pub aws_sso_app_session_id: Option<String>,
     #[serde(rename = "issuedTokenType")]
     pub issued_token_type: Option<String>,
     #[serde(rename = "originSessionId")]
     pub origin_session_id: Option<String>,
-}
-
-/// PKCE 参数
-#[derive(Debug, Clone)]
-pub struct PKCEParams {
-    pub code_verifier: String,
-    pub code_challenge: String,
 }
 
 impl AWSSSOClient {
@@ -75,105 +63,6 @@ impl AWSSSOClient {
             base_url,
             client,
         }
-    }
-
-    /// 注册 OAuth 客户端
-    pub async fn register_client(&self, issuer_url: &str) -> Result<ClientRegistration, String> {
-        let url = format!("{}/client/register", self.base_url);
-        
-        let body = serde_json::json!({
-            "clientName": "Kiro Account Manager",
-            "clientType": "public",
-            "scopes": [
-                "codewhisperer:completions",
-                "codewhisperer:analysis",
-                "codewhisperer:conversations",
-                "codewhisperer:transformations",
-                "codewhisperer:taskassist"
-            ],
-            "grantTypes": ["authorization_code", "refresh_token"],
-            "redirectUris": ["http://127.0.0.1/oauth/callback"],
-            "issuerUrl": issuer_url
-        });
-
-        println!("\n[AWS SSO] Register Client (region: {})", self.region);
-        println!("URL: {}", url);
-        println!("Issuer URL: {}", issuer_url);
-
-        let resp = self.client
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| format!("[{}] Client registration request failed: {}", self.region, e))?;
-
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-
-        if !status.is_success() {
-            return Err(format!("[{}] Client registration failed ({}): {}", self.region, status, text));
-        }
-
-        println!("Client registered successfully");
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-            if let Ok(pretty) = serde_json::to_string_pretty(&json) {
-                println!("{}", pretty);
-            }
-        }
-
-        serde_json::from_str(&text)
-            .map_err(|e| format!("Failed to parse client registration: {}", e))
-    }
-
-
-    /// 交换授权码获取 Token
-    pub async fn create_token(
-        &self,
-        client_id: &str,
-        client_secret: &str,
-        code: &str,
-        code_verifier: &str,
-        redirect_uri: &str,
-    ) -> Result<TokenResponse, String> {
-        let url = format!("{}/token", self.base_url);
-
-        let body = serde_json::json!({
-            "clientId": client_id,
-            "clientSecret": client_secret,
-            "grantType": "authorization_code",
-            "code": code,
-            "codeVerifier": code_verifier,
-            "redirectUri": redirect_uri
-        });
-
-        println!("\n[AWS SSO] Create Token");
-        println!("URL: {}", url);
-
-        let resp = self.client
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| format!("Token creation request failed: {}", e))?;
-
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-
-        if !status.is_success() {
-            return Err(format!("Token creation failed ({}): {}", status, text));
-        }
-
-        println!("Token created successfully");
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-            if let Ok(pretty) = serde_json::to_string_pretty(&json) {
-                println!("{}", pretty);
-            }
-        }
-
-        serde_json::from_str(&text)
-            .map_err(|e| format!("Failed to parse token response: {}", e))
     }
 
     /// 刷新 Token（Builder ID 账号刷新时使用）
@@ -213,64 +102,164 @@ impl AWSSSOClient {
         }
 
         println!("Token refreshed successfully");
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-            if let Ok(pretty) = serde_json::to_string_pretty(&json) {
-                println!("{}", pretty);
-            }
-        }
 
         serde_json::from_str(&text)
             .map_err(|e| format!("Failed to parse token response: {}", e))
     }
 
-    /// 生成 PKCE 参数
-    pub fn generate_pkce() -> PKCEParams {
-        // 生成 32 字节随机数作为 code_verifier
-        let random_bytes: [u8; 32] = rand::random();
-        let code_verifier = URL_SAFE_NO_PAD.encode(random_bytes);
+    /// 注册支持设备授权的客户端
+    pub async fn register_device_client(&self, issuer_url: &str) -> Result<ClientRegistration, String> {
+        let url = format!("{}/client/register", self.base_url);
+        
+        let body = serde_json::json!({
+            "clientName": "Kiro Account Manager",
+            "clientType": "public",
+            "scopes": [
+                "codewhisperer:completions",
+                "codewhisperer:analysis",
+                "codewhisperer:conversations",
+                "codewhisperer:transformations",
+                "codewhisperer:taskassist"
+            ],
+            "grantTypes": ["urn:ietf:params:oauth:grant-type:device_code", "refresh_token"],
+            "issuerUrl": issuer_url
+        });
 
-        // 计算 SHA256 哈希作为 code_challenge
-        let mut hasher = Sha256::new();
-        hasher.update(code_verifier.as_bytes());
-        let hash = hasher.finalize();
-        let code_challenge = URL_SAFE_NO_PAD.encode(hash);
+        println!("\n[AWS SSO] Register Device Client (region: {})", self.region);
 
-        PKCEParams {
-            code_verifier,
-            code_challenge,
+        let resp = self.client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Device client registration failed: {}", e))?;
+
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+
+        if !status.is_success() {
+            return Err(format!("Device client registration failed ({}): {}", status, text));
         }
+
+        println!("Device client registered successfully");
+        serde_json::from_str(&text)
+            .map_err(|e| format!("Failed to parse client registration: {}", e))
     }
 
-    /// 生成随机 state
-    pub fn generate_state() -> String {
-        uuid::Uuid::new_v4().to_string()
-    }
-
-    /// 构建授权 URL
-    pub fn build_authorization_url(
+    /// 发起设备授权请求
+    pub async fn start_device_authorization(
         &self,
         client_id: &str,
-        redirect_uri: &str,
-        state: &str,
-        code_challenge: &str,
-    ) -> String {
-        let scopes = [
-            "codewhisperer:completions",
-            "codewhisperer:analysis",
-            "codewhisperer:conversations",
-            "codewhisperer:transformations",
-            "codewhisperer:taskassist",
-        ].join(",");
+        client_secret: &str,
+        start_url: &str,
+    ) -> Result<DeviceAuthorizationResponse, String> {
+        let url = format!("{}/device_authorization", self.base_url);
 
-        format!(
-            "{}/authorize?response_type=code&client_id={}&redirect_uri={}&scopes={}&state={}&code_challenge={}&code_challenge_method=S256",
-            self.base_url,
-            urlencoding::encode(client_id),
-            urlencoding::encode(redirect_uri),
-            urlencoding::encode(&scopes),
-            state,
-            code_challenge
-        )
+        let body = serde_json::json!({
+            "clientId": client_id,
+            "clientSecret": client_secret,
+            "startUrl": start_url
+        });
+
+        println!("\n[AWS SSO] Start Device Authorization");
+
+        let resp = self.client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Device authorization failed: {}", e))?;
+
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+
+        if !status.is_success() {
+            return Err(format!("Device authorization failed ({}): {}", status, text));
+        }
+
+        println!("Device authorization started");
+        serde_json::from_str(&text)
+            .map_err(|e| format!("Failed to parse device authorization: {}", e))
     }
 
+    /// 轮询设备授权状态获取 Token
+    pub async fn poll_device_token(
+        &self,
+        client_id: &str,
+        client_secret: &str,
+        device_code: &str,
+    ) -> Result<DevicePollResult, String> {
+        let url = format!("{}/token", self.base_url);
+
+        let body = serde_json::json!({
+            "clientId": client_id,
+            "clientSecret": client_secret,
+            "grantType": "urn:ietf:params:oauth:grant-type:device_code",
+            "deviceCode": device_code
+        });
+
+        let resp = self.client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Device token poll failed: {}", e))?;
+
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+
+        if status.is_success() {
+            let token: TokenResponse = serde_json::from_str(&text)
+                .map_err(|e| format!("Failed to parse token: {}", e))?;
+            return Ok(DevicePollResult::Success(token));
+        }
+
+        // 解析错误响应
+        if let Ok(err) = serde_json::from_str::<DeviceErrorResponse>(&text) {
+            match err.error.as_str() {
+                "authorization_pending" => Ok(DevicePollResult::Pending),
+                "slow_down" => Ok(DevicePollResult::SlowDown),
+                "expired_token" => Ok(DevicePollResult::Expired),
+                "access_denied" => Ok(DevicePollResult::Denied),
+                _ => Err(format!("Device auth error: {}", err.error)),
+            }
+        } else {
+            Err(format!("Device token poll failed ({}): {}", status, text))
+        }
+    }
+}
+
+/// 设备授权响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceAuthorizationResponse {
+    #[serde(rename = "deviceCode")]
+    pub device_code: String,
+    #[serde(rename = "userCode")]
+    pub user_code: String,
+    #[serde(rename = "verificationUri")]
+    pub verification_uri: String,
+    #[serde(rename = "verificationUriComplete")]
+    pub verification_uri_complete: Option<String>,
+    #[serde(rename = "expiresIn")]
+    pub expires_in: i64,
+    pub interval: Option<i64>,
+}
+
+/// 设备授权错误响应
+#[derive(Debug, Deserialize)]
+struct DeviceErrorResponse {
+    error: String,
+}
+
+/// 设备轮询结果
+#[derive(Debug)]
+pub enum DevicePollResult {
+    Success(TokenResponse),
+    Pending,
+    SlowDown,
+    Expired,
+    Denied,
 }

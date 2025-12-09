@@ -24,3 +24,6 @@ src-tauri/target/
 
 # Reference project
 kiro-batch-login/
+/chaogei-kiro-ref/
+/Kiro-account-manager/
+temp-reference-repo/
