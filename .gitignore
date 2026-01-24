@@ -24,6 +24,9 @@ src-tauri/target/
 # Logs
 *.log
 
+# Docs - 抓包文件
+docs/api/KiroWebPortalService/OAuth-*/
+
 # Python
 __pycache__/
 *.pyc
