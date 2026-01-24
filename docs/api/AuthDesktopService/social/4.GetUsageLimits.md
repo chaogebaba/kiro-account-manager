@@ -1,0 +1,138 @@
+# CodeWhisperer Get Usage Limits API
+
+获取用户配额和订阅信息
+
+## 请求
+
+```
+GET https://codewhisperer.us-east-1.amazonaws.com/getUsageLimits
+Authorization: Bearer {accessToken}
+```
+
+### Query Parameters
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| isEmailRequired | boolean | 是 | 是否返回邮箱，固定 `true` |
+| origin | string | 是 | 来源，固定 `AI_EDITOR` |
+| profileArn | string | 是 | Profile ARN (URL 编码) |
+
+### 示例
+
+```
+https://codewhisperer.us-east-1.amazonaws.com/getUsageLimits?isEmailRequired=true&origin=AI_EDITOR&profileArn=arn%3Aaws%3Acodewhisperer%3Aus-east-1%3A699475941385%3Aprofile%2FEHGA3GRVQMUK
+```
+
+## 响应
+
+### 成功 (200 OK)
+
+```json
+{
+  "daysUntilReset": 0,
+  "limits": [],
+  "nextDateReset": 1767225600.0,
+  "overageConfiguration": {
+    "overageStatus": "DISABLED"
+  },
+  "subscriptionInfo": {
+    "overageCapability": "OVERAGE_CAPABLE",
+    "subscriptionManagementTarget": "MANAGE",
+    "subscriptionTitle": "KIRO PRO+",
+    "type": "Q_DEVELOPER_STANDALONE_PRO_PLUS",
+    "upgradeCapability": "UPGRADE_CAPABLE"
+  },
+  "usageBreakdown": null,
+  "usageBreakdownList": [
+    {
+      "bonuses": [
+        {
+          "bonusCode": "day-3-reinvent-gav-lemo-mit",
+          "currentUsage": 305.1,
+          "description": "Re:Invent day 3 code",
+          "displayName": "Day 3 Re:Invent",
+          "expiresAt": 1767410695.352,
+          "redeemedAt": 1764818695.352,
+          "status": "ACTIVE",
+          "usageLimit": 1000.0
+        }
+      ],
+      "currency": "USD",
+      "currentOverages": 0,
+      "currentOveragesWithPrecision": 0.0,
+      "currentUsage": 666,
+      "currentUsageWithPrecision": 666.26,
+      "displayName": "Credit",
+      "displayNamePlural": "Credits",
+      "freeTrialInfo": {
+        "currentUsage": 500,
+        "currentUsageWithPrecision": 500.0,
+        "freeTrialExpiry": 1765688591.569,
+        "freeTrialStatus": "ACTIVE",
+        "usageLimit": 500,
+        "usageLimitWithPrecision": 500.0
+      },
+      "nextDateReset": 1767225600.0,
+      "overageCap": 10000,
+      "overageCapWithPrecision": 10000.0,
+      "overageCharges": 0.0,
+      "overageRate": 0.04,
+      "resourceType": "CREDIT",
+      "unit": "INVOCATIONS",
+      "usageLimit": 2000,
+      "usageLimitWithPrecision": 2000.0
+    }
+  ],
+  "userInfo": {
+    "email": "1292548381@qq.com",
+    "userId": "d-9067c98495.34d8e448-a001-7081-3603-a29a23866844"
+  }
+}
+```
+
+### 响应字段说明
+
+#### userInfo
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| email | string | 用户邮箱 |
+| userId | string | 用户 ID |
+
+#### subscriptionInfo
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| subscriptionTitle | string | 订阅名称: `Free`, `KIRO PRO`, `KIRO PRO+` |
+| type | string | 订阅类型 |
+| overageCapability | string | 超额能力: `OVERAGE_CAPABLE` |
+| upgradeCapability | string | 升级能力: `UPGRADE_CAPABLE` |
+
+#### usageBreakdownList[0]
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| usageLimit | number | 配额上限 |
+| currentUsage | number | 已使用量 |
+| nextDateReset | number | 下次重置时间 (Unix 时间戳) |
+| overageRate | number | 超额费率 (USD/次) |
+| overageCap | number | 超额上限 |
+
+#### freeTrialInfo
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| usageLimit | number | 试用配额 |
+| currentUsage | number | 试用已用 |
+| freeTrialExpiry | number | 试用过期时间 |
+| freeTrialStatus | string | 状态: `ACTIVE`, `EXPIRED` |
+
+#### bonuses[]
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| bonusCode | string | 奖励码 |
+| displayName | string | 显示名称 |
+| usageLimit | number | 奖励配额 |
+| currentUsage | number | 奖励已用 |
+| expiresAt | number | 过期时间 |
+| status | string | 状态: `ACTIVE`, `EXPIRED` |
+
+### 错误
+
+- `401 Unauthorized` - accessToken 无效或已过期

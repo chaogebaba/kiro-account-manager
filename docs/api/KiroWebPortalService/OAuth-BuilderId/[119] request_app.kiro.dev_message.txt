@@ -1,0 +1,19 @@
+GET /signin/oauth?code=eyJraWQiOiJrZXktMTU2NDAyODA3OCIsImFsZyI6IkhTMzg0In0.eyJwbGFpbnRleHQiOiJ5VmUxS051MVdVUVhUWjItY1JJbDYtWE5OdmJORHNIMmJVVjVPTXhsSWswIiwiZXhwIjoxNzY0OTYxNjUzLCJ0eXBlIjoiYXV0aENvZGUifQ.5B6vUFPk1euCPBEoLhrEDs4EcquYzIhEUmyNtBxR6zqX4G4Ah8MW7Rwr4rNX-7SP&state=QUFBQURtdGxlUzB4TlRZNE9UVTFNekEzdTJfZGppMHFfdXhMbHBaaXVJSnQ2YVZpcFB0RXRiX0FUaGpGUjRPWEhIT3dzMmpJR0FUMndEOHktX0M2em8wd0tGZkNpay1hbkVBQU4xdlM0M2lwMFkxZWF6Y2tFS0RvOEVOUHhaSVlqeVd2V1dMYThpNFp1UGJ3bC1kbzNPNHltNF9hQ3lNeTFrTlNDNVk0Z3kxUjhYd2FhcHJzNmU5SHVlc003QnJiU0xIVEFBZWFHVGY5dmtHSTA2dkRoZ1BGUER1NVJWTEwyc2pvQ0liTkFsdjJPSW44 h2
+host: app.kiro.dev
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0 80592
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: cross-site
+sec-fetch-mode: navigate
+sec-fetch-dest: document
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+referer: https://view.awsapps.com/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: kiro-visitor-id=1764961097716-l97gqesg46g
+cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiZmE3YWVlZDUtOTdlMy00MDI4LTk4ODYtNGMxZDA3ZmNjMjZjIiwidiI6IjEifQ==
+priority: u=0, i
+

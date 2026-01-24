@@ -1,0 +1,29 @@
+GET /signin/oauth?code=9823bd70-07ca-46e1-b575-a2bc7f9853c0&state=9f598cd5-50d9-4016-ad9b-9991aeb3e535 h2
+host: app.kiro.dev
+pragma: no-cache
+cache-control: no-cache
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0 80592
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: cross-site
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+referer: https://app.kiro.dev/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: kiro-visitor-id=1765001485508-34kg9ith4ms
+cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiMDRiMGVlNGQtNmUwOS00YjZkLWE2ODktMzExYzEyOGVhMzkzIiwidiI6IjEifQ==
+cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiYzlkNTkxZDEtYTM3OC00NzY3LTg2YzItOThjY2JkNTlmMzE5IiwidiI6IjEifQ==
+cookie: AMCVS_7742037254C95E840A4C98A6%40AdobeOrg=1
+cookie: s_cc=true
+cookie: AMCV_7742037254C95E840A4C98A6%40AdobeOrg=1585540135%7CMCIDTS%7C20429%7CMCMID%7C04542209388087034713592716695836348839%7CMCAAMLH-1765626986%7C11%7CMCAAMB-1765626986%7C6G1ynYcLPuiQxYZrsz_pkqfLG9yMXBpb2zX5dvJdYQJzPXImdj0y%7CMCOPTOUT-1765029386s%7CNONE%7CMCAID%7CNONE%7CMCSYNCSOP%7C411-20436%7CvVersion%7C4.4.0
+cookie: aws-token-a-c=eyJraWQiOiJiOTgzZmQ4Yy02NTA1LTRjNDEtOTgyNy1hOTQwNTE1YWNhZTMiLCJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJzX3AiLCJleHAiOjE3NjUwMjI5ODAsImFpZCI6IjQyY2Q3OWM0LTE4OTgtYzk5OC02MmY0LTdlOWYzMjNiMjc0MiJ9.MEUCIA4-xTjlvyjks8sLTxwfCCQEv7sYE0u5FfClYb_K8rAzAiEAiRqnwPUHb84l7QZejVfZWuCoeI22sgAbPf3czR0lWqU
+cookie: awsd2c-token-c=eyJraWQiOiJlNTM3YTcxNy1iMjg4LTQ5YjMtODY4MS0zNDllMmJkZGE2MDAiLCJhbGciOiJFUzI1NiJ9.eyJ2aWQiOiIwOGNkNzljNC0xODk4LWQwYTktMWYxMy02MjliZDJmODlmODEiLCJpc3MiOiJzX3AiLCJleHAiOjE3NjUwMjI5ODB9.MEQCIHehkAfXHcBXfHHxR-hA1qSTwAnfFV80S49VcHOXkbo-AiA-ScR_BcbwDoNKNKJSUPw-GdehGsNY0PTmfdzd72mwGA
+cookie: s_sq=%5B%5BB%5D%5D
+priority: u=0, i
+

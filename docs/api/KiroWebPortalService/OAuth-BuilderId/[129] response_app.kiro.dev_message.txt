@@ -1,0 +1,12 @@
+h2 200
+date: Fri, 05 Dec 2025 19:02:35 GMT
+content-type: application/cbor
+content-length: 163
+x-amzn-requestid: dbceee17-1e58-4a9e-b7dc-049018c308c3
+access-control-allow-origin: https://app.kiro.dev
+smithy-protocol: rpc-v2-cbor
+vary: Origin
+access-control-expose-headers: x-amzn-RequestId,x-amzn-ErrorType,x-amzn-ErrorMessage,Date,smithy-protocol
+access-control-allow-credentials: true
+
+¿eemailsb1fbeb07@ctscts.xyzlfeatureFlagsŸsenableBlinkingGhostmenableCouponsÿcidpiBuilderIdfstatusfActivefuserIdx1d-9067642ac7.54a8b4e8-3071-7051-8d70-fbc7688c3942ÿ

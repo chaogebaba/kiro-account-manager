@@ -1,0 +1,58 @@
+# Authorize - 授权
+
+## 说明
+
+打开浏览器让用户登录授权。
+
+## 请求
+
+```
+GET https://oidc.{region}.amazonaws.com/authorize
+```
+
+## 参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| response_type | string | 是 | 固定 `code` |
+| client_id | string | 是 | RegisterClient 返回的 clientId |
+| redirect_uri | string | 是 | 回调地址，如 `http://127.0.0.1:54321/oauth/callback` |
+| scopes | string | 是 | 权限范围，逗号分隔 |
+| state | string | 是 | 随机字符串，防止 CSRF |
+| code_challenge | string | 是 | PKCE code_challenge (SHA256 + base64url) |
+| code_challenge_method | string | 是 | 固定 `S256` |
+
+## 请求示例
+
+```
+https://oidc.us-east-1.amazonaws.com/authorize?
+  response_type=code&
+  client_id=arn:aws:sso::123456789012:application/ssoins-xxx/apl-xxx&
+  redirect_uri=http://127.0.0.1:54321/oauth/callback&
+  scopes=codewhisperer:completions,codewhisperer:analysis&
+  state=abc123&
+  code_challenge=xxx&
+  code_challenge_method=S256
+```
+
+## 响应
+
+浏览器重定向到 AWS SSO 登录页面，用户完成登录后重定向回 `redirect_uri`：
+
+```
+http://127.0.0.1:54321/oauth/callback?code=AUTH_CODE&state=abc123
+```
+
+## PKCE 生成
+
+```javascript
+// 生成 code_verifier (随机 32 字节)
+const codeVerifier = crypto.randomBytes(32).toString('base64url');
+
+// 计算 code_challenge (SHA256 哈希)
+const codeChallenge = crypto
+  .createHash('sha256')
+  .update(codeVerifier)
+  .digest()
+  .toString('base64url');
+```

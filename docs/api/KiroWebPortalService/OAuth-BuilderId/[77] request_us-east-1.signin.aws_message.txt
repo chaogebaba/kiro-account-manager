@@ -1,0 +1,18 @@
+GET /assets/locales/zh-CN/notYou.json h2
+host: us-east-1.signin.aws
+sec-ch-ua-platform: "Windows"
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0 80592
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+dnt: 1
+sec-ch-ua-mobile: ?0
+accept: */*
+sec-fetch-site: same-origin
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://us-east-1.signin.aws/platform/d-9067642ac7/login?workflowStateHandle=ce5548a6-7412-4e98-ade4-fb0eda0d6e92
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: awsccc=eyJlIjoxLCJwIjoxLCJmIjoxLCJhIjoxLCJpIjoiYjcxYzkxNjctNjlmMC00ODcwLWIzM2YtYTRjYmQ4ZGYwZGU0IiwidiI6IjEifQ==
+cookie: awsd2c-token-c=eyJraWQiOiJlNTM3YTcxNy1iMjg4LTQ5YjMtODY4MS0zNDllMmJkZGE2MDAiLCJhbGciOiJFUzI1NiJ9.eyJ2aWQiOiIxNmNkNzdmMi01NWY0LTMxY2QtYTEyNy04Y2M2YjZkNjliODEiLCJpc3MiOiJzX3AiLCJleHAiOjE3NjQ5NjE5MzJ9.MEQCID2fDkDD2tazrwrHMiCaZKDn3uKNJh_hT7aAkqYrDAsZAiB9ebXGTed2LcteZWLWbOyh8HCcKPRzRth3lPt3Jqg5Iw
+priority: u=1, i
+

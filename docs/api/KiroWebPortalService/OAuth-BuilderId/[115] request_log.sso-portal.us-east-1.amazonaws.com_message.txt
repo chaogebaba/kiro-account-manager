@@ -1,0 +1,20 @@
+POST /log h2
+host: log.sso-portal.us-east-1.amazonaws.com
+content-length: 651
+sec-ch-ua-platform: "Windows"
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0 80592
+accept: application/json, text/plain, */*
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+content-type: application/json
+dnt: 1
+sec-ch-ua-mobile: ?0
+origin: https://view.awsapps.com
+sec-fetch-site: cross-site
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer: https://view.awsapps.com/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+priority: u=1, i
+
+{"type":"info","entry":{"appVersion":"2025-11-18-00-06-03-032","region":"us-east-1","accountId":"432677196278","directoryId":"d-9067642ac7","userId":"NDMyNjc3MTk2Mjc4L2QtOTA2NzY0MmFjNy81NGE4YjRlOC0zMDcxLTcwNTEtOGQ3MC1mYmM3Njg4YzM5NDI=","variant":"sono-356dbde54ba21c6b393ea0971f847c552b24dbdaf27373e24eb11a02f2778ba8","url":"https://oidc.us-east-1.amazonaws.com/authentication_result","method":"POST","pathname":"/authentication_result","apiOperation":"PostAuthenticationResult","service":"oidc","startTime":"2025-12-05T18:59:19.887Z","endTime":"2025-12-05T18:59:20.390Z","latency":503,"requestId":"83a01970-f516-422d-b968-d469a44ed79b","status":200}}

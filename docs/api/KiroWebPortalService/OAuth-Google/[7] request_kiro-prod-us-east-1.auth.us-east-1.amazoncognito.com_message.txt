@@ -1,0 +1,22 @@
+GET /oauth2/authorize?client_id=59bd15eh40ee7pc20h0bkcu7id&response_type=code&scope=email+openid&redirect_uri=https%3A%2F%2Fapp.kiro.dev%2Fsignin%2Foauth&state=9f598cd5-50d9-4016-ad9b-9991aeb3e535&code_challenge=oCufpzR_FbOowr5oiQapcWY867JxgS9Sjft48xyGzE0&code_challenge_method=S256&identity_provider=Google h2
+host: kiro-prod-us-east-1.auth.us-east-1.amazoncognito.com
+pragma: no-cache
+cache-control: no-cache
+sec-ch-ua: "Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+dnt: 1
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0 80592
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: cross-site
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+referer: https://app.kiro.dev/
+accept-encoding: gzip, deflate, br, zstd
+accept-language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+cookie: XSRF-TOKEN=3fcbbb4c-d5b7-442c-a948-0f7172ded696
+cookie: cognito="H4sIAAAAAAAAAAH1AAr/rvnWSy0I5HEXNp+JFXLJkgnhDnyq6LpUwYPQ/e3CZvOLjlRE93hKPH/Q7BJ7O6xDnDRLlNh1PsOj6e5jYymQ0gjm51BZXhCWMpf0BKriZ3pEQoIh8gxqc+qMdR4W3U5PdN5UtYU2MQefbdwqJuVzYR1DLWN2PYaNWKOCNUbklldlYGl/9J5spmbq+XElXUupnwmvBSZlQJjhIVWc9IgeyM+d+sHypY71J0eSBMXAyTcMLgUgqlhm0A+EROtTNscl1DuZayssKm5caWMn0wGiJeKUCzKBq/UmKDjcZ4MYB7Z1xaDAwhHSkhuJuwOfHdmzi7tGJFvFO+w79QAAAA==.H4sIAAAAAAAAALOSPx10Pa5P4UR5df127t68LW/NVNo+vD+w/mmva96Dne4Ass0ZiCAAAAA=.4"
+priority: u=0, i
+
