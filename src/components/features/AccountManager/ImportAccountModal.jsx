@@ -34,7 +34,12 @@ function validateAccount(item, index) {
   
   let provider = item.provider
   if (!provider) {
-    provider = isSocial ? 'Google' : 'BuilderId'
+    if (isSocial) {
+      provider = 'Google'
+    } else {
+      // IdC 账号：通过 startUrl 判断是 Enterprise 还是 BuilderId
+      provider = item.startUrl ? 'Enterprise' : 'BuilderId'
+    }
   }
   
   const validProviders = ['Google', 'Github', 'BuilderId', 'Enterprise']
