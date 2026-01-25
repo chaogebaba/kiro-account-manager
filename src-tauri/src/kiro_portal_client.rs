@@ -145,23 +145,6 @@ pub struct OverageConfiguration {
     pub overage_enabled: Option<bool>,
 }
 
-impl OverageConfiguration {
-    /// 判断超额是否启用（兼容两种格式）
-    pub fn is_overage_enabled(&self) -> bool {
-        // 企业版：检查 overageEnabled 字段
-        if let Some(enabled) = self.overage_enabled {
-            return enabled;
-        }
-        
-        // 普通版：检查 overageStatus 字段
-        if let Some(status) = &self.overage_status {
-            return status != "DISABLED";
-        }
-        
-        false
-    }
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GetUserUsageAndLimitsResponse {
     #[serde(rename = "usageBreakdownList")]
