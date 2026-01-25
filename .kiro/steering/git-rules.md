@@ -52,11 +52,42 @@ inclusion: always
 ## 发布失败处理
 
 如果发布过程中出错，必须清理所有已创建的资源后才能重新开始：
-- 删除私有仓库的 tag：`git tag -d vX.X.X` 然后 `git push origin --delete vX.X.X`
-- 删除公开仓库的 tag：`gh api -X DELETE repos/hj01857655/kiro-account-manager/git/refs/tags/vX.X.X`
-- 删除公开仓库的 Release（如已创建）：`gh release delete vX.X.X -R hj01857655/kiro-account-manager --yes`
-- 删除公开仓库失败的 Actions 记录：`gh run delete <run-id> -R hj01857655/kiro-account-manager`
-- 确认清理完成后再重新执行发布流程
+
+### 1. 删除私有仓库的 tag
+```bash
+git tag -d vX.X.X
+git push origin --delete vX.X.X
+```
+
+### 2. 删除公开仓库的 tag
+```bash
+gh api -X DELETE repos/hj01857655/kiro-account-manager/git/refs/tags/vX.X.X
+```
+
+### 3. 删除公开仓库的 Release（如已创建）
+```bash
+gh release delete vX.X.X -R hj01857655/kiro-account-manager --yes
+```
+
+### 4. 删除公开仓库失败和取消的 Actions 记录
+```bash
+# 查找失败的 Actions
+gh run list -R hj01857655/kiro-account-manager --status failure --limit 10 --json databaseId --jq '.[].databaseId'
+
+# 查找取消的 Actions
+gh run list -R hj01857655/kiro-account-manager --status cancelled --limit 10 --json databaseId --jq '.[].databaseId'
+
+# 删除指定的 Actions 记录
+gh run delete <run-id> -R hj01857655/kiro-account-manager
+
+# 批量删除失败的 Actions
+gh run list -R hj01857655/kiro-account-manager --status failure --limit 10 --json databaseId --jq '.[].databaseId' | ForEach-Object { gh run delete $_ -R hj01857655/kiro-account-manager }
+
+# 批量删除取消的 Actions
+gh run list -R hj01857655/kiro-account-manager --status cancelled --limit 10 --json databaseId --jq '.[].databaseId' | ForEach-Object { gh run delete $_ -R hj01857655/kiro-account-manager }
+```
+
+### 5. 确认清理完成后再重新执行发布流程
 
 ## Release Notes 规则
 
