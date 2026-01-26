@@ -12,6 +12,7 @@ mod http_client;
 mod kiro;
 mod kiro_auth_client;
 mod kiro_portal_client;
+mod kiro_cli_db;
 mod mcp;
 
 mod process;
@@ -44,6 +45,7 @@ use commands::auth_cmd::*;
 use commands::kiro_settings_cmd::*;
 use commands::machine_guid::*;
 use commands::mcp_cmd::*;
+use commands::kiro_cli_cmd::*;
 
 use commands::proxy_cmd::*;
 use commands::update_cmd::*;
@@ -164,6 +166,9 @@ fn main() {
             get_accounts_by_group,
             get_accounts_by_tag,
             get_account_usage,
+            // Kiro CLI 导入命令
+            get_kiro_cli_default_path,
+            import_from_kiro_cli,
             // 分组与标签命令
             get_groups,
             add_group,
