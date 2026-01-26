@@ -332,21 +332,35 @@
 
 **文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
 
+**Google 示例**：
 ```json
 {
-  "access_token": "ya29.xxx",
-  "refresh_token": "aor_xxx",
-  "expires_at": "2024-01-27T12:00:00Z",
-  "profile_arn": "arn:aws:iam::xxx:oidc-provider/accounts.google.com",
-  "region": "us-east-1"
+  "accessToken": "aoaAAAAAGlzmfwTIFYXBGo6MbK0Uc5tBAK36PSGN_DL9eMqd6wRi4qu7V4Bn_V27QZbGatQDfMcAyC2t5Ol98MWAcBkc0:MGYCMQD83+33KN2qKdRsmoD0HpJrtNQshb3JWn5VV5ga/Bp2TSZ6cpUm0pdP6NDEJlgL4noCMQC734N1hb1zOJ3O4NBm3Cca+t09oPShL0ORDhn91DT3FI4o+RdEpddBXzQvMZWU0Z8",
+  "authMethod": "social",
+  "expiresAt": "2026-01-23T16:14:04.053082400+00:00",
+  "profileArn": "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK",
+  "provider": "Google",
+  "refreshToken": "aorAAAAAGnRHpwTIubdiosK1deXVGirP0_o-tkmWYpyaO3zwx87mR_9LUu6rLPztQ79CFU6uQMbjuGEhosgc3Q5fEBkc0:MGUCMB8i5bq4tu58ByXXj8cCS7sXUFLWzDxuJ8ookvPh95EzBG1c0rqhWLTJhm6iEpb33gIxANE3XFAtK2CGF6N1PtKIhdMMUjNC84c/jcHQH7w3OI/6y/wC9hdT1CH9aGQQzcnIIA"
+}
+```
+
+**GitHub 示例**：
+```json
+{
+  "accessToken": "aoaAAAAAGlzmVUeI_8gaJNdgtyeBQfoAaIsy9_99WWHw8Y9V1qgs6-_Izr6wnZeQR1zHZOxNp_6FqJJ0QyRcHoeyIBkc0:MGQCMD+An+ZfQCjYd1p/E0yOCqUwEvK9/wTsJBU35MXa4qAecooBcRmqeW5nVoZWiKyWyQIwCbUHK7J4pOCSRACy4Iy57nU/Qn4fYwl6riQMH/lyb4u81VfFFHtQm6G2X4mG65Q8",
+  "authMethod": "social",
+  "expiresAt": "2026-01-23T16:14:48.790448100+00:00",
+  "profileArn": "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK",
+  "provider": "Github",
+  "refreshToken": "aorAAAAAGmrJCoVczruhi7H0sR_nA3vGjTquOXaNdPrpoOCAWXRGm0xSyaI1891eG0Wvh5MmOjaoKhuS9zQgD7-tIBkc0:MGUCMQDJzvBRAoT+o3N30nmQSZlQyI0gA8UgAZADXXyyZ7nMLrcKkgwddD5w/GbcSB682KACMGoVITeiZU6z6Y04dY10iTr1lOX3ywISgc5gLQsYQ6LCIeKZfJ3J2eyTzwNKMkpK9w"
 }
 ```
 
 **关键点**：
-- ✅ 不需要 `client_id`、`client_secret`
-- ✅ 不需要 `scopes`
-- ✅ `region` 固定为 `"us-east-1"`
-- ✅ 有 `profile_arn` 字段
+- ✅ 字段名使用驼峰格式（`accessToken`、`refreshToken`、`expiresAt`、`profileArn`、`authMethod`）
+- ✅ 不需要 `clientId`、`clientSecret`、`clientIdHash`
+- ✅ 不需要 `region`（虽然后端可能会添加）
+- ✅ 有 `profileArn` 字段
 
 ### BuilderId（IdC）
 
@@ -354,23 +368,22 @@
 
 ```json
 {
-  "access_token": "aoaAAAAAGlzmTAvqIzMpo_f68deMC_PKrY9FtnFBU7teMHJYsEfmTOVr_7NByZBus96RhFUJxA9Qpm_IkAaG4sOokBkc0:MGYCMQC6q7H+73sK0GsojCqjYVBzOUDielk5zt3sNOHmOpyYSGAKy2sOn9J7V7oqaqXnXrYCMQCc7OmVUvBGvCHyeZ8NC+eIAEEkVJ+ktchB+670Vpi3PqJL0hA4RKpzG4UPLPVVGsU",
-  "refresh_token": "aorAAAAAGnHNh06ug7STAHvenNZsAHSd_RXMWn2vIuIPln6_8Mbo_aMmk64tyoQ8NpjG3j68DpO8fkHkuCqAefwWMBkc0:MGYCMQCgCpeTGXN7yFoKJw/IhFnfxv7LGDXGzoyrM9DTvXlhb4TiYNvzoxLl7/W2h7iWkZkCMQCzCjqQIYNG8E3gRlRxBEWUNBU+DLn8UFlKhLumPnr39KfOGtco2JSgy4p7EIx6UrM",
-  "expires_at": "2026-01-23T15:55:14.153942900+00:00",
-  "region": "us-east-1",
-  "scopes": ["codewhisperer:completions", "codewhisperer:analysis"],
-  "client_id": "xxx",
-  "client_secret": "xxx",
-  "client_id_hash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53"
+  "accessToken": "aoaAAAAAGlzmTAvqIzMpo_f68deMC_PKrY9FtnFBU7teMHJYsEfmTOVr_7NByZBus96RhFUJxA9Qpm_IkAaG4sOokBkc0:MGYCMQC6q7H+73sK0GsojCqjYVBzOUDielk5zt3sNOHmOpyYSGAKy2sOn9J7V7oqaqXnXrYCMQCc7OmVUvBGvCHyeZ8NC+eIAEEkVJ+ktchB+670Vpi3PqJL0hA4RKpzG4UPLPVVGsU",
+  "authMethod": "IdC",
+  "clientIdHash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53",
+  "expiresAt": "2026-01-23T15:55:14.153942900+00:00",
+  "provider": "BuilderId",
+  "refreshToken": "aorAAAAAGnHNh06ug7STAHvenNZsAHSd_RXMWn2vIuIPln6_8Mbo_aMmk64tyoQ8NpjG3j68DpO8fkHkuCqAefwWMBkc0:MGYCMQCgCpeTGXN7yFoKJw/IhFnfxv7LGDXGzoyrM9DTvXlhb4TiYNvzoxLl7/W2h7iWkZkCMQCzCjqQIYNG8E3gRlRxBEWUNBU+DLn8UFlKhLumPnr39KfOGtco2JSgy4p7EIx6UrM",
+  "region": "us-east-1"
 }
 ```
 
 **关键点**：
-- ✅ 需要 `client_id`、`client_secret`
-- ✅ 需要 `scopes` 数组
-- ✅ 需要 `client_id_hash`（根据固定 Start URL 计算）
-- ✅ 没有 `profile_arn` 字段
-- ✅ `region` 通常为 `"us-east-1"`
+- ✅ 字段名使用驼峰格式（`accessToken`、`refreshToken`、`expiresAt`、`authMethod`、`clientIdHash`）
+- ✅ 需要 `clientIdHash`（根据固定 Start URL 计算）
+- ✅ 需要 `region`
+- ✅ 没有 `profileArn` 字段
+- ⚠️ **注意**：没有 `clientId` 和 `clientSecret` 字段（这些字段存储在账号管理器中，不写入 Kiro IDE）
 
 ### Enterprise（IdC）
 
@@ -378,24 +391,22 @@
 
 ```json
 {
-  "access_token": "xxx",
-  "refresh_token": "aor_xxx",
-  "expires_at": "2024-01-27T12:00:00Z",
-  "region": "ap-southeast-2",
-  "scopes": ["codewhisperer:completions", "codewhisperer:analysis"],
-  "client_id": "xxx",
-  "client_secret": "xxx",
-  "client_id_hash": "sha256-xxx"
+  "accessToken": "aoaAAAAAGlzllwmet_r6NCXwX9f47uEl6x8R2IFaES87UoK2C_kt_CTCwhDx793ltv5P7a7D7X7IxML5gxIjZWKykBbg1:MGYCMQDlqT37HBa2RObtq/u9TsuhH8G7d1o6Us8NMmdel7xluASmT3kd59JFdK7xiuroN5wCMQDFaO1gK0ZOtFVNBDV81x/aF4ik4gHvbLSTSyNQP0kkcWt01DitdHzxpOWXucJ7ktI",
+  "refreshToken": "aorAAAAAGnnhFcE-lz3fyoGmmOdc99Nsgu9iwWwPgFnjrNdUzYgUgn6BaZdtf3-Gxuu408sZqoLUkpfZRMhsqyUDABbg1:MGUCMQCV3aaHmN5XIL4M5kcFaitYAqiUVJxN2LcM76ecZTPdBtFCabIDkGGzEeoLvBbH1Q8CMDLxoqvL1DeYnZEssM3k4Dds2u/qQud788lI25dLiF0hZ34DprM4Pgpvfxu95gdsCw",
+  "expiresAt": "2026-01-23T15:40:14.847Z",
+  "clientIdHash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53",
+  "authMethod": "IdC",
+  "provider": "Enterprise",
+  "region": "ap-southeast-2"
 }
 ```
 
 **关键点**：
-- ✅ 需要 `client_id`、`client_secret`
-- ✅ 需要 `scopes` 数组
-- ✅ 需要 `client_id_hash`（根据 `start_url` 计算）
-- ✅ 没有 `profile_arn` 字段
-- ✅ `region` 可以是任意 AWS 区域（如 `"ap-southeast-2"`）
-- ⚠️ **注意**：写入文件时不包含 `start_url`，但切换账号时需要 `start_url` 来计算 `client_id_hash`
+- ✅ 字段名使用驼峰格式（`accessToken`、`refreshToken`、`expiresAt`、`authMethod`、`clientIdHash`）
+- ✅ 需要 `clientIdHash`（根据 `start_url` 计算）
+- ✅ 需要 `region`（可以是任意 AWS 区域）
+- ✅ 没有 `profileArn` 字段
+- ⚠️ **注意**：没有 `clientId`、`clientSecret` 和 `startUrl` 字段（这些字段存储在账号管理器中，不写入 Kiro IDE）
 
 ---
 
@@ -413,14 +424,35 @@
 }
 ```
 
-### Q2: start_url 在哪里使用？
+### Q2: 为什么 Kiro IDE 写入的文件中没有 clientId 和 clientSecret？
+
+**A**: `clientId` 和 `clientSecret` 是敏感信息，只存储在账号管理器中（`accounts.json`），不会写入 Kiro IDE 的 Token 文件。Kiro IDE 只需要 `clientIdHash` 来验证身份。
+
+**账号管理器存储**：
+```json
+{
+  "client_id": "xxx",
+  "client_secret": "xxx",
+  "client_id_hash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53"
+}
+```
+
+**Kiro IDE 写入**：
+```json
+{
+  "clientIdHash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53"
+}
+```
+
+### Q3: start_url 在哪里使用？
 
 **A**: `start_url` 只在以下场景使用：
-1. **切换账号时**：计算 `client_id_hash`（本地操作）
-2. **刷新 token 时**：计算 `client_id_hash`（本地操作）
+1. **切换账号时**：计算 `clientIdHash`（本地操作）
+2. **刷新 token 时**：计算 `clientIdHash`（本地操作）
 3. **不参与 API 调用**：刷新 token 的 API 不需要 `start_url` 参数
+4. **不写入 Kiro IDE**：`start_url` 只存储在账号管理器中
 
-### Q3: client_id_hash 如何计算？
+### Q4: clientIdHash 如何计算？
 
 **A**: 
 ```rust
@@ -440,7 +472,7 @@ fn compute_client_id_hash(start_url: &str) -> String {
 }
 ```
 
-### Q4: BuilderId 的 start_url 是什么？
+### Q5: BuilderId 的 start_url 是什么？
 
 **A**: BuilderId 使用固定的 Start URL：`https://view.awsapps.com/start`
 
@@ -453,16 +485,25 @@ fn compute_client_id_hash(start_url: &str) -> String {
 }
 ```
 
-### Q5: 为什么 Social 账号不需要 region？
+### Q6: 为什么字段名是驼峰格式？
 
-**A**: Social 账号（Google/GitHub）使用 Cognito 认证，不涉及 AWS SSO，所以不需要 `region` 字段。写入 Kiro IDE 时固定使用 `"us-east-1"`。
+**A**: Kiro IDE 使用驼峰格式（`accessToken`、`refreshToken`），而账号管理器使用下划线格式（`access_token`、`refresh_token`）。切换账号时需要转换字段名。
 
-**示例**：
+**账号管理器格式**：
 ```json
 {
-  "provider": "Google",
-  "auth_method": "social",
-  "region": null
+  "access_token": "xxx",
+  "refresh_token": "xxx",
+  "expires_at": "xxx"
+}
+```
+
+**Kiro IDE 格式**：
+```json
+{
+  "accessToken": "xxx",
+  "refreshToken": "xxx",
+  "expiresAt": "xxx"
 }
 ```
 
