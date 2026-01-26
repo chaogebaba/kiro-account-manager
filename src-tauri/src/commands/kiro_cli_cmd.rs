@@ -17,7 +17,13 @@ pub fn get_kiro_cli_default_path() -> Result<String, String> {
     #[cfg(not(target_os = "windows"))]
     let default_path = format!("{}/.local/share/kiro-cli/data.sqlite3", home);
 
-    Ok(default_path)
+    // 检查文件是否存在
+    if std::path::Path::new(&default_path).exists() {
+        Ok(default_path)
+    } else {
+        // 文件不存在，返回空字符串（前端会显示占位符）
+        Ok(String::new())
+    }
 }
 
 /// 从 kiro-cli 数据库导入账号

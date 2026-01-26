@@ -45,19 +45,15 @@ export function useAutoRefresh(appSettings, settingsLoading) {
         } catch (e) {
           const errorMsg = String(e)
           if (errorMsg.includes('BANNED')) {
-            console.warn(`[AutoRefresh] ${account.email} 账号已封禁`)
             // 发送封禁事件，让前端弹窗通知
             emit('account-banned', { email: account.email, id: account.id })
           } else if (errorMsg.includes('AUTH_ERROR') || errorMsg.includes('invalid')) {
-            console.warn(`[AutoRefresh] ${account.email} Token已失效`)
             // 发送 Token 失效事件
             emit('account-token-invalid', { email: account.email, id: account.id })
           } else if (errorMsg.includes('request failed') || errorMsg.includes('network') || errorMsg.includes('timeout') || errorMsg.includes('connection')) {
-            console.warn(`[AutoRefresh] ${account.email} 网络错误:`, errorMsg)
             networkErrorCount++
-          } else {
-            console.warn(`[AutoRefresh] ${account.email} 同步失败:`, errorMsg)
           }
+          // 其他错误静默处理
         }
       })
 
@@ -71,7 +67,7 @@ export function useAutoRefresh(appSettings, settingsLoading) {
 
       emit('accounts-updated')
     } catch (e) {
-      console.error('[AutoRefresh] 刷新失败:', e)
+      // 静默处理
     }
   }
 

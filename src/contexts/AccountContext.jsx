@@ -23,7 +23,6 @@ export function AccountProvider({ children }) {
       setAccounts(accountsData || [])
       setLocalToken(localData)
     } catch (e) {
-      console.error('Failed to load accounts:', e)
       setError(e)
     }
   }, [])
@@ -76,8 +75,6 @@ export function AccountProvider({ children }) {
     try {
       await invoke('sync_account', { id })
     } catch (e) {
-      const errorMsg = String(e)
-      console.warn('[AccountContext] 刷新账号失败:', errorMsg)
       // 错误会在 loadData 后反映到账号状态
     }
     await loadData()

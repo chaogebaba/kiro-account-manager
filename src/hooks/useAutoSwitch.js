@@ -44,7 +44,6 @@ export function useAutoSwitch(appSettings, settingsLoading) {
           currentAccount = accounts.find(acc => acc.refreshToken === localToken.refreshToken)
         }
       } catch (e) {
-        console.warn('[AutoSwitch] 获取本地 token 失败:', e)
         return
       }
 
@@ -59,7 +58,6 @@ export function useAutoSwitch(appSettings, settingsLoading) {
       } catch (e) {
         const errorMsg = String(e)
         if (errorMsg.includes('BANNED')) {
-          console.warn('[AutoSwitch] 当前账号已封禁')
           // 更新账号状态为封禁
           try {
             await invoke('update_account', { 
@@ -68,14 +66,11 @@ export function useAutoSwitch(appSettings, settingsLoading) {
             })
             emit('accounts-updated')
           } catch (updateErr) {
-            console.error('[AutoSwitch] 更新封禁状态失败:', updateErr)
+            // 静默处理
           }
           return
-        } else if (errorMsg.includes('AUTH_ERROR') || errorMsg.includes('invalid')) {
-          console.warn('[AutoSwitch] 当前账号 Token 已失效')
-        } else {
-          console.warn('[AutoSwitch] 刷新当前账号失败:', errorMsg)
         }
+        // 其他错误静默处理
       }
 
       // 计算剩余额度
@@ -117,7 +112,7 @@ export function useAutoSwitch(appSettings, settingsLoading) {
       emit('account-switched', { email: availableAccount.email })
 
     } catch (e) {
-      console.error('[AutoSwitch] 检查失败:', e)
+      // 静默处理
     }
   }
 

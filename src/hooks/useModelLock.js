@@ -28,7 +28,7 @@ export function useModelLock(appSettings, settingsLoading) {
         await invoke('set_kiro_model', { model: settings.lockedModel })
       }
     } catch (e) {
-      console.error('[ModelLock] 检查模型失败:', e)
+      // 静默处理
     }
   }
 

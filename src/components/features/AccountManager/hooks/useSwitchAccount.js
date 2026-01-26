@@ -38,8 +38,7 @@ export function useSwitchAccount(onLocalTokenChange) {
         await invoke('set_custom_machine_guid', { newGuid: newMachineId })
       }
     } catch (e) {
-      // 机器码操作失败不阻断切换流程，只打印日志
-      console.warn('[Switch] 机器码操作失败:', e)
+      // 机器码操作失败不阻断切换流程
     }
   }, [])
 

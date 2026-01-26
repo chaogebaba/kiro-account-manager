@@ -81,6 +81,8 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }) {
 
   // 从 kiro-cli 导入相关状态
   const [kiroCliDbPath, setKiroCliDbPath] = useState('')
+  const [kiroCliDetected, setKiroCliDetected] = useState(false)
+  const [kiroCliDetecting, setKiroCliDetecting] = useState(false)
   const [kiroCliImporting, setKiroCliImporting] = useState(false)
   const [kiroCliResult, setKiroCliResult] = useState(null)
 
@@ -92,11 +94,20 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }) {
   }, [activeTab])
 
   const detectKiroCliPath = async () => {
+    setKiroCliDetecting(true)
     try {
       const defaultPath = await invoke('get_kiro_cli_default_path')
-      setKiroCliDbPath(defaultPath)
+      if (defaultPath) {
+        setKiroCliDbPath(defaultPath)
+        setKiroCliDetected(true)
+      } else {
+        setKiroCliDetected(false)
+      }
     } catch (e) {
       console.error('获取默认路径失败:', e)
+      setKiroCliDetected(false)
+    } finally {
+      setKiroCliDetecting(false)
     }
   }
 
@@ -643,6 +654,27 @@ return (
                   </div>
                 </Alert>
 
+                {kiroCliDetecting ? (
+                  <div className={`p-5 rounded-xl ${colors.cardSecondary} border ${colors.cardBorder}`}>
+                    <div className="flex items-center gap-3">
+                      <Loader2 size={20} className="animate-spin text-violet-500" />
+                      <div className={`text-sm ${colors.text}`}>正在检测 kiro-cli 数据库...</div>
+                    </div>
+                  </div>
+                ) : kiroCliDetected ? (
+                  <Alert icon={<CheckCircle size={16} />} color="teal" variant="light">
+                    <div className={`text-sm font-medium ${colors.text}`}>检测到 kiro-cli 数据库</div>
+                    <div className={`text-xs mt-1 ${colors.textMuted}`}>{kiroCliDbPath}</div>
+                  </Alert>
+                ) : (
+                  <Alert icon={<AlertCircle size={16} />} color="gray" variant="light">
+                    <div className={`text-sm ${colors.text}`}>未检测到 kiro-cli 数据库</div>
+                    <div className={`text-xs mt-1 ${colors.textMuted}`}>
+                      请手动输入数据库路径或浏览选择
+                    </div>
+                  </Alert>
+                )}
+
                 <div className={`p-4 rounded-xl ${colors.cardSecondary} border ${colors.cardBorder}`}>
                   <Stack gap="md">
                     <div>
@@ -653,12 +685,20 @@ return (
                         <input
                           type="text"
                           value={kiroCliDbPath}
-                          onChange={(e) => setKiroCliDbPath(e.target.value)}
+                          onChange={(e) => {
+                            setKiroCliDbPath(e.target.value)
+                            setKiroCliDetected(false)
+                          }}
                           placeholder="~/.local/share/kiro-cli/data.sqlite3"
                           className={`flex-1 px-4 py-3 border rounded-xl ${colors.text} ${colors.input} ${colors.inputFocus} focus:ring-2 transition-all`}
                         />
                         <FileButton
-                          onChange={(file) => file && setKiroCliDbPath(file.path)}
+                          onChange={(file) => {
+                            if (file) {
+                              setKiroCliDbPath(file.path)
+                              setKiroCliDetected(false)
+                            }
+                          }}
                           accept=".sqlite3,.db"
                         >
                           {(props) => (
@@ -673,7 +713,7 @@ return (
                         </FileButton>
                       </div>
                       <div className={`text-xs mt-1 ${colors.textMuted}`}>
-                        已自动检测默认路径，也可以手动输入或浏览选择
+                        {kiroCliDetected ? '已自动检测到数据库路径' : '请手动输入或浏览选择数据库文件'}
                       </div>
                     </div>
 

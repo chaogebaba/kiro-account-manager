@@ -33,7 +33,7 @@ export function useAccounts() {
       const loadedAccounts = await invoke('get_accounts')
       setAccounts(loadedAccounts)
     } catch (e) {
-      console.error('账号加载失败:', e)
+      // 静默处理
     } finally {
       setLoading(false)
     }
@@ -121,7 +121,6 @@ export function useAccounts() {
       setAccounts(prev => prev.map(a => a.id === id ? updated : a))
       return { success: true, data: updated }
     } catch (e) {
-      console.warn(e)
       const errorMsg = String(e)
       // 只有封禁时才更新状态
       if (errorMsg.includes('BANNED')) {
@@ -129,7 +128,7 @@ export function useAccounts() {
           await invoke('update_account', { id, updates: { status: 'banned' } })
           setAccounts(prev => prev.map(a => a.id === id ? { ...a, status: 'banned' } : a))
         } catch (updateErr) {
-          console.error('更新封禁状态失败:', updateErr)
+          // 静默处理
         }
       }
       // 其他错误只返回错误信息，不更新状态
@@ -143,7 +142,6 @@ export function useAccounts() {
     try {
       // 必须选中账号才能导出
       if (selectedIds.length === 0) {
-        console.warn('未选中任何账号')
         return
       }
       
@@ -166,7 +164,7 @@ export function useAccounts() {
       const json = await invoke('export_accounts', { ids: selectedIds })
       await writeTextFile(filePath, json)
     } catch (e) {
-      console.error('导出失败:', e)
+      // 错误已通过 showError 显示
     }
   }, [])
 

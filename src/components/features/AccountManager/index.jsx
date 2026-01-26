@@ -71,7 +71,7 @@ function AccountManager({ onNavigate }) {
         setTagDefinitions(tags)
       })
       .catch(err => {
-        console.error('标签加载失败:', err)
+        // 静默处理
       })
   }, [])
 
@@ -252,7 +252,7 @@ function AccountManager({ onNavigate }) {
         await invoke('delete_account_remote', { id: account.id, deleteLocal: true })
         loadAccounts()
       } catch (e) {
-        console.error('远程删除账号失败:', e)
+        // 错误已通过 showError 显示
       }
     }
   }, [showConfirm, loadAccounts, t])
