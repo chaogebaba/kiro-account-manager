@@ -100,6 +100,7 @@ impl AuthProvider for SocialProvider {
             client_secret: None,
             client_id_hash: None,
             sso_session_id: None,
+            start_url: None,  // Social 不需要 start_url
             profile_arn: token_response.profile_arn,
         })
     }
@@ -126,6 +127,7 @@ impl AuthProvider for SocialProvider {
             client_secret: None,
             client_id_hash: None,
             sso_session_id: None,
+            start_url: None,  // Social 不需要 start_url
             profile_arn: metadata.profile_arn.or(token_response.profile_arn),
         })
     }

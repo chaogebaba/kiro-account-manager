@@ -153,6 +153,7 @@ async fn login_idc(
         existing.client_id = auth_result.client_id;
         existing.client_secret = auth_result.client_secret;
         existing.region = auth_result.region;
+        existing.start_url = auth_result.start_url.clone();  // 保存 start_url
         existing.sso_session_id = auth_result.sso_session_id;
         existing.id_token = auth_result.id_token;
         existing.profile_arn = auth_result.profile_arn;
@@ -171,6 +172,7 @@ async fn login_idc(
         account.client_id = auth_result.client_id;
         account.client_secret = auth_result.client_secret;
         account.region = auth_result.region;
+        account.start_url = auth_result.start_url.clone();  // 保存 start_url
         account.sso_session_id = auth_result.sso_session_id;
         account.id_token = auth_result.id_token;
         account.profile_arn = auth_result.profile_arn;

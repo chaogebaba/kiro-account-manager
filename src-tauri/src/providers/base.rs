@@ -24,6 +24,7 @@ pub struct AuthResult {
     pub client_secret: Option<String>,
     pub client_id_hash: Option<String>,
     pub sso_session_id: Option<String>,
+    pub start_url: Option<String>,  // Enterprise 的 Start URL
     
     // Social (Google/Github) 专用
     pub profile_arn: Option<String>,

@@ -236,6 +236,7 @@ impl AuthProvider for IdcProvider {
             client_secret: Some(client_reg.client_secret),
             client_id_hash: Some(client_id_hash),
             sso_session_id: token_response.aws_sso_app_session_id,
+            start_url: if provider == "Enterprise" { Some(start_url.to_string()) } else { None },  // Enterprise 保存 start_url
             profile_arn: None,
         })
     }
@@ -266,6 +267,7 @@ impl AuthProvider for IdcProvider {
             client_secret: Some(client_secret),
             client_id_hash: Some(client_id_hash),
             sso_session_id: token_response.aws_sso_app_session_id,
+            start_url: self.start_url.clone(),  // 保留原有的 start_url
             profile_arn: None,
         })
     }
