@@ -358,17 +358,23 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }) {
     setKiroCliResult(null)
 
     try {
-      const accounts = await invoke('import_from_kiro_cli', {
+      const result = await invoke('import_from_kiro_cli', {
         dbPath: kiroCliDbPath
       })
 
-      setKiroCliResult({
-        success: true,
-        count: accounts.length
-      })
+      if (result.success) {
+        setKiroCliResult({
+          success: true,
+          isNew: result.is_new,
+          email: result.account?.email || result.account?.user_id || '未知账号'
+        })
 
-      if (accounts.length > 0) {
         onSuccess?.()
+      } else {
+        setKiroCliResult({
+          success: false,
+          error: result.error || '导入失败'
+        })
       }
     } catch (e) {
       setKiroCliResult({
@@ -452,8 +458,8 @@ return (
           <div className="px-6 py-6">
             <div className={`p-5 rounded-xl ${colors.cardSecondary} border ${colors.cardBorder}`}>
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <Loader2 size={20} className="animate-spin text-white" />
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colors.cardSecondary}`}>
+                  <Loader2 size={20} className={colors.primary} />
                 </div>
                 <div>
                   <div className={`font-medium ${colors.text}`}>
@@ -470,8 +476,8 @@ return (
                 size="lg"
                 radius="xl"
                 classNames={{
-                  root: 'bg-gray-200 dark:bg-gray-700',
-                  bar: 'bg-gradient-to-r from-blue-500 to-indigo-600'
+                  root: colors.cardSecondary,
+                  bar: colors.primary
                 }}
               />
             </div>
@@ -724,7 +730,11 @@ return (
                         variant="light"
                       >
                         <div className={`text-sm font-medium ${colors.text}`}>
-                          {kiroCliResult.success ? `成功导入 ${kiroCliResult.count} 个账号` : '导入失败'}
+                          {kiroCliResult.success 
+                            ? (kiroCliResult.isNew 
+                                ? `✅ 新增账号: ${kiroCliResult.email}` 
+                                : `🔄 更新账号: ${kiroCliResult.email}`)
+                            : '❌ 导入失败'}
                         </div>
                         {kiroCliResult.error && (
                           <div className={`text-xs mt-1 ${colors.textMuted}`}>{kiroCliResult.error}</div>

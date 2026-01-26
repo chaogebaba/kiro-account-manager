@@ -70,7 +70,7 @@ const ListRow = memo(function ListRow({
           <span className={`text-sm font-medium truncate ${colors.text}`}>
             {account.email ? maskEmail(account.email) : getAccountDisplayName(account)}
           </span>
-          {isCurrent && <span className="text-xs px-1.5 py-0.5 bg-blue-500 text-white rounded shrink-0">当前</span>}
+          {isCurrent && <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${colors.badgeInfo}`}>当前</span>}
         </div>
         {account.label && <span className={`text-xs ${colors.textMuted} truncate block mt-0.5`}>{account.label}</span>}
       </div>
@@ -86,13 +86,13 @@ const ListRow = memo(function ListRow({
       {/* 订阅类型 */}
       <span className={`text-xs px-2 py-1 rounded w-20 text-center shrink-0 ${
         account.usageData?.subscriptionInfo?.subscriptionTitle?.toUpperCase()?.includes('ENTERPRISE')
-          ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
+          ? colors.badgeWarning
           : account.usageData?.subscriptionInfo?.subscriptionTitle?.includes('PRO+')
-            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+            ? colors.badgePurple
             : account.usageData?.subscriptionInfo?.subscriptionTitle?.includes('PRO')
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+              ? colors.badgeInfo
               : account.usageData?.subscriptionInfo?.subscriptionTitle?.toUpperCase()?.includes('KIRO')
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white'
+                ? colors.badgeCyan
                 : colors.badgeDisabled
       }`}>{account.usageData?.subscriptionInfo?.subscriptionTitle || 'Free'}</span>
 
