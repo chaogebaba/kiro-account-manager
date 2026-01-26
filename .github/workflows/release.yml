@@ -57,6 +57,38 @@ jobs:
           rm -rf node_modules package-lock.json
           npm install
 
+      - name: Generate Release Notes
+        id: release_notes
+        shell: bash
+        run: |
+          # 获取上一个 tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          CURRENT_TAG=${{ github.ref_name }}
+          
+          # 生成更新日志
+          echo "## 🎉 更新内容" > release_notes.md
+          echo "" >> release_notes.md
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            # 获取两个 tag 之间的 commits
+            git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s" --no-merges >> release_notes.md
+          else
+            # 如果没有上一个 tag，获取最近 20 个 commits
+            git log -20 --pretty=format:"- %s" --no-merges >> release_notes.md
+          fi
+          
+          echo "" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "---" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "📥 **下载地址**：[GitHub Releases](https://github.com/${{ github.repository }}/releases/tag/${CURRENT_TAG})" >> release_notes.md
+          
+          # 输出到环境变量
+          cat release_notes.md
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Build and release
         uses: tauri-apps/tauri-action@v0.6
         env:
@@ -69,7 +101,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Kiro Account Manager v__VERSION__'
-          releaseBody: '请查看 CHANGELOG 了解更新内容。'
+          releaseBody: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
