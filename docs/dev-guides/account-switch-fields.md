@@ -330,7 +330,7 @@
 
 ### Google/GitHub（Social）
 
-**文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
+**Token 文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
 
 **Google 示例**：
 ```json
@@ -359,12 +359,12 @@
 **关键点**：
 - ✅ 字段名使用驼峰格式（`accessToken`、`refreshToken`、`expiresAt`、`profileArn`、`authMethod`）
 - ✅ 不需要 `clientId`、`clientSecret`、`clientIdHash`
-- ✅ 不需要 `region`（虽然后端可能会添加）
+- ✅ 不需要 `region`
 - ✅ 有 `profileArn` 字段
 
 ### BuilderId（IdC）
 
-**文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
+**Token 文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
 
 ```json
 {
@@ -378,16 +378,25 @@
 }
 ```
 
+**Client 文件路径**：`~/.aws/sso/cache/{clientIdHash}.json`（如 `9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53.json`）
+
+```json
+{
+  "clientId": "LkndlEtWf81u16m15VfmMnVzLWVhc3QtMQ",
+  "clientSecret": "eyJraWQiOiJrZXktMTU2NDAyODA5OSIsImFsZyI6IkhTMzg0In0...",
+  "expiresAt": "2026-04-23T14:55:14.155591400+00:00"
+}
+```
+
 **关键点**：
-- ✅ 字段名使用驼峰格式（`accessToken`、`refreshToken`、`expiresAt`、`authMethod`、`clientIdHash`）
-- ✅ 需要 `clientIdHash`（根据固定 Start URL 计算）
-- ✅ 需要 `region`
-- ✅ 没有 `profileArn` 字段
-- ⚠️ **注意**：没有 `clientId` 和 `clientSecret` 字段（这些字段存储在账号管理器中，不写入 Kiro IDE）
+- ✅ Token 和 Client 信息分开存储在两个文件中
+- ✅ Token 文件包含：`accessToken`、`refreshToken`、`expiresAt`、`authMethod`、`clientIdHash`、`region`
+- ✅ Client 文件包含：`clientId`、`clientSecret`、`expiresAt`
+- ✅ Client 文件名就是 `clientIdHash` 的值
 
 ### Enterprise（IdC）
 
-**文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
+**Token 文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
 
 ```json
 {
@@ -401,12 +410,22 @@
 }
 ```
 
+**Client 文件路径**：`~/.aws/sso/cache/{clientIdHash}.json`（如 `9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53.json`）
+
+```json
+{
+  "clientId": "xxx",
+  "clientSecret": "xxx",
+  "expiresAt": "2026-04-23T14:55:14.155591400+00:00"
+}
+```
+
 **关键点**：
-- ✅ 字段名使用驼峰格式（`accessToken`、`refreshToken`、`expiresAt`、`authMethod`、`clientIdHash`）
-- ✅ 需要 `clientIdHash`（根据 `start_url` 计算）
-- ✅ 需要 `region`（可以是任意 AWS 区域）
-- ✅ 没有 `profileArn` 字段
-- ⚠️ **注意**：没有 `clientId`、`clientSecret` 和 `startUrl` 字段（这些字段存储在账号管理器中，不写入 Kiro IDE）
+- ✅ Token 和 Client 信息分开存储在两个文件中
+- ✅ Token 文件包含：`accessToken`、`refreshToken`、`expiresAt`、`authMethod`、`clientIdHash`、`region`
+- ✅ Client 文件包含：`clientId`、`clientSecret`、`expiresAt`
+- ✅ Client 文件名就是 `clientIdHash` 的值
+- ⚠️ **注意**：不包含 `startUrl` 字段（只存储在账号管理器中）
 
 ---
 
@@ -424,23 +443,34 @@
 }
 ```
 
-### Q2: 为什么 Kiro IDE 写入的文件中没有 clientId 和 clientSecret？
+### Q2: 为什么 clientId 和 clientSecret 存储在单独的文件中？
 
-**A**: `clientId` 和 `clientSecret` 是敏感信息，只存储在账号管理器中（`accounts.json`），不会写入 Kiro IDE 的 Token 文件。Kiro IDE 只需要 `clientIdHash` 来验证身份。
+**A**: Kiro IDE 将 Token 信息和 Client 信息分开存储：
+- **Token 文件**：`~/.aws/sso/cache/kiro-auth-token.json` - 存储访问令牌、刷新令牌等
+- **Client 文件**：`~/.aws/sso/cache/{clientIdHash}.json` - 存储客户端 ID 和密钥
 
-**账号管理器存储**：
+**文件结构**：
+```
+~/.aws/sso/cache/
+├── kiro-auth-token.json          # Token 信息
+└── 9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53.json  # Client 信息
+```
+
+**Token 文件内容**：
 ```json
 {
-  "client_id": "xxx",
-  "client_secret": "xxx",
-  "client_id_hash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53"
+  "accessToken": "xxx",
+  "refreshToken": "xxx",
+  "clientIdHash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53"
 }
 ```
 
-**Kiro IDE 写入**：
+**Client 文件内容**：
 ```json
 {
-  "clientIdHash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53"
+  "clientId": "xxx",
+  "clientSecret": "xxx",
+  "expiresAt": "2026-04-23T14:55:14.155591400+00:00"
 }
 ```
 
