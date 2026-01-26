@@ -36,8 +36,8 @@
 | 🪟 **Windows** | [KiroAccountManager_x64_zh-CN.msi](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/KiroAccountManager_x64_zh-CN.msi) |
 | 🍎 **macOS (Intel)** | [KiroAccountManager_x64.dmg](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/KiroAccountManager_x64.dmg) |
 | 🍎 **macOS (Apple Silicon)** | [KiroAccountManager_aarch64.dmg](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/KiroAccountManager_aarch64.dmg) |
-| **Linux (AppImage)** | [kiro-account-manager_amd64.AppImage](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/kiro-account-manager_amd64.AppImage) |
-| 🐧 **Linux (deb)** | [kiro-account-manager_amd64.deb](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/kiro-account-manager_amd64.deb) |
+| 🐧 **Linux (AppImage)** | [KiroAccountManager_amd64.AppImage](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/KiroAccountManager_amd64.AppImage) |
+| 🐧 **Linux (deb)** | [KiroAccountManager_amd64.deb](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/KiroAccountManager_amd64.deb) |
 
 **系统要求**：
 - **Windows**: Windows 10/11 (64-bit)，需要 WebView2 (Win11 已内置)
