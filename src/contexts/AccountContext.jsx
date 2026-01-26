@@ -39,14 +39,12 @@ export function AccountProvider({ children }) {
       // 监听登录成功事件，刷新数据
       unlistenLogin = await listen('login-success', () => {
         if (!mounted) return
-        console.log('[AccountContext] 登录成功，刷新数据')
         loadData()
       })
       
       // 监听账号数据变化（如自动刷新 token 后）
       unlistenAccounts = await listen('accounts-updated', () => {
         if (!mounted) return
-        console.log('[AccountContext] 账号数据已更新，刷新缓存')
         loadData()
       })
     }

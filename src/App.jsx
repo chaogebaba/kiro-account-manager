@@ -75,7 +75,6 @@ function App() {
       // 监听登录成功事件
       unlisten = await listen('login-success', (event) => {
         if (!mounted) return
-        console.log('Login success in App:', event.payload)
         checkAuth()
         setActiveMenu('accounts')
       })
@@ -83,7 +82,6 @@ function App() {
       // 监听设置变化，重启定时器
       unlistenSettings = await listen('settings-changed', () => {
         if (!mounted) return
-        console.log('[AutoRefresh] 设置已变化，重启定时器')
         startAutoRefreshTimer()
         startAutoSwitchTimer()
       })
@@ -91,7 +89,6 @@ function App() {
       // 监听设置变化，重新检查模型
       unlistenAppSettings = await listen('app-settings-changed', () => {
         if (!mounted) return
-        console.log('[ModelLock] 设置已变化，重新检查模型')
         checkAndRestoreLockedModel()
       })
 

@@ -49,7 +49,6 @@ export function useAutoSwitch(appSettings, settingsLoading) {
       }
 
       if (!currentAccount) {
-        console.log('[AutoSwitch] 未找到当前使用的账号')
         return
       }
 
@@ -84,15 +83,10 @@ export function useAutoSwitch(appSettings, settingsLoading) {
       const used = getUsed(currentAccount)
       const remaining = quota - used
 
-      console.log(`[AutoSwitch] 当前账号: ${currentAccount.email}, 剩余: ${remaining}, 阈值: ${threshold}`)
-
       // 检查是否需要切换
       if (remaining > threshold) {
-        console.log('[AutoSwitch] 余额充足，无需切换')
         return
       }
-
-      console.log(`[AutoSwitch] 账号 ${currentAccount.email} 余额不足，开始查找可用账号...`)
 
       // 查找可用账号
       const availableAccount = accounts.find(acc => {
@@ -109,11 +103,8 @@ export function useAutoSwitch(appSettings, settingsLoading) {
       })
 
       if (!availableAccount) {
-        console.log('[AutoSwitch] 没有可用账号可切换')
         return
       }
-
-      console.log(`[AutoSwitch] 切换到: ${availableAccount.email}`)
 
       // 执行切换
       await invoke('switch_account', {
@@ -122,7 +113,6 @@ export function useAutoSwitch(appSettings, settingsLoading) {
         bindMachineIdToAccount: settings.bindMachineIdToAccount ?? true
       })
 
-      console.log(`[AutoSwitch] 切换成功: ${availableAccount.email}`)
       emit('accounts-updated')
       emit('account-switched', { email: availableAccount.email })
 
@@ -143,14 +133,11 @@ export function useAutoSwitch(appSettings, settingsLoading) {
     
     // 未启用则不启动
     if (!settings.autoSwitchEnabled) {
-      console.log('[AutoSwitch] 自动换号未启用')
       return
     }
 
     const interval = settings.autoSwitchInterval ?? DEFAULT_INTERVAL
     const intervalMs = interval * 60 * 1000
-
-    console.log(`[AutoSwitch] 启动定时器，间隔: ${interval} 分钟`)
 
     // 立即检查一次
     checkAndAutoSwitch()
@@ -164,7 +151,6 @@ export function useAutoSwitch(appSettings, settingsLoading) {
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
-      console.log('[AutoSwitch] 定时器已停止')
     }
   }
 
@@ -174,7 +160,6 @@ export function useAutoSwitch(appSettings, settingsLoading) {
 
     const settings = appSettingsRef.current || {}
     if (settings.autoSwitchEnabled) {
-      console.log('[AutoSwitch] 设置加载完成，启动定时器')
       startAutoSwitchTimer()
     }
 

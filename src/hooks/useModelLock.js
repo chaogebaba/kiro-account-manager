@@ -25,9 +25,7 @@ export function useModelLock(appSettings, settingsLoading) {
       const currentModel = kiroSettings.modelSelection
 
       if (currentModel && currentModel !== settings.lockedModel) {
-        console.log(`[ModelLock] 检测到模型被修改: ${currentModel} -> 恢复为: ${settings.lockedModel}`)
         await invoke('set_kiro_model', { model: settings.lockedModel })
-        console.log('[ModelLock] 模型已恢复')
       }
     } catch (e) {
       console.error('[ModelLock] 检查模型失败:', e)

@@ -20,7 +20,6 @@ function Login({ onLogin }) {
 
     const setupListener = async () => {
       unlistenSuccess = await listen('login-success', (event) => {
-        console.log('Login success event:', event.payload)
         setLoadingProvider(null)
         setShowWaitingModal(false)
         onLogin?.(event.payload)

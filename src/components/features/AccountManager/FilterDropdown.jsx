@@ -50,12 +50,9 @@ function FilterSelect({ label, value, options, onChange, onClear, colors }) {
           value={displayValue}
           onChange={(e) => {
             const v = e.target.value
-            console.log(`[FilterSelect] ${label} 选择:`, v)
             if (v === '') {
-              console.log(`[FilterSelect] ${label} 清空`)
               onClear?.()
             } else {
-              console.log(`[FilterSelect] ${label} 设置为:`, v)
               onChange(v)
             }
           }}
@@ -71,7 +68,6 @@ function FilterSelect({ label, value, options, onChange, onClear, colors }) {
           <button
             onClick={(e) => {
               e.stopPropagation()
-              console.log(`[FilterSelect] ${label} 清空`)
               onClear?.()
             }}
             className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg ${colors.cardHover} hover:bg-red-500/10 transition-all hover:scale-110 active:scale-95`}

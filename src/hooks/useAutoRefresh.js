@@ -30,12 +30,10 @@ export function useAutoRefresh(appSettings, settingsLoading) {
       // 只排除封禁账号，其他都交给后端判断
       const validAccounts = accounts.filter(acc => acc.status !== 'banned')
       if (!validAccounts.length) {
-        console.log('[AutoRefresh] 没有有效账号')
         return
       }
 
       const concurrency = getConcurrency(validAccounts.length)
-      console.log(`[AutoRefresh] 同步 ${validAccounts.length} 个账号数据，并发数: ${concurrency}`)
 
       // 统计网络错误数量，避免频繁弹窗
       let networkErrorCount = 0
@@ -71,7 +69,6 @@ export function useAutoRefresh(appSettings, settingsLoading) {
         emit('sync-network-error', { count: networkErrorCount, total: validAccounts.length })
       }
 
-      console.log('[AutoRefresh] 数据同步完成')
       emit('accounts-updated')
     } catch (e) {
       console.error('[AutoRefresh] 刷新失败:', e)
@@ -100,7 +97,6 @@ export function useAutoRefresh(appSettings, settingsLoading) {
     const interval = settings.autoRefreshInterval ?? DEFAULT_REFRESH_INTERVAL
     const intervalMs = interval * 60 * 1000
 
-    console.log(`[AutoRefresh] 定时器间隔: ${interval} 分钟`)
     refreshTimerRef.current = setInterval(checkAndSyncAccounts, intervalMs)
   }
 
@@ -108,7 +104,6 @@ export function useAutoRefresh(appSettings, settingsLoading) {
   useEffect(() => {
     if (settingsLoading) return
 
-    console.log('[AutoRefresh] 设置加载完成，启动定时器')
     startAutoRefreshTimer()
 
     return () => {

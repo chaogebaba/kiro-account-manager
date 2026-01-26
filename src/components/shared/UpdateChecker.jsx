@@ -11,7 +11,6 @@ function UpdateChecker() {
     try {
       // 先用自定义命令检查（支持代理）
       const result = await invoke('check_update')
-      console.log('[Update] 检查结果:', result)
 
       if (result.has_update && result.latest_version) {
         // 有更新，再用 Tauri updater 获取完整的 update 对象
@@ -25,7 +24,6 @@ function UpdateChecker() {
         }
       }
     } catch (e) {
-      console.log('[Update] 检查更新失败:', e)
       // 静默处理
     }
   }

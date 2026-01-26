@@ -50,7 +50,6 @@ export default function AnnouncementModal() {
       clearTimeout(timeoutId)
       
       if (!res.ok) {
-        console.log('[Announcement] API 返回错误:', res.status)
         return
       }
       
@@ -78,11 +77,6 @@ export default function AnnouncementModal() {
       setShow(true)
     } catch (e) {
       // 静默失败，不影响应用使用
-      if (e.name === 'AbortError') {
-        console.log('[Announcement] 请求超时')
-      } else {
-        console.log('[Announcement] 获取公告失败:', e.message || e)
-      }
     }
   }
 
