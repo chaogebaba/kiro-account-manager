@@ -108,8 +108,7 @@ pub struct KiroAccountInfo {
 
 **Tab 布局**：
 - Tab 1: JSON 导入
-- Tab 2: SSO Token 导入
-- Tab 3: 从 Kiro 导入（新增）
+- Tab 2: 从 Kiro 导入
 
 **自动检测**：
 - 切换到"从 Kiro 导入" Tab 时自动调用 `read_kiro_accounts`
