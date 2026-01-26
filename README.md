@@ -36,8 +36,8 @@
 | 🪟 **Windows** | [KiroAccountManager_x64_zh-CN.msi](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/KiroAccountManager_x64_zh-CN.msi) |
 | 🍎 **macOS (Intel)** | [KiroAccountManager_x64.dmg](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/KiroAccountManager_x64.dmg) |
 | 🍎 **macOS (Apple Silicon)** | [KiroAccountManager_aarch64.dmg](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/KiroAccountManager_aarch64.dmg) |
-| **Linux (AppImage)** | [kiro-account-manager_amd64.AppImage](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/kiro-account-manager_amd64.AppImage) |
-| 🐧 **Linux (deb)** | [kiro-account-manager_amd64.deb](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/kiro-account-manager_amd64.deb) |
+| 🐧 **Linux (AppImage)** | [KiroAccountManager_amd64.AppImage](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/KiroAccountManager_amd64.AppImage) |
+| 🐧 **Linux (deb)** | [KiroAccountManager_amd64.deb](https://github.com/hj01857655/kiro-account-manager/releases/latest/download/KiroAccountManager_amd64.deb) |
 
 **系统要求**：
 - **Windows**: Windows 10/11 (64-bit)，需要 WebView2 (Win11 已内置)
@@ -71,7 +71,7 @@
 - 状态高亮（正常 / 过期 / 封禁 / 当前使用）
 
 **智能检测**
-- 封禁检测（423 Locked 状态识别）
+- 封禁检测（423 Locked / 403 TEMPORARILY_SUSPENDED）
 - 默认按试用到期时间排序
 - 刷新失败自动通知（封禁 / Token 失效）
 
@@ -93,6 +93,7 @@
 **批量管理**
 - 批量刷新（智能并发控制，自动优化速度）
 - 批量删除 / 批量打标签
+- 🆕 远程删除（从 AWS 服务端注销，仅 Google/GitHub 且状态正常）
 - 关键词搜索过滤
 
 **性能优化**
@@ -100,11 +101,17 @@
 - 🚀 前端优化组件重渲染，筛选/搜索快 2-3 倍
 - 🚀 使用 Map/Set 数据结构，查找性能提升至 O(1)
 
-### 🏷️ 标签系统
+### 🏷️ 标签与分组
 
+**标签系统**
 - 自定义标签（名称 / 颜色）
 - 批量设置标签
 - 按标签筛选账号
+
+**分组管理**
+- 🆕 账号分组功能
+- 按分组筛选账号
+- 支持无分组 / 有分组筛选
 
 ### 🔍 高级筛选
 
