@@ -1,338 +1,13 @@
 # 账号切换字段需求文档
 
-本文档详细说明四种账号类型（Google、GitHub、BuilderId、Enterprise）在切换账号时需要的字段。
-
----
-
-## 目录
-
-1. [Google 账号](#google-账号)
-2. [GitHub 账号](#github-账号)
-3. [BuilderId 账号](#builderid-账号)
-4. [Enterprise 账号](#enterprise-账号)
-5. [字段对比](#字段对比)
-6. [Kiro IDE 写入格式](#kiro-ide-写入格式)
-7. [常见问题](#常见问题)
+本文档说明四种账号类型（Google、GitHub、BuilderId、Enterprise）在**切换账号时实际写入 Kiro IDE 的字段**。
 
 ---
 
 ## Google 账号
 
-### 完整示例
+**文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
 
-```json
-{
-  "id": "uuid-xxx",
-  "email": "user@gmail.com",
-  "label": "我的 Google 账号",
-  "refresh_token": "aor_xxx",
-  "access_token": "ya29.xxx",
-  "expires_at": "2024-01-27T12:00:00Z",
-  "provider": "Google",
-  "auth_method": "social",
-  "profile_arn": "arn:aws:iam::xxx:oidc-provider/accounts.google.com",
-  "machine_id": "uuid-xxx",
-  "status": "active",
-  "created_at": "2024-01-01T00:00:00Z",
-  "updated_at": "2024-01-27T00:00:00Z"
-}
-```
-
-### 必需字段（切换账号时）
-
-```json
-{
-  "email": "user@gmail.com",
-  "refresh_token": "aor_xxx",
-  "provider": "Google",
-  "auth_method": "social"
-}
-```
-
-### 可选字段
-
-```json
-{
-  "access_token": "ya29.xxx",
-  "expires_at": "2024-01-27T12:00:00Z",
-  "profile_arn": "arn:aws:iam::xxx:oidc-provider/accounts.google.com",
-  "machine_id": "uuid-xxx"
-}
-```
-
-### 不需要的字段
-
-```json
-{
-  "user_id": null,
-  "client_id": null,
-  "client_secret": null,
-  "client_id_hash": null,
-  "start_url": null,
-  "region": null
-}
-```
-
----
-
-## GitHub 账号
-
-### 完整示例
-
-```json
-{
-  "id": "uuid-xxx",
-  "email": "user@github.com",
-  "label": "我的 GitHub 账号",
-  "refresh_token": "aor_xxx",
-  "access_token": "gho_xxx",
-  "expires_at": "2024-01-27T12:00:00Z",
-  "provider": "GitHub",
-  "auth_method": "social",
-  "profile_arn": "arn:aws:iam::xxx:oidc-provider/token.actions.githubusercontent.com",
-  "machine_id": "uuid-xxx",
-  "status": "active",
-  "created_at": "2024-01-01T00:00:00Z",
-  "updated_at": "2024-01-27T00:00:00Z"
-}
-```
-
-### 必需字段（切换账号时）
-
-```json
-{
-  "email": "user@github.com",
-  "refresh_token": "aor_xxx",
-  "provider": "GitHub",
-  "auth_method": "social"
-}
-```
-
-### 可选字段
-
-```json
-{
-  "access_token": "gho_xxx",
-  "expires_at": "2024-01-27T12:00:00Z",
-  "profile_arn": "arn:aws:iam::xxx:oidc-provider/token.actions.githubusercontent.com",
-  "machine_id": "uuid-xxx"
-}
-```
-
-### 不需要的字段
-
-```json
-{
-  "user_id": null,
-  "client_id": null,
-  "client_secret": null,
-  "client_id_hash": null,
-  "start_url": null,
-  "region": null
-}
-```
-
----
-
-## BuilderId 账号
-
-### 完整示例
-
-```json
-{
-  "id": "uuid-xxx",
-  "email": "user@example.com",
-  "label": "我的 BuilderId 账号",
-  "refresh_token": "aorAAAAAGnHNh06ug7STAHvenNZsAHSd_RXMWn2vIuIPln6_8Mbo_aMmk64tyoQ8NpjG3j68DpO8fkHkuCqAefwWMBkc0:MGYCMQCgCpeTGXN7yFoKJw/IhFnfxv7LGDXGzoyrM9DTvXlhb4TiYNvzoxLl7/W2h7iWkZkCMQCzCjqQIYNG8E3gRlRxBEWUNBU+DLn8UFlKhLumPnr39KfOGtco2JSgy4p7EIx6UrM",
-  "access_token": "aoaAAAAAGlzmTAvqIzMpo_f68deMC_PKrY9FtnFBU7teMHJYsEfmTOVr_7NByZBus96RhFUJxA9Qpm_IkAaG4sOokBkc0:MGYCMQC6q7H+73sK0GsojCqjYVBzOUDielk5zt3sNOHmOpyYSGAKy2sOn9J7V7oqaqXnXrYCMQCc7OmVUvBGvCHyeZ8NC+eIAEEkVJ+ktchB+670Vpi3PqJL0hA4RKpzG4UPLPVVGsU",
-  "expires_at": "2026-01-23T15:55:14.153942900+00:00",
-  "provider": "BuilderId",
-  "auth_method": "IdC",
-  "region": "us-east-1",
-  "client_id": "xxx",
-  "client_secret": "xxx",
-  "client_id_hash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53",
-  "machine_id": "uuid-xxx",
-  "status": "active",
-  "created_at": "2024-01-01T00:00:00Z",
-  "updated_at": "2024-01-27T00:00:00Z"
-}
-```
-
-### 必需字段（切换账号时）
-
-```json
-{
-  "email": "user@example.com",
-  "refresh_token": "aorAAAAAGnHNh06ug7STAHvenNZsAHSd_RXMWn2vIuIPln6_8Mbo_aMmk64tyoQ8NpjG3j68DpO8fkHkuCqAefwWMBkc0:MGYCMQCgCpeTGXN7yFoKJw/IhFnfxv7LGDXGzoyrM9DTvXlhb4TiYNvzoxLl7/W2h7iWkZkCMQCzCjqQIYNG8E3gRlRxBEWUNBU+DLn8UFlKhLumPnr39KfOGtco2JSgy4p7EIx6UrM",
-  "client_id": "xxx",
-  "client_secret": "xxx",
-  "region": "us-east-1",
-  "provider": "BuilderId",
-  "auth_method": "IdC"
-}
-```
-
-### 可选字段
-
-```json
-{
-  "access_token": "aoaAAAAAGlzmTAvqIzMpo_f68deMC_PKrY9FtnFBU7teMHJYsEfmTOVr_7NByZBus96RhFUJxA9Qpm_IkAaG4sOokBkc0:MGYCMQC6q7H+73sK0GsojCqjYVBzOUDielk5zt3sNOHmOpyYSGAKy2sOn9J7V7oqaqXnXrYCMQCc7OmVUvBGvCHyeZ8NC+eIAEEkVJ+ktchB+670Vpi3PqJL0hA4RKpzG4UPLPVVGsU",
-  "expires_at": "2026-01-23T15:55:14.153942900+00:00",
-  "client_id_hash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53",
-  "machine_id": "uuid-xxx"
-}
-```
-
-**说明**：
-- `client_id_hash` 可选，如果没有会根据固定的 Start URL（`https://view.awsapps.com/start`）自动计算
-
-### 不需要的字段
-
-```json
-{
-  "user_id": null,
-  "profile_arn": null,
-  "start_url": null
-}
-```
-
----
-
-## Enterprise 账号
-
-### 完整示例
-
-```json
-{
-  "id": "uuid-xxx",
-  "user_id": "xxx-xxx-xxx",
-  "email": null,
-  "label": "我的 Enterprise 账号",
-  "refresh_token": "aor_xxx",
-  "access_token": "xxx",
-  "expires_at": "2024-01-27T12:00:00Z",
-  "provider": "Enterprise",
-  "auth_method": "IdC",
-  "region": "ap-southeast-2",
-  "start_url": "https://xxx.awsapps.com/start",
-  "client_id": "xxx",
-  "client_secret": "xxx",
-  "client_id_hash": "sha256-xxx",
-  "machine_id": "uuid-xxx",
-  "status": "active",
-  "created_at": "2024-01-01T00:00:00Z",
-  "updated_at": "2024-01-27T00:00:00Z"
-}
-```
-
-### 必需字段（切换账号时）
-
-```json
-{
-  "user_id": "xxx-xxx-xxx",
-  "refresh_token": "aor_xxx",
-  "client_id": "xxx",
-  "client_secret": "xxx",
-  "region": "ap-southeast-2",
-  "start_url": "https://xxx.awsapps.com/start",
-  "provider": "Enterprise",
-  "auth_method": "IdC"
-}
-```
-
-### 可选字段
-
-```json
-{
-  "email": null,
-  "access_token": "xxx",
-  "expires_at": "2024-01-27T12:00:00Z",
-  "client_id_hash": "sha256-xxx",
-  "machine_id": "uuid-xxx"
-}
-```
-
-**说明**：
-- `email` 可选，Enterprise 账号可能没有 email
-- `client_id_hash` 可选，如果没有会根据 `start_url` 自动计算
-
-### 不需要的字段
-
-```json
-{
-  "profile_arn": null
-}
-```
-
----
-
-## 字段对比
-
-### 核心字段对比
-
-```json
-{
-  "Google": {
-    "email": "required",
-    "user_id": "not_used",
-    "refresh_token": "required",
-    "provider": "Google",
-    "auth_method": "social",
-    "client_id": "not_used",
-    "client_secret": "not_used",
-    "region": "not_used",
-    "start_url": "not_used",
-    "profile_arn": "optional"
-  },
-  "GitHub": {
-    "email": "required",
-    "user_id": "not_used",
-    "refresh_token": "required",
-    "provider": "GitHub",
-    "auth_method": "social",
-    "client_id": "not_used",
-    "client_secret": "not_used",
-    "region": "not_used",
-    "start_url": "not_used",
-    "profile_arn": "optional"
-  },
-  "BuilderId": {
-    "email": "required",
-    "user_id": "not_used",
-    "refresh_token": "required",
-    "provider": "BuilderId",
-    "auth_method": "IdC",
-    "client_id": "required",
-    "client_secret": "required",
-    "region": "required",
-    "start_url": "not_used",
-    "profile_arn": "not_used"
-  },
-  "Enterprise": {
-    "email": "optional",
-    "user_id": "required",
-    "refresh_token": "required",
-    "provider": "Enterprise",
-    "auth_method": "IdC",
-    "client_id": "required",
-    "client_secret": "required",
-    "region": "required",
-    "start_url": "required",
-    "profile_arn": "not_used"
-  }
-}
-```
-
----
-
-## Kiro IDE 写入格式
-
-### Google/GitHub（Social）
-
-**Token 文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
-
-**Google 示例**：
 ```json
 {
   "accessToken": "aoaAAAAAGlzmfwTIFYXBGo6MbK0Uc5tBAK36PSGN_DL9eMqd6wRi4qu7V4Bn_V27QZbGatQDfMcAyC2t5Ol98MWAcBkc0:MGYCMQD83+33KN2qKdRsmoD0HpJrtNQshb3JWn5VV5ga/Bp2TSZ6cpUm0pdP6NDEJlgL4noCMQC734N1hb1zOJ3O4NBm3Cca+t09oPShL0ORDhn91DT3FI4o+RdEpddBXzQvMZWU0Z8",
@@ -344,7 +19,12 @@
 }
 ```
 
-**GitHub 示例**：
+---
+
+## GitHub 账号
+
+**文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
+
 ```json
 {
   "accessToken": "aoaAAAAAGlzmVUeI_8gaJNdgtyeBQfoAaIsy9_99WWHw8Y9V1qgs6-_Izr6wnZeQR1zHZOxNp_6FqJJ0QyRcHoeyIBkc0:MGQCMD+An+ZfQCjYd1p/E0yOCqUwEvK9/wTsJBU35MXa4qAecooBcRmqeW5nVoZWiKyWyQIwCbUHK7J4pOCSRACy4Iy57nU/Qn4fYwl6riQMH/lyb4u81VfFFHtQm6G2X4mG65Q8",
@@ -356,15 +36,11 @@
 }
 ```
 
-**关键点**：
-- ✅ 字段名使用驼峰格式（`accessToken`、`refreshToken`、`expiresAt`、`profileArn`、`authMethod`）
-- ✅ 不需要 `clientId`、`clientSecret`、`clientIdHash`
-- ✅ 不需要 `region`
-- ✅ 有 `profileArn` 字段
+---
 
-### BuilderId（IdC）
+## BuilderId 账号
 
-**Token 文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
+**Token 文件**：`~/.aws/sso/cache/kiro-auth-token.json`
 
 ```json
 {
@@ -378,25 +54,21 @@
 }
 ```
 
-**Client 文件路径**：`~/.aws/sso/cache/{clientIdHash}.json`（如 `9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53.json`）
+**Client 文件**：`~/.aws/sso/cache/9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53.json`
 
 ```json
 {
   "clientId": "LkndlEtWf81u16m15VfmMnVzLWVhc3QtMQ",
-  "clientSecret": "eyJraWQiOiJrZXktMTU2NDAyODA5OSIsImFsZyI6IkhTMzg0In0...",
+  "clientSecret": "eyJraWQiOiJrZXktMTU2NDAyODA5OSIsImFsZyI6IkhTMzg0In0.eyJzZXJpYWxpemVkIjoie1wiY2xpZW50SWRcIjp7XCJ2YWx1ZVwiOlwiTGtuZGxFdFdmODF1MTZtMTVWZm1NblZ6TFdWaGMzUXRNUVwifSxcImlkZW1wb3RlbnRLZXlcIjpudWxsLFwidGVuYW50SWRcIjpudWxsLFwiY2xpZW50TmFtZVwiOlwiS2lybyBBY2NvdW50IE1hbmFnZXJcIixcImJhY2tmaWxsVmVyc2lvblwiOm51bGwsXCJjbGllbnRUeXBlXCI6XCJQVUJMSUNcIixcInRlbXBsYXRlQXJuXCI6bnVsbCxcInRlbXBsYXRlQ29udGV4dFwiOm51bGwsXCJleHBpcmF0aW9uVGltZXN0YW1wXCI6MTc3NDY2MzIxOC43NDExNjE3MTksXCJjcmVhdGVkVGltZXN0YW1wXCI6MTc2Njg4NzIxOC43NDExNjE3MTksXCJ1cGRhdGVkVGltZXN0YW1wXCI6MTc2Njg4NzIxOC43NDExNjE3MTksXCJjcmVhdGVkQnlcIjpudWxsLFwidXBkYXRlZEJ5XCI6bnVsbCxcInN0YXR1c1wiOm51bGwsXCJpbml0aWF0ZUxvZ2luVXJpXCI6bnVsbCxcImVudGl0bGVkUmVzb3VyY2VJZFwiOm51bGwsXCJlbnRpdGxlZFJlc291cmNlQ29udGFpbmVySWRcIjpudWxsLFwiZXh0ZXJuYWxJZFwiOm51bGwsXCJzb2Z0d2FyZUlkXCI6bnVsbCxcInNjb3Blc1wiOlt7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6Y29tcGxldGlvbnNcIixcInN0YXR1c1wiOlwiSU5JVElBTFwiLFwiYXBwbGljYXRpb25Bcm5cIjpudWxsLFwiZnJpZW5kbHlJZFwiOlwiY29kZXdoaXNwZXJlclwiLFwidXNlQ2FzZUFjdGlvblwiOlwiY29tcGxldGlvbnNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6YW5hbHlzaXNcIixcInN0YXR1c1wiOlwiSU5JVElBTFwiLFwiYXBwbGljYXRpb25Bcm5cIjpudWxsLFwiZnJpZW5kbHlJZFwiOlwiY29kZXdoaXNwZXJlclwiLFwidXNlQ2FzZUFjdGlvblwiOlwiYW5hbHlzaXNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6Y29udmVyc2F0aW9uc1wiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJjb252ZXJzYXRpb25zXCIsXCJ0eXBlXCI6XCJJbW11dGFibGVBY2Nlc3NTY29wZVwiLFwic2NvcGVUeXBlXCI6XCJBQ0NFU1NfU0NPUEVcIn0se1wiZnVsbFNjb3BlXCI6XCJjb2Rld2hpc3BlcmVyOnRyYW5zZm9ybWF0aW9uc1wiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJ0cmFuc2Zvcm1hdGlvbnNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6dGFza2Fzc2lzdFwiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJ0YXNrYXNzaXN0XCIsXCJ0eXBlXCI6XCJJbW11dGFibGVBY2Nlc3NTY29wZVwiLFwic2NvcGVUeXBlXCI6XCJBQ0NFU1NfU0NPUEVcIn1dLFwiYXV0aGVudGljYXRpb25Db25maWd1cmF0aW9uXCI6bnVsbCxcInNoYWRvd0F1dGhlbnRpY2F0aW9uQ29uZmlndXJhdGlvblwiOm51bGwsXCJlbmFibGVkR3JhbnRzXCI6bnVsbCxcImVuZm9yY2VBdXRoTkNvbmZpZ3VyYXRpb25cIjpudWxsLFwib3duZXJBY2NvdW50SWRcIjpudWxsLFwic3NvSW5zdGFuY2VBY2NvdW50SWRcIjpudWxsLFwidXNlckNvbnNlbnRcIjpudWxsLFwibm9uSW50ZXJhY3RpdmVTZXNzaW9uc0VuYWJsZWRcIjpudWxsLFwiYXNzb2NpYXRlZEluc3RhbmNlQXJuXCI6bnVsbCxcImlzQmFja2ZpbGxlZFwiOmZhbHNlLFwiaGFzSW5pdGlhbFNjb3Blc1wiOnRydWUsXCJhcmVBbGxTY29wZXNDb25zZW50ZWRUb1wiOmZhbHNlLFwiaXNFeHBpcmVkXCI6ZmFsc2UsXCJzc29TY29wZXNcIjpbXSxcImdyb3VwU2NvcGVzQnlGcmllbmRseUlkXCI6e1wiY29kZXdoaXNwZXJlclwiOlt7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6YW5hbHlzaXNcIixcInN0YXR1c1wiOlwiSU5JVElBTFwiLFwiYXBwbGljYXRpb25Bcm5cIjpudWxsLFwiZnJpZW5kbHlJZFwiOlwiY29kZXdoaXNwZXJlclwiLFwidXNlQ2FzZUFjdGlvblwiOlwiYW5hbHlzaXNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6Y29tcGxldGlvbnNcIixcInN0YXR1c1wiOlwiSU5JVElBTFwiLFwiYXBwbGljYXRpb25Bcm5cIjpudWxsLFwiZnJpZW5kbHlJZFwiOlwiY29kZXdoaXNwZXJlclwiLFwidXNlQ2FzZUFjdGlvblwiOlwiY29tcGxldGlvbnNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6dGFza2Fzc2lzdFwiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJ0YXNrYXNzaXN0XCIsXCJ0eXBlXCI6XCJJbW11dGFibGVBY2Nlc3NTY29wZVwiLFwic2NvcGVUeXBlXCI6XCJBQ0NFU1NfU0NPUEVcIn0se1wiZnVsbFNjb3BlXCI6XCJjb2Rld2hpc3BlcmVyOnRyYW5zZm9ybWF0aW9uc1wiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJ0cmFuc2Zvcm1hdGlvbnNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6Y29udmVyc2F0aW9uc1wiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJjb252ZXJzYXRpb25zXCIsXCJ0eXBlXCI6XCJJbW11dGFibGVBY2Nlc3NTY29wZVwiLFwic2NvcGVUeXBlXCI6XCJBQ0NFU1NfU0NPUEVcIn1dfSxcInNob3VsZEdldFZhbHVlRnJvbVRlbXBsYXRlXCI6dHJ1ZSxcImhhc1JlcXVlc3RlZFNjb3Blc1wiOmZhbHNlLFwiY29udGFpbnNPbmx5U3NvU2NvcGVzXCI6ZmFsc2UsXCJpc1YxQmFja2ZpbGxlZFwiOmZhbHNlLFwiaXNWMkJhY2tmaWxsZWRcIjpmYWxzZSxcImlzVjNCYWNrZmlsbGVkXCI6ZmFsc2UsXCJpc1Y0QmFja2ZpbGxlZFwiOmZhbHNlfSJ9.S7MVVh0F-x6er5WTQTs9T051nQ8hIX_F2Y1z367ifjbGBpEbXGLgQc31wF_txJbw",
   "expiresAt": "2026-04-23T14:55:14.155591400+00:00"
 }
 ```
 
-**关键点**：
-- ✅ Token 和 Client 信息分开存储在两个文件中
-- ✅ Token 文件包含：`accessToken`、`refreshToken`、`expiresAt`、`authMethod`、`clientIdHash`、`region`
-- ✅ Client 文件包含：`clientId`、`clientSecret`、`expiresAt`
-- ✅ Client 文件名就是 `clientIdHash` 的值
+---
 
-### Enterprise（IdC）
+## Enterprise 账号
 
-**Token 文件路径**：`~/.aws/sso/cache/kiro-auth-token.json`
+**Token 文件**：`~/.aws/sso/cache/kiro-auth-token.json`
 
 ```json
 {
@@ -410,144 +82,353 @@
 }
 ```
 
-**Client 文件路径**：`~/.aws/sso/cache/{clientIdHash}.json`（如 `9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53.json`）
+**Client 文件**：`~/.aws/sso/cache/9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53.json`
 
 ```json
 {
-  "clientId": "xxx",
-  "clientSecret": "xxx",
+  "clientId": "LkndlEtWf81u16m15VfmMnVzLWVhc3QtMQ",
+  "clientSecret": "eyJraWQiOiJrZXktMTU2NDAyODA5OSIsImFsZyI6IkhTMzg0In0.eyJzZXJpYWxpemVkIjoie1wiY2xpZW50SWRcIjp7XCJ2YWx1ZVwiOlwiTGtuZGxFdFdmODF1MTZtMTVWZm1NblZ6TFdWaGMzUXRNUVwifSxcImlkZW1wb3RlbnRLZXlcIjpudWxsLFwidGVuYW50SWRcIjpudWxsLFwiY2xpZW50TmFtZVwiOlwiS2lybyBBY2NvdW50IE1hbmFnZXJcIixcImJhY2tmaWxsVmVyc2lvblwiOm51bGwsXCJjbGllbnRUeXBlXCI6XCJQVUJMSUNcIixcInRlbXBsYXRlQXJuXCI6bnVsbCxcInRlbXBsYXRlQ29udGV4dFwiOm51bGwsXCJleHBpcmF0aW9uVGltZXN0YW1wXCI6MTc3NDY2MzIxOC43NDExNjE3MTksXCJjcmVhdGVkVGltZXN0YW1wXCI6MTc2Njg4NzIxOC43NDExNjE3MTksXCJ1cGRhdGVkVGltZXN0YW1wXCI6MTc2Njg4NzIxOC43NDExNjE3MTksXCJjcmVhdGVkQnlcIjpudWxsLFwidXBkYXRlZEJ5XCI6bnVsbCxcInN0YXR1c1wiOm51bGwsXCJpbml0aWF0ZUxvZ2luVXJpXCI6bnVsbCxcImVudGl0bGVkUmVzb3VyY2VJZFwiOm51bGwsXCJlbnRpdGxlZFJlc291cmNlQ29udGFpbmVySWRcIjpudWxsLFwiZXh0ZXJuYWxJZFwiOm51bGwsXCJzb2Z0d2FyZUlkXCI6bnVsbCxcInNjb3Blc1wiOlt7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6Y29tcGxldGlvbnNcIixcInN0YXR1c1wiOlwiSU5JVElBTFwiLFwiYXBwbGljYXRpb25Bcm5cIjpudWxsLFwiZnJpZW5kbHlJZFwiOlwiY29kZXdoaXNwZXJlclwiLFwidXNlQ2FzZUFjdGlvblwiOlwiY29tcGxldGlvbnNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6YW5hbHlzaXNcIixcInN0YXR1c1wiOlwiSU5JVElBTFwiLFwiYXBwbGljYXRpb25Bcm5cIjpudWxsLFwiZnJpZW5kbHlJZFwiOlwiY29kZXdoaXNwZXJlclwiLFwidXNlQ2FzZUFjdGlvblwiOlwiYW5hbHlzaXNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6Y29udmVyc2F0aW9uc1wiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJjb252ZXJzYXRpb25zXCIsXCJ0eXBlXCI6XCJJbW11dGFibGVBY2Nlc3NTY29wZVwiLFwic2NvcGVUeXBlXCI6XCJBQ0NFU1NfU0NPUEVcIn0se1wiZnVsbFNjb3BlXCI6XCJjb2Rld2hpc3BlcmVyOnRyYW5zZm9ybWF0aW9uc1wiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJ0cmFuc2Zvcm1hdGlvbnNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6dGFza2Fzc2lzdFwiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJ0YXNrYXNzaXN0XCIsXCJ0eXBlXCI6XCJJbW11dGFibGVBY2Nlc3NTY29wZVwiLFwic2NvcGVUeXBlXCI6XCJBQ0NFU1NfU0NPUEVcIn1dLFwiYXV0aGVudGljYXRpb25Db25maWd1cmF0aW9uXCI6bnVsbCxcInNoYWRvd0F1dGhlbnRpY2F0aW9uQ29uZmlndXJhdGlvblwiOm51bGwsXCJlbmFibGVkR3JhbnRzXCI6bnVsbCxcImVuZm9yY2VBdXRoTkNvbmZpZ3VyYXRpb25cIjpudWxsLFwib3duZXJBY2NvdW50SWRcIjpudWxsLFwic3NvSW5zdGFuY2VBY2NvdW50SWRcIjpudWxsLFwidXNlckNvbnNlbnRcIjpudWxsLFwibm9uSW50ZXJhY3RpdmVTZXNzaW9uc0VuYWJsZWRcIjpudWxsLFwiYXNzb2NpYXRlZEluc3RhbmNlQXJuXCI6bnVsbCxcImlzQmFja2ZpbGxlZFwiOmZhbHNlLFwiaGFzSW5pdGlhbFNjb3Blc1wiOnRydWUsXCJhcmVBbGxTY29wZXNDb25zZW50ZWRUb1wiOmZhbHNlLFwiaXNFeHBpcmVkXCI6ZmFsc2UsXCJzc29TY29wZXNcIjpbXSxcImdyb3VwU2NvcGVzQnlGcmllbmRseUlkXCI6e1wiY29kZXdoaXNwZXJlclwiOlt7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6YW5hbHlzaXNcIixcInN0YXR1c1wiOlwiSU5JVElBTFwiLFwiYXBwbGljYXRpb25Bcm5cIjpudWxsLFwiZnJpZW5kbHlJZFwiOlwiY29kZXdoaXNwZXJlclwiLFwidXNlQ2FzZUFjdGlvblwiOlwiYW5hbHlzaXNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6Y29tcGxldGlvbnNcIixcInN0YXR1c1wiOlwiSU5JVElBTFwiLFwiYXBwbGljYXRpb25Bcm5cIjpudWxsLFwiZnJpZW5kbHlJZFwiOlwiY29kZXdoaXNwZXJlclwiLFwidXNlQ2FzZUFjdGlvblwiOlwiY29tcGxldGlvbnNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6dGFza2Fzc2lzdFwiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJ0YXNrYXNzaXN0XCIsXCJ0eXBlXCI6XCJJbW11dGFibGVBY2Nlc3NTY29wZVwiLFwic2NvcGVUeXBlXCI6XCJBQ0NFU1NfU0NPUEVcIn0se1wiZnVsbFNjb3BlXCI6XCJjb2Rld2hpc3BlcmVyOnRyYW5zZm9ybWF0aW9uc1wiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJ0cmFuc2Zvcm1hdGlvbnNcIixcInR5cGVcIjpcIkltbXV0YWJsZUFjY2Vzc1Njb3BlXCIsXCJzY29wZVR5cGVcIjpcIkFDQ0VTU19TQ09QRVwifSx7XCJmdWxsU2NvcGVcIjpcImNvZGV3aGlzcGVyZXI6Y29udmVyc2F0aW9uc1wiLFwic3RhdHVzXCI6XCJJTklUSUFMXCIsXCJhcHBsaWNhdGlvbkFyblwiOm51bGwsXCJmcmllbmRseUlkXCI6XCJjb2Rld2hpc3BlcmVyXCIsXCJ1c2VDYXNlQWN0aW9uXCI6XCJjb252ZXJzYXRpb25zXCIsXCJ0eXBlXCI6XCJJbW11dGFibGVBY2Nlc3NTY29wZVwiLFwic2NvcGVUeXBlXCI6XCJBQ0NFU1NfU0NPUEVcIn1dfSxcInNob3VsZEdldFZhbHVlRnJvbVRlbXBsYXRlXCI6dHJ1ZSxcImhhc1JlcXVlc3RlZFNjb3Blc1wiOmZhbHNlLFwiY29udGFpbnNPbmx5U3NvU2NvcGVzXCI6ZmFsc2UsXCJpc1YxQmFja2ZpbGxlZFwiOmZhbHNlLFwiaXNWMkJhY2tmaWxsZWRcIjpmYWxzZSxcImlzVjNCYWNrZmlsbGVkXCI6ZmFsc2UsXCJpc1Y0QmFja2ZpbGxlZFwiOmZhbHNlfSJ9.S7MVVh0F-x6er5WTQTs9T051nQ8hIX_F2Y1z367ifjbGBpEbXGLgQc31wF_txJbw",
   "expiresAt": "2026-04-23T14:55:14.155591400+00:00"
 }
 ```
 
-**关键点**：
-- ✅ Token 和 Client 信息分开存储在两个文件中
-- ✅ Token 文件包含：`accessToken`、`refreshToken`、`expiresAt`、`authMethod`、`clientIdHash`、`region`
-- ✅ Client 文件包含：`clientId`、`clientSecret`、`expiresAt`
-- ✅ Client 文件名就是 `clientIdHash` 的值
-- ⚠️ **注意**：不包含 `startUrl` 字段（只存储在账号管理器中）
+**说明**：
+- `clientIdHash` 通过 `start_url` 计算（如 `https://xxx.awsapps.com/start`）
+- `start_url` 不写入文件，只用于计算 `clientIdHash`
+
+---
+
+## 字段对比
+
+### Social 账号（Google、GitHub）
+
+**Token 文件字段**：
+```json
+{
+  "accessToken": "ya29.xxx 或 gho_xxx",
+  "refreshToken": "aor_xxx",
+  "expiresAt": "2024-01-27T12:00:00Z",
+  "authMethod": "social",
+  "provider": "Google 或 Github",
+  "profileArn": "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK (可选)"
+}
+```
+
+### IdC 账号（BuilderId、Enterprise）
+
+**Token 文件字段**：
+```json
+{
+  "accessToken": "aoa_xxx",
+  "refreshToken": "aor_xxx",
+  "expiresAt": "2026-01-23T15:55:14.153942900+00:00",
+  "authMethod": "IdC",
+  "provider": "BuilderId 或 Enterprise",
+  "region": "us-east-1 或其他区域",
+  "clientIdHash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53"
+}
+```
+
+**Client 文件字段**：
+```json
+{
+  "clientId": "LkndlEtWf81u16m15VfmMnVzLWVhc3QtMQ",
+  "clientSecret": "eyJraWQiOiJrZXktMTU2NDAyODA5OSIsImFsZyI6IkhTMzg0In0...",
+  "expiresAt": "2026-04-23T14:55:14.155591400+00:00"
+}
+```
 
 ---
 
 ## 常见问题
 
-### Q1: 为什么 Enterprise 账号可能没有 email？
+### Q1: 为什么需要 clientIdHash？
 
-**A**: Enterprise 账号使用 AWS IAM Identity Center，配额响应中只有 `userId`，没有 `email` 字段。这是 AWS 的设计，不是 bug。
+**A**: `clientIdHash` 用于标识 Client 文件的文件名。计算方法（与 Kiro IDE 源码一致）：
 
-**示例**：
-```json
-{
-  "email": null,
-  "user_id": "xxx-xxx-xxx"
-}
-```
-
-### Q2: 为什么 clientId 和 clientSecret 存储在单独的文件中？
-
-**A**: Kiro IDE 将 Token 信息和 Client 信息分开存储：
-- **Token 文件**：`~/.aws/sso/cache/kiro-auth-token.json` - 存储访问令牌、刷新令牌等
-- **Client 文件**：`~/.aws/sso/cache/{clientIdHash}.json` - 存储客户端 ID 和密钥
-
-**文件结构**：
-```
-~/.aws/sso/cache/
-├── kiro-auth-token.json          # Token 信息
-└── 9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53.json  # Client 信息
-```
-
-**Token 文件内容**：
-```json
-{
-  "accessToken": "xxx",
-  "refreshToken": "xxx",
-  "clientIdHash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53"
-}
-```
-
-**Client 文件内容**：
-```json
-{
-  "clientId": "xxx",
-  "clientSecret": "xxx",
-  "expiresAt": "2026-04-23T14:55:14.155591400+00:00"
-}
-```
-
-### Q3: start_url 在哪里使用？
-
-**A**: `start_url` 只在以下场景使用：
-1. **切换账号时**：计算 `clientIdHash`（本地操作）
-2. **刷新 token 时**：计算 `clientIdHash`（本地操作）
-3. **不参与 API 调用**：刷新 token 的 API 不需要 `start_url` 参数
-4. **不写入 Kiro IDE**：`start_url` 只存储在账号管理器中
-
-### Q4: clientIdHash 如何计算？
-
-**A**: 
 ```rust
-fn compute_client_id_hash(start_url: &str) -> String {
-    use sha2::{Sha256, Digest};
-    let mut hasher = Sha256::new();
-    hasher.update(start_url.as_bytes());
-    format!("{:x}", hasher.finalize())
+fn calculate_client_id_hash(start_url: &str) -> String {
+    let input = format!(r#"{{"startUrl":"{}"}}"#, start_url);
+    let mut hasher = Sha1::new();
+    hasher.update(input.as_bytes());
+    hex::encode(hasher.finalize())
 }
 ```
 
-**示例**：
-```json
-{
-  "start_url": "https://view.awsapps.com/start",
-  "client_id_hash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53"
-}
-```
+**关键点**：
+- 使用 **SHA1**（不是 SHA256）
+- 输入格式：`{"startUrl":"https://xxx.awsapps.com/start"}`（JSON 格式）
+- BuilderId 使用固定 Start URL：`https://view.awsapps.com/start`
+- Enterprise 使用账号的 `start_url` 字段
 
-### Q5: BuilderId 的 start_url 是什么？
+### Q2: 为什么 Enterprise 可能没有 email？
 
-**A**: BuilderId 使用固定的 Start URL：`https://view.awsapps.com/start`
+**A**: Enterprise 账号使用 AWS IAM Identity Center，配额响应中只有 `userId`，没有 `email` 字段。
 
-**示例**：
-```json
-{
-  "provider": "BuilderId",
-  "start_url": null,
-  "client_id_hash": "9b7accc909e1b8b5bc5fd05ee6c86fc891a78d53"
-}
-```
+### Q3: 字段名为什么要转换？
 
-### Q6: 为什么字段名是驼峰格式？
+**A**: 账号管理器使用下划线格式（`access_token`），Kiro IDE 使用驼峰格式（`accessToken`）。切换账号时需要转换字段名。
 
-**A**: Kiro IDE 使用驼峰格式（`accessToken`、`refreshToken`），而账号管理器使用下划线格式（`access_token`、`refresh_token`）。切换账号时需要转换字段名。
+### Q4: Client 文件的 expiresAt 是什么？
 
-**账号管理器格式**：
-```json
-{
-  "access_token": "xxx",
-  "refresh_token": "xxx",
-  "expires_at": "xxx"
-}
-```
-
-**Kiro IDE 格式**：
-```json
-{
-  "accessToken": "xxx",
-  "refreshToken": "xxx",
-  "expiresAt": "xxx"
-}
-```
+**A**: Client 文件的 `expiresAt` 是客户端注册的过期时间（通常是 90 天后），不是 Token 的过期时间。
 
 ---
 
 ## 相关文档
 
 - `docs/dev-guides/account-structure.md` - Account 结构体字段说明
-- `docs/api-reference/Kiro Desktop Auth Provider.md` - 认证流程说明
-- `src-tauri/src/account.rs` - Account 结构体定义
 - `src-tauri/src/kiro.rs` - 切换账号实现
+- `src-tauri/src/account.rs` - Account 结构体定义
 
 ---
 
 ## 更新记录
 
-- 2026-01-27: 创建文档，使用 JSON 格式展示字段需求
+- 2026-01-27: 重写文档，聚焦切换账号时需要的字段
+
+
+---
+
+## 刷新 Token 请求与响应
+
+### Social 账号（Google、GitHub）
+
+**请求 API**：`POST https://prod.us-east-1.auth.desktop.kiro.dev/refreshToken`
+
+**请求体**：
+```json
+{
+  "refreshToken": "aor_xxx"
+}
+```
+
+**响应体**：
+```json
+{
+  "accessToken": "aoaAAAAAGlzmfwTIFYXBGo6MbK0Uc5tBAK36PSGN_DL9eMqd6wRi4qu7V4Bn_V27QZbGatQDfMcAyC2t5Ol98MWAcBkc0:MGYCMQD83+33KN2qKdRsmoD0HpJrtNQshb3JWn5VV5ga/Bp2TSZ6cpUm0pdP6NDEJlgL4noCMQC734N1hb1zOJ3O4NBm3Cca+t09oPShL0ORDhn91DT3FI4o+RdEpddBXzQvMZWU0Z8",
+  "refreshToken": "aorAAAAAGnRHpwTIubdiosK1deXVGirP0_o-tkmWYpyaO3zwx87mR_9LUu6rLPztQ79CFU6uQMbjuGEhosgc3Q5fEBkc0:MGUCMB8i5bq4tu58ByXXj8cCS7sXUFLWzDxuJ8ookvPh95EzBG1c0rqhWLTJhm6iEpb33gIxANE3XFAtK2CGF6N1PtKIhdMMUjNC84c/jcHQH7w3OI/6y/wC9hdT1CH9aGQQzcnIIA",
+  "profileArn": "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK",
+  "expiresIn": 3600
+}
+```
+
+---
+
+### IdC 账号（BuilderId、Enterprise）
+
+**请求 API**：`POST https://oidc.{region}.amazonaws.com/token`
+
+**请求体**：
+```json
+{
+  "clientId": "LkndlEtWf81u16m15VfmMnVzLWVhc3QtMQ",
+  "clientSecret": "eyJraWQiOiJrZXktMTU2NDAyODA5OSIsImFsZyI6IkhTMzg0In0...",
+  "grantType": "refresh_token",
+  "refreshToken": "aorAAAAAGnHNh06ug7STAHvenNZsAHSd_RXMWn2vIuIPln6_8Mbo_aMmk64tyoQ8NpjG3j68DpO8fkHkuCqAefwWMBkc0:MGYCMQCgCpeTGXN7yFoKJw/IhFnfxv7LGDXGzoyrM9DTvXlhb4TiYNvzoxLl7/W2h7iWkZkCMQCzCjqQIYNG8E3gRlRxBEWUNBU+DLn8UFlKhLumPnr39KfOGtco2JSgy4p7EIx6UrM"
+}
+```
+
+**响应体**：
+```json
+{
+  "accessToken": "aoaAAAAAGlzmTAvqIzMpo_f68deMC_PKrY9FtnFBU7teMHJYsEfmTOVr_7NByZBus96RhFUJxA9Qpm_IkAaG4sOokBkc0:MGYCMQC6q7H+73sK0GsojCqjYVBzOUDielk5zt3sNOHmOpyYSGAKy2sOn9J7V7oqaqXnXrYCMQCc7OmVUvBGvCHyeZ8NC+eIAEEkVJ+ktchB+670Vpi3PqJL0hA4RKpzG4UPLPVVGsU",
+  "refreshToken": "aorAAAAAGnHNh06ug7STAHvenNZsAHSd_RXMWn2vIuIPln6_8Mbo_aMmk64tyoQ8NpjG3j68DpO8fkHkuCqAefwWMBkc0:MGYCMQCgCpeTGXN7yFoKJw/IhFnfxv7LGDXGzoyrM9DTvXlhb4TiYNvzoxLl7/W2h7iWkZkCMQCzCjqQIYNG8E3gRlRxBEWUNBU+DLn8UFlKhLumPnr39KfOGtco2JSgy4p7EIx6UrM",
+  "idToken": "eyJraWQiOiJ...",
+  "tokenType": "Bearer",
+  "expiresIn": 3600,
+  "aws_sso_app_session_id": "xxx-xxx-xxx",
+  "issuedTokenType": "urn:ietf:params:oauth:token-type:access_token",
+  "originSessionId": "xxx-xxx-xxx"
+}
+```
+
+**说明**：
+- `region` 必须与账号注册时使用的 region 一致
+- `clientId` 和 `clientSecret` 从 Client 文件读取
+- 响应中的 `idToken`、`aws_sso_app_session_id` 等字段可选
+
+---
+
+
+## 获取配额请求与响应
+
+### 请求
+
+**API**：`POST https://app.kiro.dev/service/KiroWebPortalService/operation/GetUserUsageAndLimits`
+
+**请求头**：
+```
+Content-Type: application/cbor
+Accept: application/cbor
+smithy-protocol: rpc-v2-cbor
+authorization: Bearer {accessToken}
+Cookie: Idp={provider}; AccessToken={accessToken}
+```
+
+**请求体（CBOR 编码）**：
+```json
+{
+  "isEmailRequired": true,
+  "origin": "KIRO_IDE"
+}
+```
+
+---
+
+### 响应（CBOR 编码）
+
+#### Google/GitHub/BuilderId（免费版）
+
+```json
+{
+  "daysUntilReset": 0,
+  "limits": [],
+  "nextDateReset": "2026-02-01T00:00:00+00:00",
+  "overageConfiguration": {
+    "overageEnabled": false
+  },
+  "subscriptionInfo": {
+    "overageCapability": "OVERAGE_INCAPABLE",
+    "subscriptionManagementTarget": "PURCHASE",
+    "subscriptionTitle": "KIRO FREE",
+    "type": "Q_DEVELOPER_STANDALONE_FREE",
+    "upgradeCapability": "UPGRADE_CAPABLE"
+  },
+  "usageBreakdownList": [
+    {
+      "bonuses": [],
+      "currency": "USD",
+      "currentOverages": 0,
+      "currentOveragesWithPrecision": 0.0,
+      "currentUsage": 50,
+      "currentUsageWithPrecision": 50.0,
+      "displayName": "Credit",
+      "displayNamePlural": "Credits",
+      "freeTrialInfo": {
+        "currentUsage": 500,
+        "currentUsageWithPrecision": 500.0,
+        "freeTrialExpiry": "2026-01-31T06:52:04.970000+00:00",
+        "freeTrialStatus": "ACTIVE",
+        "usageLimit": 500,
+        "usageLimitWithPrecision": 500.0
+      },
+      "nextDateReset": "2026-02-01T00:00:00+00:00",
+      "overageCap": 10000,
+      "overageCapWithPrecision": 10000.0,
+      "overageCharges": 0.0,
+      "overageRate": 0.04,
+      "resourceType": "CREDIT",
+      "unit": "INVOCATIONS",
+      "usageLimit": 50,
+      "usageLimitWithPrecision": 50.0
+    }
+  ],
+  "userInfo": {
+    "email": "user@example.com",
+    "userId": "d-9067c98495.14783408-d041-703f-20bc-39709c27f6f3"
+  }
+}
+```
+
+**关键字段**：
+- `userInfo.email` - 用户邮箱（有）
+- `userInfo.userId` - 用户 ID
+- `usageBreakdownList[0].usageLimit` - 主配额限制（50）
+- `usageBreakdownList[0].currentUsage` - 主配额已用
+- `usageBreakdownList[0].freeTrialInfo` - 试用配额信息（500）
+- `usageBreakdownList[0].bonuses` - 奖励配额列表
+
+---
+
+#### Enterprise（付费版）
+
+```json
+{
+  "daysUntilReset": 0,
+  "limits": [],
+  "nextDateReset": "2026-02-01T00:00:00+00:00",
+  "overageConfiguration": {
+    "overageEnabled": false
+  },
+  "subscriptionInfo": {
+    "overageCapability": "OVERAGE_CAPABLE",
+    "subscriptionManagementTarget": "MANAGE",
+    "subscriptionTitle": "KIRO POWER",
+    "type": "Q_DEVELOPER_STANDALONE_POWER",
+    "upgradeCapability": "UPGRADE_INCAPABLE"
+  },
+  "usageBreakdownList": [
+    {
+      "bonuses": [],
+      "currency": "USD",
+      "currentOverages": 0,
+      "currentOveragesWithPrecision": 0.0,
+      "currentUsage": 769,
+      "currentUsageWithPrecision": 769.62,
+      "displayName": "Credit",
+      "displayNamePlural": "Credits",
+      "nextDateReset": "2026-02-01T00:00:00+00:00",
+      "overageCap": 10000,
+      "overageCapWithPrecision": 10000.0,
+      "overageCharges": 0.0,
+      "overageRate": 0.04,
+      "resourceType": "CREDIT",
+      "unit": "INVOCATIONS",
+      "usageLimit": 10000,
+      "usageLimitWithPrecision": 10000.0
+    }
+  ],
+  "userInfo": {
+    "userId": "d-9767936181.c97e64c8-5011-709d-bf5b-d8401d5132d9"
+  }
+}
+```
+
+**关键差异**：
+- ❌ `userInfo.email` - 无邮箱字段
+- ✅ `userInfo.userId` - 只有用户 ID
+- ✅ `usageLimit` - 主配额限制（10000）
+- ❌ `freeTrialInfo` - 无试用配额
+
+---
+
+### 错误响应
+
+#### 401 Unauthorized（Token 过期）
+
+```json
+{
+  "__type": "UnauthorizedException",
+  "message": "Token expired"
+}
+```
+
+#### 403 Forbidden（Token 无效）
+
+```json
+{
+  "reason": "INVALID_TOKEN",
+  "message": "Invalid access token"
+}
+```
+
+#### 403 Forbidden（账号封禁）
+
+```json
+{
+  "reason": "TEMPORARILY_SUSPENDED",
+  "message": "Your account has been temporarily suspended"
+}
+```
+
+#### 423 Locked（账号封禁）
+
+```json
+{
+  "__type": "AccountSuspendedException",
+  "message": "Account suspended"
+}
+```
+
+---
