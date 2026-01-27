@@ -26,7 +26,42 @@ inclusion: always
 - ❌ **禁止** 在公开仓库创建、合并 PR
 - ✅ **只允许** 使用 `gh api` 在公开仓库打 tag
 - ✅ **只允许** 使用 `gh release edit` 更新 Release Notes
-- ✅ **例外允许** 通过 `gh api` 更新 `README.md`、`LICENSE` 和 `.github/workflows/`
+- ✅ **例外允许** 使用 `mcp_github_create_or_update_file` 更新 `README.md`、`LICENSE` 和 `.github/workflows/`
+
+## 更新公开仓库文件的方法
+
+**使用 MCP GitHub 工具**（推荐）：
+
+```javascript
+// 更新 README.md
+mcp_github_create_or_update_file({
+  owner: "hj01857655",
+  repo: "kiro-account-manager",
+  path: "README.md",
+  content: "...",  // 文件内容
+  message: "docs: 更新 README",
+  branch: "main",
+  sha: "..."  // 如果是更新现有文件，需要提供 SHA
+})
+
+// 更新 workflow
+mcp_github_create_or_update_file({
+  owner: "hj01857655",
+  repo: "kiro-account-manager",
+  path: ".github/workflows/release.yml",
+  content: "...",
+  message: "ci: 更新 release workflow",
+  branch: "main",
+  sha: "..."
+})
+```
+
+**获取文件 SHA**（更新现有文件时需要）：
+
+```bash
+gh api repos/hj01857655/kiro-account-manager/contents/README.md --jq '.sha'
+gh api repos/hj01857655/kiro-account-manager/contents/.github/workflows/release.yml --jq '.sha'
+```
 
 ## 安全保障
 
@@ -37,7 +72,8 @@ inclusion: always
 **AI 助手规则**：
 - 禁止执行任何 `git push` 到公开仓库
 - 禁止执行 `git remote add` 添加公开仓库
-- 只允许使用 `gh api` 操作公开仓库
+- 只允许使用 `gh api` 打 tag 和编辑 Release
+- 只允许使用 `mcp_github_create_or_update_file` 更新 README 和 workflow
 
 ## 日常开发流程
 
