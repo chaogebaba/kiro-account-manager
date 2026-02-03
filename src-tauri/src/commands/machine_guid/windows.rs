@@ -57,8 +57,8 @@ pub fn reset_machine_guid_inner() -> Result<String, String> {
     Ok(new_guid)
 }
 
-pub fn set_custom_machine_guid_inner(new_guid: &str) -> Result<String, String> {
-    if !is_valid_machine_id(new_guid) {
+pub fn set_custom_machine_guid_inner(new_guid: String) -> Result<String, String> {
+    if !is_valid_machine_id(&new_guid) {
         return Err("无效的机器码格式".to_string());
     }
     let formatted = new_guid.to_uppercase();

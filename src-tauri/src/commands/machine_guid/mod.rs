@@ -24,7 +24,7 @@ mod platform {
     pub fn backup_machine_guid_inner() -> Result<MachineGuidBackup, String> { Err(ERR.into()) }
     pub fn restore_machine_guid_inner() -> Result<String, String> { Err(ERR.into()) }
     pub fn reset_machine_guid_inner() -> Result<String, String> { Err(ERR.into()) }
-    pub fn set_custom_machine_guid_inner(_: &str) -> Result<String, String> { Err(ERR.into()) }
+    pub fn set_custom_machine_guid_inner(_: String) -> Result<String, String> { Err(ERR.into()) }
     pub fn clear_override_inner() -> Result<(), String> { Ok(()) }
 }
 
