@@ -43,7 +43,9 @@
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  【Executor 层】LangChain Agent Executor                                 │
-│  - 决定使用哪个模型                                                       │
+│  - 获取用户选择的模型（从 UI 选择器）                                     │
+│  - selectedModelTitle: 用户在 Quick Pick 中选择的模型标题                │
+│  - 调用 configHandler.llmFromTitle(selectedModelTitle)                  │
 │  - provider: Q_CLIENT_NAMESPACE                                          │
 │  - model: "anthropic.claude-3-5-sonnet-20241022-v2:0"                   │
 │  - mode: "AUTOPILOT"                                                     │
@@ -491,13 +493,103 @@ chatAgent 命令接收参数
   ↓
 创建或获取 Agent Executor
   ↓
+获取用户选择的模型（selectedModelTitle）
+  ↓
 调用 LangChain Agent 执行
   ↓
-Agent 选择使用的模型（通过 loadModel）
+Agent 通过 loadModel 加载模型
   ↓
 执行模型推理
   ↓
 返回响应
+```
+
+### 模型选择机制
+
+**用户选择模型的流程**：
+
+1. **UI 选择器**：`getModelQuickPickVal()`
+   - 位置：行 591730-591760
+   - 显示 Quick Pick 选择器
+   - 用户从配置的模型列表中选择
+
+```javascript
+async function getModelQuickPickVal(curModelTitle, config) {
+  // 1. 构建模型列表
+  const modelItems = config.models.map((model) => {
+    const isCurModel = curModelTitle === model.title;
+    return {
+      label: model.title 
+        ? `${isCurModel ? "$(check)" : "     "} ${model.title}` 
+        : "Model title not set"
+    };
+  });
+  
+  // 2. 显示 Quick Pick
+  const selectedItem = await vscode.window.showQuickPick(modelItems, {
+    title: "Models",
+    placeHolder: "Select a model"
+  });
+  
+  if (!selectedItem) {
+    return void 0;
+  }
+  
+  // 3. 返回选中的模型标题
+  const selectedModelTitle = config.models.find(
+    (model) => model.title && selectedItem.label.includes(model.title)
+  )?.title;
+  
+  return selectedModelTitle;
+}
+```
+
+2. **保存选择**：
+   - 位置：行 593685-593688
+   - 保存到 `_curModelTitle`
+
+```javascript
+const selectedModelTitle = await getModelQuickPickVal(curModelTitle, config);
+if (selectedModelTitle) {
+  this._curModelTitle = selectedModelTitle;
+}
+```
+
+3. **获取模型实例**：`getSelectedModel()`
+   - 位置：行 586246-586248
+   - 通过 `configHandler.llmFromTitle()` 获取模型实例
+
+```javascript
+async getSelectedModel() {
+  return await this.configHandler.llmFromTitle(this.selectedModelTitle);
+}
+```
+
+4. **llmFromTitle() 调用 loadModel()**：
+   - 解析模型标题，提取 provider、model、mode
+   - 调用 `loadModel(provider, model, mode, options)`
+
+**完整流程**：
+
+```
+用户点击模型选择器
+  ↓
+getModelQuickPickVal() 显示 Quick Pick
+  ↓
+用户选择模型（如 "Q Developer - Claude 3.5 Sonnet"）
+  ↓
+保存 selectedModelTitle
+  ↓
+getSelectedModel() 调用 configHandler.llmFromTitle(selectedModelTitle)
+  ↓
+llmFromTitle() 解析标题，提取：
+  - provider: Q_CLIENT_NAMESPACE
+  - model: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+  - mode: "AUTOPILOT"
+  ↓
+调用 loadModel(provider, model, mode)
+  ↓
+返回 QDeveloperConverse 实例
 ```
 
 ---
