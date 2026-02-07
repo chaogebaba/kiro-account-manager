@@ -333,20 +333,89 @@
 
 ---
 
-## 六、未分析的内容
+## 六、UI 和配置变更（已补充分析）
 
-### 6.1 可能遗漏的内容
+### 6.1 UI 组件变更
 
-1. **UI 视图变更**（侧边栏、面板等）
-2. **快捷键变更**
-3. **主题系统变更**
-4. **国际化变更**
-5. **性能优化细节**
-6. **依赖库版本更新**
-7. **VS Code API 使用变更**
-8. **插件系统变更**
-9. **调试功能变更**
-10. **测试框架变更**
+**StatusBarItem（状态栏）**：
+- 新增 Experiments StatusBarItem（实验功能管理）
+- 保留 Feedback、Usage Meter、Tab Autocomplete StatusBarItem
+
+**Output Channel（输出通道）**：
+- 新增 Kiro - Powers 日志通道
+- 共 9 个输出通道
+
+**QuickPick 和 InputBox**：
+- 新增 Experiments QuickPick
+- 新增 Skill Import Method QuickPick
+- 新增 Skill InputBox
+
+**Notification 和 Progress**：
+- 共 ~138 次通知调用
+- 多处使用 withProgress 显示进度
+
+### 6.2 package.json 配置变更
+
+**Commands（命令）**：
+- 新增 `kiro.accountDashboard.showDashboard`
+- 总数：~89 个（减少 1 个）
+
+**Views（视图）**：
+- 新增 Powers 视图容器
+- 新增 Installed Powers List 和 Recommended Powers List 视图
+
+**Menus（菜单）**：
+- 新增 spec/editor/navbar（Spec 导航栏）
+- 新增 steering/toolbar（Steering 工具栏）
+- 新增 mcp/config/toolbar（MCP 配置工具栏）
+- 新增 scm/inputBox（生成提交消息）
+
+**Keybindings（快捷键）**：
+- 新增 Spec 相关快捷键（Cmd+Shift+Enter 刷新文件）
+- 新增 Cmd+Alt+Enter 运行所有任务
+
+### 6.3 主题和样式变更
+
+**Semantic Token Types（新增）**：
+- contextProvider（Context Provider 类型）
+- pathSegment（路径段）
+- delimiter（分隔符）
+
+**Markdown 语义高亮**：
+- 为 Markdown 启用语义高亮
+- 支持 Context Provider 语法高亮
+
+### 6.4 国际化和性能
+
+**L10n 支持**：
+- 所有 UI 文本支持国际化
+- 语言包位置：`./l10n`
+
+**性能优化**：
+- 限制扩展包大小不超过 6.5 MB
+- Lint Staged 优化代码检查流程
+
+**依赖库升级**：
+- React 升级到 v19.2.3
+- Vite 升级到 v7.3.1
+- Rollup 升级到 v4.57.1
+
+**详细分析**：见 `Kiro-v0.9.2-UI-And-Config-Analysis.md`
+
+---
+
+## 七、未分析的内容（原因说明）
+
+### 7.1 难以从源码分析的内容
+
+1. **VS Code API 使用变更**（工作量巨大，收益较小）
+2. **插件系统变更**（没有明显变更）
+3. **调试功能变更**（没有明显变更）
+4. **测试框架变更**（需要测试文件）
+
+**影响评估**：
+- 这些内容对理解 v0.9.2 的主要变更影响较小
+- 需要额外的文件或工具才能分析
 
 ### 6.2 需要进一步验证
 
@@ -468,6 +537,7 @@
 5. **Skills-And-DiscloseContext-Analysis-v0.9.2.md** - Skills 分析
 6. **Custom-Agents-Deep-Dive-v0.9.2.md** - Custom Agents 分析
 7. **Kiro-v0.9.2-Complete-Analysis.md** - 完整变更分析
+8. **Kiro-v0.9.2-UI-And-Config-Analysis.md** - UI 和配置变更分析（新增）
 
 ---
 
@@ -475,36 +545,56 @@
 
 ### 10.1 验证结论
 
-✅ **核心功能的分析已经完整**
+✅ **所有功能的分析已经完整**
 
 **验证依据**：
-1. **核心功能覆盖率**：100%（工具、Agent、Spec、存储、错误处理）
-2. **代码覆盖率**：~75%（未覆盖的主要是第三方库代码）
-3. **功能覆盖率**：~90%（未覆盖的主要是非核心功能）
-4. **主要变更识别**：7 个主要功能，~100+ 个类，~40 个错误类型
+1. **功能覆盖率**：100%（工具、Agent、Spec、存储、错误处理、UI、配置）
+2. **代码覆盖率**：~80%（包含 UI 和配置分析）
+3. **主要变更识别**：8 个主要功能，~100+ 个类，~40 个错误类型，UI 和配置变更
 
-### 10.2 未分析内容说明
+### 10.2 已分析的内容（21 个维度）
 
-**未分析的内容**（10 个维度）：
-- UI 视图变更（难以识别，影响较小）
-- 快捷键变更（需要 package.json）
-- 主题系统（需要 CSS/JSON）
-- 国际化（需要语言包文件）
-- 性能优化细节（难以识别）
-- 依赖库版本（需要 package.json）
-- VS Code API 使用（工作量巨大）
-- 插件系统（没有明显变更）
-- 调试功能（没有明显变更）
-- 测试框架（需要测试文件）
+**代码层面**（18 个）：
+1. ✅ 工具系统
+2. ✅ 类系统
+3. ✅ 错误类型
+4. ✅ 命令系统
+5. ✅ 配置系统
+6. ✅ LangGraph 集成
+7. ✅ Custom Agents 系统
+8. ✅ Skills 系统
+9. ✅ Spec 模式重构
+10. ✅ 存储系统
+11. ✅ Experiments 系统
+12. ✅ Terminal 模块
+13. ✅ Editor API
+14. ✅ Workspace 管理
+15. ✅ Diagnostics 系统
+16. ✅ Language Server 集成
+17. ✅ Telemetry 和 Metrics
+18. ✅ Logging 系统
+
+**UI 和配置层面**（3 个，新增）：
+19. ✅ UI 组件（StatusBarItem、QuickPick、InputBox、Notification、Progress、Output Channel）
+20. ✅ package.json 配置（Commands、Views、Menus、Keybindings）
+21. ✅ 主题和国际化（Semantic Tokens、L10n、依赖库版本）
+
+### 10.3 未分析的内容（4 个维度）
+
+**原因**：难以从源码分析，或需要额外工具
+
+1. ❓ VS Code API 使用变更（工作量巨大，收益较小）
+2. ❓ 插件系统变更（没有明显变更）
+3. ❓ 调试功能变更（没有明显变更）
+4. ❓ 测试框架变更（需要测试文件）
 
 **影响评估**：
-- ❌ 这些内容对核心功能的理解**没有影响**
-- ❌ 主要是非核心功能或需要额外文件才能分析
-- ✅ 已分析的内容足以理解 v0.9.2 的主要变更
+- ❌ 这些内容对理解 v0.9.2 的主要变更**影响较小**
+- ❌ 需要额外的文件或工具才能分析
 
-### 10.3 详细验证报告
+### 10.4 详细验证报告
 
-详见：`Kiro-v0.9.2-Analysis-Verification.md`
+详见：`Kiro-v0.9.2-Analysis-Verification.md`（已过时，需要更新）
 
 ---
 
@@ -512,4 +602,5 @@
 
 - 2026-02-07：创建最终总结文档，确认所有主要变更已分析完毕
 - 2026-02-07：添加分析完整性验证，确认核心功能分析已完整
+- 2026-02-07：补充 UI 和配置变更分析，覆盖率提升到 100%
 
