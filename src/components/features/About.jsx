@@ -3,7 +3,7 @@ import { Github, Heart, Coffee, ExternalLink, Sparkles, Code2, Palette, Cpu, Ref
 import { getVersion } from '@tauri-apps/api/app'
 import { invoke } from '@tauri-apps/api/core'
 import { check } from '@tauri-apps/plugin-updater'
-import { Card, Stack, Group, Text, Badge, Image, Button, List, Modal } from '@mantine/core'
+import { Card, Stack, Group, Text, Badge, Image, Button, Modal } from '@mantine/core'
 import { useApp } from '../../hooks/useApp'
 import { useDialog } from '../../contexts/DialogContext'
 import alipayQR from '../../assets/donate/alipay.jpg'
@@ -235,19 +235,17 @@ function About() {
               <Text size="sm" fw={500} className={colors.text} mb="xs">
                 💖 {t('about.sponsorBenefits')}
               </Text>
-              <List
-                size="sm"
-                spacing="xs"
-                className={colors.textMuted}
-                styles={{
-                  itemWrapper: { width: '100%' },
-                  itemLabel: { fontSize: '0.875rem' }
-                }}
-              >
-                <List.Item>✅ {t('about.benefit1')}</List.Item>
-                <List.Item>✅ {t('about.benefit2')}</List.Item>
-                <List.Item>✅ {t('about.benefit3')}</List.Item>
-              </List>
+              <Stack gap="xs" className={colors.text}>
+                <Text size="sm" style={{ lineHeight: 1.6 }}>
+                  {t('about.benefit1')}
+                </Text>
+                <Text size="sm" style={{ lineHeight: 1.6 }}>
+                  {t('about.benefit2')}
+                </Text>
+                <Text size="sm" style={{ lineHeight: 1.6 }}>
+                  {t('about.benefit3')}
+                </Text>
+              </Stack>
             </div>
 
             {/* 二维码 */}
