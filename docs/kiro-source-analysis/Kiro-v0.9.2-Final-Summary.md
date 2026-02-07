@@ -8,7 +8,7 @@
 
 ---
 
-## 一、已完成的分析文档
+## 一、已完成的分析文档（9 个）
 
 ### 1. Kiro-v0.9.2-Tools-Comparison.md
 **内容**：工具系统完整对比
@@ -64,6 +64,23 @@
 **内容**：完整变更分析
 - 所有主要变更的汇总
 - 迁移指南
+
+### 8. Kiro-v0.9.2-UI-And-Config-Analysis.md
+**内容**：UI 和配置变更分析
+- UI 组件变更（StatusBarItem、Output Channel、QuickPick、InputBox）
+- package.json 配置变更（Commands、Views、Menus、Keybindings）
+- 主题和样式变更（Semantic Tokens、Markdown 语义高亮）
+- 国际化和性能优化
+
+### 9. Kiro-v0.9.2-Additional-Features-Analysis.md（新增）
+**内容**：补充功能分析
+- Inline Chat（编辑器内对话）
+- Code References（代码引用追踪）
+- Onboarding 系统（新用户引导）
+- Webview Providers（UI 架构）
+- Account Dashboard（账号仪表板）
+- Tab Autocomplete（代码自动补全）
+- Git Commit Message 生成（提交信息生成）
 
 ---
 
@@ -358,7 +375,8 @@
 
 **Commands（命令）**：
 - 新增 `kiro.accountDashboard.showDashboard`
-- 总数：~89 个（减少 1 个）
+- 新增 `kiroAgent.generateCommitMessage`
+- 总数：~89 个
 
 **Views（视图）**：
 - 新增 Powers 视图容器
@@ -368,11 +386,12 @@
 - 新增 spec/editor/navbar（Spec 导航栏）
 - 新增 steering/toolbar（Steering 工具栏）
 - 新增 mcp/config/toolbar（MCP 配置工具栏）
-- 新增 scm/inputBox（生成提交消息）
+- 新增 scm/inputBox（生成提交消息，魔法棒图标）
 
 **Keybindings（快捷键）**：
 - 新增 Spec 相关快捷键（Cmd+Shift+Enter 刷新文件）
 - 新增 Cmd+Alt+Enter 运行所有任务
+- 新增 Cmd+I / Ctrl+I（Inline Chat）
 
 ### 6.3 主题和样式变更
 
@@ -400,7 +419,7 @@
 - Vite 升级到 v7.3.1
 - Rollup 升级到 v4.57.1
 
-**详细分析**：见 `Kiro-v0.9.2-UI-And-Config-Analysis.md`
+**详细分析**：见 `Kiro-v0.9.2-UI-And-Config-Analysis.md` 和 `Kiro-v0.9.2-Additional-Features-Analysis.md`
 
 ---
 
@@ -537,7 +556,8 @@
 5. **Skills-And-DiscloseContext-Analysis-v0.9.2.md** - Skills 分析
 6. **Custom-Agents-Deep-Dive-v0.9.2.md** - Custom Agents 分析
 7. **Kiro-v0.9.2-Complete-Analysis.md** - 完整变更分析
-8. **Kiro-v0.9.2-UI-And-Config-Analysis.md** - UI 和配置变更分析（新增）
+8. **Kiro-v0.9.2-UI-And-Config-Analysis.md** - UI 和配置变更分析
+9. **Kiro-v0.9.2-Additional-Features-Analysis.md** - 补充功能分析（新增）
 
 ---
 
@@ -552,7 +572,7 @@
 2. **代码覆盖率**：~80%（包含 UI 和配置分析）
 3. **主要变更识别**：8 个主要功能，~100+ 个类，~40 个错误类型，UI 和配置变更
 
-### 10.2 已分析的内容（21 个维度）
+### 10.2 已分析的内容（27 个维度）
 
 **代码层面**（18 个）：
 1. ✅ 工具系统
@@ -574,10 +594,19 @@
 17. ✅ Telemetry 和 Metrics
 18. ✅ Logging 系统
 
-**UI 和配置层面**（3 个，新增）：
+**UI 和配置层面**（3 个）：
 19. ✅ UI 组件（StatusBarItem、QuickPick、InputBox、Notification、Progress、Output Channel）
 20. ✅ package.json 配置（Commands、Views、Menus、Keybindings）
 21. ✅ 主题和国际化（Semantic Tokens、L10n、依赖库版本）
+
+**补充功能层面**（6 个，新增）：
+22. ✅ Inline Chat（编辑器内对话）
+23. ✅ Code References（代码引用追踪）
+24. ✅ Onboarding 系统（新用户引导）
+25. ✅ Webview Providers（UI 架构）
+26. ✅ Account Dashboard（账号仪表板）
+27. ✅ Tab Autocomplete（代码自动补全）
+28. ✅ Git Commit Message 生成（提交信息生成）
 
 ### 10.3 未分析的内容（4 个维度）
 
@@ -603,4 +632,5 @@
 - 2026-02-07：创建最终总结文档，确认所有主要变更已分析完毕
 - 2026-02-07：添加分析完整性验证，确认核心功能分析已完整
 - 2026-02-07：补充 UI 和配置变更分析，覆盖率提升到 100%
+- 2026-02-07：补充 7 个额外功能分析（Inline Chat、Code References、Onboarding、Webview Providers、Account Dashboard、Tab Autocomplete、Git Commit Message 生成），分析维度从 21 个增加到 28 个
 
