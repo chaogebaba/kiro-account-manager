@@ -27,7 +27,8 @@
         "visible": false,
         "center": true,
         "decorations": true,
-        "shadow": true
+        "shadow": true,
+        "additionalBrowserArgs": "--disable-features=GCM"
       }
     ],
     "security": {
