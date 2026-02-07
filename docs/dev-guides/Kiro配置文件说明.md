@@ -12,8 +12,8 @@ Kiro IDE 的用户配置存放在 `~/.kiro/` 目录下（Windows: `C:\Users\<用
 ├── skills/               # Skills（技能）
 │   └── <skill-name>/
 │       └── SKILL.md      # Skill 指令文件
-├── agents/               # 自定义 Agents
-│   └── AGENTS.md         # Agents 配置文件
+├── agents/               # 自定义 Agents（v0.9.2+）
+│   └── <agent-id>.md     # Agent 定义文件
 ├── steering/             # Steering 规则（全局）
 │   └── *.md              # Markdown 格式的指导文件
 └── settings/
@@ -87,13 +87,17 @@ Skills 是可复用的指令集/能力模块，类似插件或工具包，按需
 ### 目录结构
 
 ```
-~/.kiro/skills/
+~/.kiro/skills/               # 用户级 Skills（全局）
 ├── code-review/
-│   └── SKILL.md          # 代码审查规则
+│   └── SKILL.md              # 代码审查规则
 ├── react-best-practices/
-│   └── SKILL.md          # React 开发规范
+│   └── SKILL.md              # React 开发规范
 └── security-check/
-    └── SKILL.md          # 安全检查清单
+    └── SKILL.md              # 安全检查清单
+
+.kiro/skills/                 # 工作区级 Skills（项目特定）
+└── project-specific-skill/
+    └── SKILL.md
 ```
 
 ### SKILL.md 格式
@@ -136,40 +140,220 @@ AI：根据 skill 指令执行审查
 
 ---
 
-## 3. 自定义 Agents (`agents/AGENTS.md`)
+## 3. 自定义 Agents（Custom Agents）(`agents/`)
 
-自定义 Agents 允许你创建专门的 AI 助手，用于特定任务。
+**版本要求**：v0.9.2+（v0.8.206 叫 "sub-agent"，v0.9.2 改名为 "custom agent"）
 
-### 文件位置
+自定义 Agents 允许你创建专门的 AI 助手，用于特定任务。每个 agent 是一个独立的 Markdown 文件，包含 YAML frontmatter 配置和 Markdown 指令。
 
-- 用户级：`~/.kiro/agents/AGENTS.md`
-- 工作区级：`.kiro/agents/AGENTS.md`（项目根目录）
+### 目录结构
 
-### 配置格式
+```
+~/.kiro/agents/               # 用户级 Agents（全局）
+├── code-reviewer.md          # 代码审查 agent
+├── test-generator.md         # 测试生成 agent
+└── doc-writer.md             # 文档编写 agent
 
-```markdown
-# My Custom Agents
-
-## Code Reviewer Agent
-
-**Name**: code-reviewer
-**Description**: 专门用于代码审查的 AI 助手
-**System Prompt**: 你是一个专业的代码审查专家...
-
-## Documentation Writer Agent
-
-**Name**: doc-writer
-**Description**: 自动生成项目文档
-**System Prompt**: 你是一个技术文档撰写专家...
+.kiro/agents/                 # 工作区级 Agents（项目特定）
+└── project-agent.md          # 项目特定 agent
 ```
 
-### 使用方式
+### Agent 文件格式
 
-在 Kiro IDE 中通过命令面板或侧边栏选择自定义 agent，它会使用你定义的 system prompt 和配置。
+文件名即为 agent ID（如 `code-reviewer.md` 的 ID 是 `code-reviewer`）。
+
+**文件结构**：
+```markdown
+---
+id: code-reviewer
+description: 专门用于代码审查的 agent
+tools:
+  - read
+  - write
+model: claude-sonnet-4
+---
+
+# Code Reviewer Agent
+
+你是一个专业的代码审查助手。
+
+## 审查标准
+1. 代码风格
+2. 安全问题
+3. 性能优化
+4. 最佳实践
+
+## 输出格式
+- 问题列表
+- 改进建议
+- 优先级排序
+```
+
+### YAML Frontmatter 字段
+
+| 字段 | 必需 | 说明 | 示例 |
+|------|------|------|------|
+| `id` | ✅ | Agent 唯一标识 | `code-reviewer` |
+| `description` | ✅ | Agent 描述 | `专门用于代码审查的 agent` |
+| `tools` | ✅ | 允许使用的工具标签 | `["read", "write"]` |
+| `model` | ❌ | 使用的模型 | `claude-sonnet-4` |
+
+### 工具标签说明
+
+使用标签而非具体工具名，更稳定：
+
+| 标签 | 包含的工具 |
+|------|-----------|
+| `read` | readFile、readCode、listDirectory、grepSearch 等 |
+| `write` | fsWrite、strReplace、editCode、deleteFile 等 |
+| `shell` | executePwsh、controlPwshProcess 等 |
+| `web` | remote_web_search、webFetch 等 |
+| `spec` | Spec 相关工具 |
+| `@mcp` | 所有 MCP 工具 |
+| `@powers` | 所有 Powers 工具 |
+| `@builtin` | 所有内置工具 |
+
+**示例**：
+```yaml
+tools:
+  - read      # 允许读取文件
+  - write     # 允许写入文件
+  - @mcp      # 允许使用所有 MCP 工具
+```
+
+### 内置 Custom Agents
+
+Kiro IDE 内置了以下 agents：
+
+| Agent ID | 描述 |
+|----------|------|
+| `context-gatherer` | 探索代码库，识别相关文件 |
+| `general-task-execution` | 通用任务执行器 |
+| `custom-agent-creator` | 创建新 custom agent 的专用 agent（v0.9.2 新增） |
+| `spec-task-execution` | Spec 任务执行器 |
+| `feature-design-first-workflow` | 功能设计优先工作流 |
+| `feature-requirements-first-workflow` | 需求优先工作流 |
+
+### 调用方式
+
+通过 `invokeSubAgent` 工具调用：
+
+```javascript
+invokeSubAgent({
+  name: "code-reviewer",
+  prompt: "审查这段代码：...",
+  explanation: "需要专业的代码审查"
+})
+```
+
+### 创建新 Agent
+
+**方法 1：使用 custom-agent-creator**
+```
+用户："创建一个代码审查 agent"
+AI：调用 invokeSubAgent("custom-agent-creator", "创建代码审查 agent")
+custom-agent-creator：询问用户需求
+用户：提供审查标准和输出格式
+custom-agent-creator：生成 .kiro/agents/code-reviewer.md
+```
+
+**方法 2：手动创建**
+1. 在 `.kiro/agents/` 或 `~/.kiro/agents/` 创建 `.md` 文件
+2. 添加 YAML frontmatter 配置
+3. 编写 Markdown 指令
+4. Kiro 自动发现并注册
+
+### AGENTS.md 文件
+
+**位置**：项目根目录（不是 `.kiro/agents/` 目录）
+
+**作用**：
+- 作为 steering 文档使用
+- 描述项目中可用的 agents
+- 提供 agents 使用指南
+
+**与 custom agents 的区别**：
+- `AGENTS.md`：文档，描述 agents
+- `.kiro/agents/*.md`：实际的 agent 定义文件
+
+**示例**：
+```markdown
+# Project Agents
+
+## Code Reviewer Agent
+- 专注于代码审查
+- 检查代码风格和最佳实践
+
+## Documentation Agent
+- 生成和维护文档
+- 确保文档与代码同步
+```
 
 ---
 
-## 4. Powers 注册表 (`powers/registry.json`)
+## 4. Steering 规则 (`steering/`)
+
+Steering 文件用于给 AI 提供项目上下文和规范。
+
+### 包含模式
+
+**1. 始终包含**（默认）
+```yaml
+---
+inclusion: always
+---
+
+# 我的规则
+
+这个规则会在每次对话时自动加载。
+```
+
+**2. 自动激活**（v0.9.2+ 新增）
+```yaml
+---
+inclusion: auto
+---
+
+# 我的自动激活规则
+
+这个规则只在通过 discloseContext 工具激活时加载，节省 token。
+```
+
+**3. 文件匹配**
+```yaml
+---
+inclusion: fileMatch
+fileMatchPattern: '**/*.py'
+---
+
+# Python 开发规范
+
+当读取 Python 文件时自动加载。
+```
+
+**4. 手动引用**
+```yaml
+---
+inclusion: manual
+---
+
+# 手动引用规则
+
+通过 `#规则名` 手动引用时加载。
+```
+
+### 包含模式对比
+
+| 模式 | 触发时机 | 使用场景 |
+|------|----------|----------|
+| `always` | 每次对话都加载 | 全局规则，始终生效 |
+| `auto` | 通过 discloseContext 激活 | 按需加载，节省 token |
+| `fileMatch` | 匹配的文件被读取时加载 | 特定文件类型的规则 |
+| `manual` | 手动引用（`#` 语法） | 用户主动引用 |
+
+---
+
+## 5. Powers 注册表 (`powers/registry.json`)
 
 Powers 是 Kiro 的扩展能力包，包含文档、工作流指南和 MCP 服务器。
 
@@ -231,79 +415,21 @@ Powers 是 Kiro 的扩展能力包，包含文档、工作流指南和 MCP 服�
 每个项目可以有自己的 `.kiro/` 目录：
 
 ```
-项目根目录/.kiro/
-├── hooks/                # Agent Hooks
-│   └── *.kiro.hook       # Hook 配置文件
-├── skills/               # 工作区级 Skills
-│   └── <skill-name>/
-│       └── SKILL.md
-├── agents/               # 工作区级 Agents
-│   └── AGENTS.md
-├── settings/
-│   └── mcp.json          # 工作区级 MCP 配置（覆盖全局）
-└── steering/             # Steering 规则
-    └── *.md              # Markdown 格式的指导文件
+项目根目录/
+├── AGENTS.md             # 自定义 Agents 配置（工作区级）
+└── .kiro/
+    ├── hooks/            # Agent Hooks
+    │   └── *.kiro.hook   # Hook 配置文件
+    ├── skills/           # 工作区级 Skills
+    │   └── <skill-name>/
+    │       └── SKILL.md
+    ├── agents/           # 工作区级 Custom Agents
+    │   └── <agent-id>.md
+    ├── settings/
+    │   └── mcp.json      # 工作区级 MCP 配置（覆盖全局）
+    └── steering/         # Steering 规则
+        └── *.md          # Markdown 格式的指导文件
 ```
-
-### Steering 文件
-
-Steering 文件用于给 AI 提供项目上下文和规范：
-
-#### 包含模式
-
-**1. 始终包含**（默认）
-```yaml
----
-inclusion: always
----
-
-# 我的规则
-
-这个规则会在每次对话时自动加载。
-```
-
-**2. 自动激活**（v0.9.2+ 新增）
-```yaml
----
-inclusion: auto
----
-
-# 我的自动激活规则
-
-这个规则只在通过 discloseContext 工具激活时加载，节省 token。
-```
-
-**3. 文件匹配**
-```yaml
----
-inclusion: fileMatch
-fileMatchPattern: '**/*.py'
----
-
-# Python 开发规范
-
-当读取 Python 文件时自动加载。
-```
-
-**4. 手动引用**
-```yaml
----
-inclusion: manual
----
-
-# 手动引用规则
-
-通过 `#规则名` 手动引用时加载。
-```
-
-#### 包含模式对比
-
-| 模式 | 触发时机 | 使用场景 |
-|------|----------|----------|
-| `always` | 每次对话都加载 | 全局规则，始终生效 |
-| `auto` | 通过 discloseContext 激活 | 按需加载，节省 token |
-| `fileMatch` | 匹配的文件被读取时加载 | 特定文件类型的规则 |
-| `manual` | 手动引用（`#` 语法） | 用户主动引用 |
 
 ### Hooks
 
@@ -316,7 +442,7 @@ Agent Hooks 可以在特定事件触发时自动执行：
 
 ---
 
-## 4. 应用数据目录 (`%APPDATA%\Kiro`)
+## 7. 应用数据目录 (`%APPDATA%\Kiro`)
 
 Kiro IDE 的运行时数据：
 
