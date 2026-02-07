@@ -80,12 +80,11 @@ jobs:
           echo "" >> release_notes.md
           
           if [ -n "$PREVIOUS_TAG" ]; then
-            # 获取两个 tag 之间的 commits，过滤掉 docs/ci/chore/ refactor等内部开发相关的 commit
+            # 获取两个 tag 之间的 commits，过滤掉 docs/ci/chore/style/test 等内部开发相关的 commit
             git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s" --no-merges | \
               grep -v "^- docs:" | \
               grep -v "^- ci:" | \
               grep -v "^- chore:" | \
-              grep -v "^- refactor:" | \
               grep -v "^- style:" | \
               grep -v "^- test:" >> release_notes.md
           else
@@ -94,7 +93,6 @@ jobs:
               grep -v "^- docs:" | \
               grep -v "^- ci:" | \
               grep -v "^- chore:" | \
-              grep -v "^- refactor:" | \
               grep -v "^- style:" | \
               grep -v "^- test:" >> release_notes.md
           fi
