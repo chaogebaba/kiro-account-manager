@@ -14,7 +14,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-shell = "2"
 tauri-plugin-process = "2"
-tauri-plugin-updater = "2"
+tauri-plugin-updater = "2.10"
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2.6"
 tauri-plugin-fs = "2"
@@ -52,9 +52,11 @@ winreg = "0.52"
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
-# 开发配置：增量编译加速
+# 开发配置：增量编译加速 + 避免编译器崩溃
 [profile.dev]
 incremental = true
+opt-level = 0        # 禁用优化，避免编译器崩溃
+codegen-units = 256  # 增加并行编译单元
 
 # 发布配置：优化二进制体积
 [profile.release]

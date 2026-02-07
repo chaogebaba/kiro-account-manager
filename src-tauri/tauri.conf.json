@@ -37,7 +37,7 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["kiro-manager", "kiro"]
+        "schemes": ["kiro-account-manager"]
       }
     },
     "updater": {
