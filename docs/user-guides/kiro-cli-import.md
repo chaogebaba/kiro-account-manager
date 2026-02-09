@@ -394,8 +394,8 @@ fn test_parse_expires_at() {
 
 ## 参考资料
 
-- [kiro-gateway 源码](https://github.com/jwadow/kiro-gateway)
-- [kiro-gateway auth.py](https://github.com/jwadow/kiro-gateway/blob/main/kiro/auth.py)
+- [kiro-gateway 源码](https://github.com/hj01857655/kiro-gateway) - Go + Gin 实现
+- [kiro-gateway (Python 版本)](https://github.com/jwadow/kiro-gateway) - 原始 Python 实现
 - [rusqlite 文档](https://docs.rs/rusqlite/)
 - [Tauri Dialog API](https://tauri.app/v1/api/js/dialog/)
 

@@ -20,18 +20,29 @@
 
 ## 🌟 Kiro 相关项目（核心推荐）
 
-### 1. ⭐ kiro-gateway (jwadow)
+### 1. ⭐ kiro-gateway (hj01857655) - Go 版本
+- **仓库**：https://github.com/hj01857655/kiro-gateway
+- **描述**：Go + Gin 实现的 Kiro API 代理网关，提供 OpenAI/Anthropic 兼容接口
+- **特点**：
+  - ✅ Go + Gin 实现，性能优秀
+  - ✅ 支持 OpenAI & Anthropic 兼容
+  - ✅ 支持流式响应和工具调用
+  - ✅ 文档详细完善
+  - ✅ 多账号轮询和自动刷新
+- **Star**: 最新维护版本
+
+### 2. ⭐ kiro-gateway (jwadow) - Python 版本
 - **仓库**：https://github.com/jwadow/kiro-gateway
 - **描述**：Proxy API gateway for Kiro IDE & CLI (Amazon Q Developer / AWS CodeWhisperer). Use free Claude models with any client.
 - **特点**：
-  - ✅ 最活跃维护
+  - ✅ Python + FastAPI 实现
   - ✅ 支持 Kiro IDE & CLI
   - ✅ 免费使用 Claude 模型
   - ✅ 文档详细完善
   - ✅ OpenAI & Anthropic 兼容
-- **Star**: 活跃项目
+- **Star**: 原始实现版本
 
-### 2. ⭐ KiroGate (aliom-v)
+### 3. ⭐ KiroGate (aliom-v)
 - **仓库**：https://github.com/aliom-v/KiroGate
 - **描述**：OpenAI & Anthropic 兼容的 Kiro IDE API 代理网关，支持 Claude Code CLI
 - **特点**：
@@ -42,7 +53,7 @@
   - ✅ 文档完善
 - **Star**: 高质量项目
 
-### 3. ⭐ kiro-openai-gateway (ronald919)
+### 4. ⭐ kiro-openai-gateway (ronald919)
 - **仓库**：https://github.com/ronald919/kiro-openai-gateway
 - **描述**：🌐 Enable seamless access to OpenAI models with the Kiro OpenAI Gateway, an easy-to-use proxy for the Kiro IDE API.
 - **特点**：
