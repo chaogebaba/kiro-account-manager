@@ -34,6 +34,9 @@ docs/templates/
 __pycache__/
 *.pyc
 
+# Environment variables
+.env
+
 # Downloaded files
 downloaded_files/
 scripts/register/downloaded_files/
@@ -45,4 +48,4 @@ scripts/register/debug/
 enterprise-import.json
 src-tauri/clippy_warnings.txt
 1.json
-test_current_apis.py
+nul
