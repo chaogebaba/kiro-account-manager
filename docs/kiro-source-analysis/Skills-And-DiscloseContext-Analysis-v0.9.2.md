@@ -739,7 +739,260 @@ function AgentsPanel() {
 
 ---
 
+## v0.9.2 Skills 与 Steering 合并管理——深度分析
+
+### 核心变更：从分离到统一
+
+v0.8.206 中 Steering 和 Skills 是**完全分离**的（实际上 Skills 根本不存在）。v0.9.2 将两者纳入统一的 **Progressive Context（渐进式上下文）** 架构下管理。
+
+### v0.8.206 vs v0.9.2 对比
+
+#### Steering Schema 变更
+
+**v0.8.206**（行 842805-842808）：
+```javascript
+var SteeringContextFrontMatterSchema = z.object({
+  inclusion: z.enum(["always", "fileMatch", "manual"]).optional().nullable(),
+  fileMatchPattern: z.string().or(z.string().array()).optional().nullable()
+});
+// 只有 3 种 inclusion 模式，没有 name 和 description 字段
+```
+
+**v0.9.2**（行 853072-853077）：
+```javascript
+var SteeringContextFrontMatterSchema = z.object({
+  inclusion: z.enum(["always", "fileMatch", "manual", "auto"]).optional().nullable(),
+  fileMatchPattern: z.string().or(z.string().array()).optional().nullable(),
+  name: z.string().optional(),           // 新增
+  description: z.string().optional()     // 新增
+});
+```
+
+**变更点**：
+- 新增 `inclusion: "auto"` 模式——与 Skills 共用 `discloseContext` 工具按需激活
+- 新增 `name` 字段——用于 LLM 工具调用时匹配
+- 新增 `description` 字段——显示给 LLM 用于判断是否需要激活
+
+#### Skill Schema（v0.9.2 新增）
+
+```javascript
+// 行 853078-853084
+var SkillFrontMatterSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+  license: z.string().optional(),
+  compatibility: z.string().optional(),
+  metadata: z.record(z.unknown()).optional()
+}).passthrough();
+```
+
+> 注意：虽然 schema 中 `name` 和 `description` 标记为 `optional()`，但 `parseSkillMd()`（行 874181）会强制校验两者必须存在。
+
+#### 组件对比
+
+| 组件 | v0.8.206 | v0.9.2 |
+|---|---|---|
+| `SkillFrontMatterSchema` | ❌ 不存在 | ✅ 行 853078 |
+| `isSkillDocument()` | ❌ 不存在 | ✅ 行 853085 |
+| `ProgressiveContextRegistry` | ❌ 不存在 | ✅ 行 858802（单例注册表） |
+| `ProgressiveContextLoader` | ❌ 不存在 | ✅ 行 874056（扫描器+监听器） |
+| `SteeringTreeView` | ❌ 不存在 | ✅ 行 873950（合并树形视图） |
+| `SkillTreeItem` | ❌ 不存在 | ✅ 在树形视图中展示 skill 节点 |
+| `ToolDiscloseContext` | ❌ 不存在 | ✅ 行 867500（LLM 工具） |
+| `SteeringDocumentsController` | ✅ 行 848038 | ✅ 行 858830（增加了 skills 方法） |
+| `inclusion: "auto"` | ❌ 只有 always/fileMatch/manual | ✅ 新增 auto 模式 |
+| `getGlobalSkillsDirectory()` | ❌ 不存在 | ✅ 行 858761 |
+| import-skills 命令 | ❌ 不存在 | ✅ 行 873366 |
+| delete-skill 命令 | ❌ 不存在 | ✅ 行 873785 |
+
+### 合并管理的具体实现
+
+#### 1. 统一注册表：ProgressiveContextRegistry（行 858802-858824）
+
+Skills 和 auto-inclusion Steering 共用一个内存注册表：
+
+```javascript
+class ProgressiveContextRegistry {
+  items = new Map();  // key = displayName, value = SkillDocument | SteeringDocument
+
+  setItems(items)    // 原子替换（由 ProgressiveContextLoader.scanAll() 调用）
+  getAll()           // 返回全部 items（skills + steering 混合）
+  getByName(name)    // 按 displayName 查找（discloseContext 工具使用）
+}
+
+var progressiveContextRegistry = new ProgressiveContextRegistry();  // 全局单例
+```
+
+**统一的数据结构**：
+```javascript
+// Skill 类型
+{
+  type: "skill",
+  workspaceUri: "...",
+  id: "file:///...SKILL.md",
+  displayName: "从 frontmatter.name 读取",
+  config: { name, description, license, ... },
+  scope: "global" | "workspace",
+  uri: "file:///...SKILL.md"
+}
+
+// Auto-inclusion Steering 类型
+{
+  type: "steering",
+  workspaceUri: "...",
+  id: "file:///...xxx.md",
+  displayName: "从 frontmatter.name 或文件名读取",
+  config: { inclusion: "auto", description, ... },
+  content: "...",
+  scope: "global" | "workspace",
+  uri: "file:///...xxx.md"
+}
+```
+
+#### 2. 统一扫描器：ProgressiveContextLoader（行 874056-874316）
+
+同时扫描 skills 和 steering 目录，合并注册：
+
+```
+scanAll()
+  ┌─ 全局 Skills:    ~/.kiro/skills/     → scanSkillsDirectory("global")
+  ├─ 全局 Steering:  ~/.kiro/steering/   → scanSteeringDirectory("global")
+  ├─ 工作区 Skills:  .kiro/skills/       → scanSkillsDirectory("workspace")  [仅受信任工作区]
+  └─ 工作区 Steering:.kiro/steering/     → scanSteeringDirectory("workspace")[仅受信任工作区]
+      ↓
+  allItems = [...allSkills, ...allSteering]
+  progressiveContextRegistry.setItems(allItems)  ← 统一注册
+```
+
+**文件监听也是统一的**（行 874068-874083）：
+```javascript
+async initialize() {
+  await this.scanAll();
+  // Skills 监听
+  this.createWatcher(getGlobalSkillsDirectory(), "**/SKILL.md");
+  this.createWatcher(getGlobalSkillsDirectory(), "*");
+  for (const wsSkillsDir of this.getWorkspaceSkillsDirectories()) {
+    this.createWatcher(wsSkillsDir, "**/SKILL.md");
+    this.createWatcher(wsSkillsDir, "*");
+  }
+  // Steering 监听
+  this.createWatcher(getGlobalSteeringDirectory(), "**/*.md");
+  for (const wsSteeringDir of this.getWorkspaceSteeringDirectories()) {
+    this.createWatcher(wsSteeringDir, "**/*.md");
+  }
+}
+```
+
+任何 skill 或 steering 文件的变更都触发同一个 `scanAndUpdate()` → 300ms 防抖 → `scanAll()` 全量重扫。
+
+#### 3. 统一 LLM 工具：ToolDiscloseContext（行 867500-867620）
+
+Skills 和 auto-steering 共用 `discloseContext` 工具。工具描述动态生成，按类型分组展示：
+
+```javascript
+// 行 867517-867550
+const skills = items.filter(isSkillDocument);
+const steering = items.filter(item => !isSkillDocument(item));
+
+let description = "Activate skills or auto inclusion steering files...";
+
+if (skills.length > 0) {
+  description += "**Skills:**\n";
+  for (const skill of skills) {
+    description += `• name: "${skill.config.name}" - ${skill.config.description}\n`;
+  }
+}
+if (steering.length > 0) {
+  description += "**Steering Files:**\n";
+  for (const doc of steering) {
+    description += `• name: "${steeringName}" - ${steeringDescription}\n`;
+  }
+}
+```
+
+LLM 看到的工具描述示例：
+```
+**Skills:**
+• name: "code-review" - 专业代码审查工具
+• name: "react-best-practices" - React 开发规范
+
+**Steering Files:**
+• name: "security-rules" - 安全编码规则
+```
+
+调用方式完全一致：`discloseContext({ name: "code-review" })` 或 `discloseContext({ name: "security-rules" })`。
+
+#### 4. 统一树形视图：SteeringTreeView（行 873950-874011）
+
+侧边栏的 `steeringExplorer` 树形视图同时展示 steering 文件和 skills：
+
+```
+Steering Explorer (kiroAgent.views.steeringExplorer)
+├── Workspace
+│   ├── my-steering-doc          (SteeringTreeItem)
+│   ├── another-rule             (SteeringTreeItem)
+│   └── my-skill                 (SkillTreeItem)      ← skills 混入
+└── Global
+    ├── global-rule              (SteeringTreeItem)
+    └── global-skill             (SkillTreeItem)      ← skills 混入
+```
+
+关键代码（行 873990-874007）：
+```javascript
+if (element instanceof SteeringGroupTreeItem) {
+  const steeringItems = steeringDocuments
+    .filter(doc => doc.scope === element.scope)
+    .map(doc => new SteeringTreeItem(...));
+
+  const skillItems = skills
+    .filter(skill => skill.scope === element.scope)
+    .map(skill => new SkillTreeItem(skill));    // 不同的 TreeItem 类型
+
+  return [...steeringItems, ...skillItems];     // 合并返回
+}
+```
+
+树形视图同时监听 steering 文件变化和 `progressiveContextRegistry.onDidChange` 事件（行 874039）。
+
+#### 5. SteeringDocumentsController 的扩展（行 858830-859228）
+
+v0.8.206 中 `SteeringDocumentsController` 只管 steering。v0.9.2 新增了 skills 相关方法：
+
+| 方法 | v0.8.206 | v0.9.2 |
+|---|---|---|
+| `listContextDocuments()` | ✅ | ✅ |
+| `getAlwaysIncludedDocuments()` | ✅ | ✅ |
+| `getMatchedDocuments()` | ✅ | ✅ |
+| `getProgressiveDisclosureItems()` | ❌ | ✅ 新增，从注册表获取全部 items |
+| `listAllSkills()` | ❌ | ✅ 新增，筛选 type=skill 的 items |
+| `getProgressiveContent(name)` | ❌ | ✅ 新增，加载 skill/steering 内容 |
+| `metrics()` | ✅ 仅 steering 指标 | ✅ 增加 skillDocuments 等指标 |
+
+### 合并设计的关键决策
+
+1. **统一抽象**：Skills 和 auto-steering 都是"按需加载的上下文"，统一为 `ProgressiveContextItem`
+2. **分类展示**：虽然内部统一管理，但在 LLM 工具描述和 UI 树形视图中仍然分类展示（Skills / Steering Files）
+3. **分离存储**：文件系统上仍分开存放（`skills/` vs `steering/`），不混合
+4. **统一触发**：共用 `discloseContext` 工具，LLM 无需区分两者的激活方式
+5. **统一监听**：`ProgressiveContextLoader` 同时监听两类目录，任何变更都全量重扫
+
+### 命令 ID 汇总（v0.9.2 新增）
+
+| 命令 ID | 功能 |
+|---|---|
+| `kiro.steering.createSteeringOrImportSkill` | 创建 steering 或导入 skill（合并入口） |
+| `kiro.skills.deleteSkill` | 删除 skill（整个文件夹） |
+| `kiro.steering.deleteSteering` | 删除 steering 文件 |
+| `kiroAgent.steering.getSteering` | 获取 steering 列表 |
+| `kiro.steering.refineSteeringFile` | AI 优化 steering 内容 |
+| `kiro.steering.createInitialSteering` | 创建初始 steering |
+
+注意 `kiro.steering.createSteeringOrImportSkill`（行 873750）将创建 steering 和导入 skills 合并到了同一个命令入口——这是 UI 层面"合并管理"的直接体现。
+
+---
+
 ## 更新记录
 
 - 2026-02-07：基于 v0.9.2 创建文档，分析 Skills、DiscloseContext 和自定义 Agents 功能
 - 2026-02-07：通过对比 v0.8.206 和 v0.9.2 源码，确认术语变更（sub-agent → custom agent）
+- 2026-02-11：补充 v0.9.2 Skills 与 Steering 合并管理深度分析，包含注册表、扫描器、TreeView、LLM 工具等源码级对比
