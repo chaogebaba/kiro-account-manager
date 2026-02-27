@@ -56,7 +56,7 @@ const ScopeBadge = ({ scope, accent }) => {
 
 function SteeringPanel({ onCountChange, projectDir }) {
   const { t, theme, colors } = useApp()
-  const { showConfirm, showError } = useDialog()
+  const { showConfirm } = useDialog()
   const surface = getThemeSurfaceStyles(theme)
   const accent = getThemeAccent(theme)
 
@@ -120,7 +120,7 @@ function SteeringPanel({ onCountChange, projectDir }) {
       setSelectedFile({ ...selectedFile, content: fullContent })
       setHasChanges(false)
     } catch (e) {
-      showError(t('steering.saveFailed'), String(e))
+      handleUiError('保存 Steering 文件失败', e, { userMessage: t('steering.saveFailed') || '保存失败' })
     } finally {
       setSaving(false)
     }
@@ -163,7 +163,7 @@ function SteeringPanel({ onCountChange, projectDir }) {
       setShowCreateModal(false)
       handleSelect(newFile)
     } catch (e) {
-      showError(t('steering.createFailed'), String(e))
+      handleUiError('创建 Steering 文件失败', e, { userMessage: t('steering.createFailed') || '创建失败' })
     }
   }
 
