@@ -39,15 +39,15 @@
 
 ## 📥 下载
 
-**最新版本**：[v1.8.2](https://github.com/hj01857655/kiro-account-manager/releases/latest)
+**最新版本**：[v1.8.3](https://github.com/hj01857655/kiro-account-manager/releases/latest)
 
 | 平台 | 架构 | 文件格式 | 下载链接 |
 |------|------|---------|---------|
-| 🪟 **Windows** | x64 | MSI 安装包 | [KiroAccountManager_1.8.2_x64_zh-CN.msi](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.2/KiroAccountManager_1.8.2_x64_zh-CN.msi) |
-| 🍎 **macOS** | Intel (x64) | DMG 镜像 | [KiroAccountManager_1.8.2_x64.dmg](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.2/KiroAccountManager_1.8.2_x64.dmg) |
-| 🍎 **macOS** | Apple Silicon (M1/M2/M3) | DMG 镜像 | [KiroAccountManager_1.8.2_aarch64.dmg](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.2/KiroAccountManager_1.8.2_aarch64.dmg) |
-| 🐧 **Linux** | x86_64 | AppImage | [KiroAccountManager_1.8.2_amd64.AppImage](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.2/KiroAccountManager_1.8.2_amd64.AppImage) |
-| 🐧 **Linux** | x86_64 | DEB 包 | [KiroAccountManager_1.8.2_amd64.deb](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.2/KiroAccountManager_1.8.2_amd64.deb) |
+| 🪟 **Windows** | x64 | MSI 安装包 | [KiroAccountManager_1.8.3_x64_zh-CN.msi](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.3/KiroAccountManager_1.8.3_x64_zh-CN.msi) |
+| 🍎 **macOS** | Intel (x64) | DMG 镜像 | [KiroAccountManager_1.8.3_x64.dmg](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.3/KiroAccountManager_1.8.3_x64.dmg) |
+| 🍎 **macOS** | Apple Silicon (M1/M2/M3) | DMG 镜像 | [KiroAccountManager_1.8.3_aarch64.dmg](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.3/KiroAccountManager_1.8.3_aarch64.dmg) |
+| 🐧 **Linux** | x86_64 | AppImage | [KiroAccountManager_1.8.3_amd64.AppImage](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.3/KiroAccountManager_1.8.3_amd64.AppImage) |
+| 🐧 **Linux** | x86_64 | DEB 包 | [KiroAccountManager_1.8.3_amd64.deb](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.3/KiroAccountManager_1.8.3_amd64.deb) |
 
 **系统要求**：
 - **Windows**: Windows 10/11 (64-bit)，需要 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) (Win11 已内置)
