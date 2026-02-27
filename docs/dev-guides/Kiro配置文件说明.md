@@ -229,10 +229,11 @@ Kiro IDE 内置了以下 agents：
 |----------|------|
 | `context-gatherer` | 探索代码库，识别相关文件 |
 | `general-task-execution` | 通用任务执行器 |
-| `custom-agent-creator` | 创建新 custom agent 的专用 agent（v0.9.2 新增） |
+| `custom-agent-creator` | 创建新 custom agent 的专用 agent（v0.9.2 引入，v0.10.32 可用） |
 | `spec-task-execution` | Spec 任务执行器 |
 | `feature-design-first-workflow` | 功能设计优先工作流 |
 | `feature-requirements-first-workflow` | 需求优先工作流 |
+| `bugfix-workflow` | Bugfix 工作流（bugfix → design → tasks） |
 
 ### 调用方式
 
@@ -353,7 +354,26 @@ inclusion: manual
 
 ---
 
-## 5. Powers 注册表 (`powers/registry.json`)
+## 5. 版本变化（v0.9.2 → v0.10.32）
+
+### v0.9.2（引入）
+- Skills / Custom Agents / Powers registry-v2 架构上线
+- Steering 新增 `inclusion: auto`
+
+### v0.10.x（增强，当前对齐 v0.10.32）
+- Spec 工作流增强：
+  - Feature 支持 `requirements-first` / `design-first`
+  - Bugfix 支持独立 workflow（`bugfix.md -> design.md -> tasks.md`）
+- 导航与执行能力：
+  - `kiro.spec.navigateToRequirements` / `kiro.spec.navigateToDesign` / `kiro.spec.navigateToTasks` / `kiro.spec.navigateToBugfix`
+  - `kiro.spec.runAllTasks`
+- Supervised hunk 级审查：`supervisedDiff.discussHunk`
+- Hook 扩展到任务阶段：Pre/Post Task Execution
+- MCP 增强：Prompts / Resource Templates / Elicitation
+
+---
+
+## 6. Powers 注册表 (`powers/registry.json`)
 
 Powers 是 Kiro 的扩展能力包，包含文档、工作流指南和 MCP 服务器。
 
@@ -406,11 +426,11 @@ Powers 是 Kiro 的扩展能力包，包含文档、工作流指南和 MCP 服�
 
 在 Kiro IDE 中使用命令面板搜索 "Powers" 或通过侧边栏的 Powers 面板安装。
 
-**注意**：v0.9.2 版本对 Powers 系统进行了重构，提升了稳定性和性能。
+**注意**：Powers registry-v2 于 v0.9.2 引入，在 v0.10.32 仍为当前主架构。
 
 ---
 
-## 5. 工作区配置 (`.kiro/`)
+## 7. 工作区配置 (`.kiro/`)
 
 每个项目可以有自己的 `.kiro/` 目录：
 
@@ -439,10 +459,12 @@ Agent Hooks 可以在特定事件触发时自动执行：
 - Agent 执行完成时
 - 新会话创建时
 - 保存文件时
+- Spec 任务执行前（Pre Task Execution）
+- Spec 任务执行后（Post Task Execution）
 
 ---
 
-## 7. 应用数据目录 (`%APPDATA%\Kiro`)
+## 8. 应用数据目录 (`%APPDATA%\Kiro`)
 
 Kiro IDE 的运行时数据：
 
