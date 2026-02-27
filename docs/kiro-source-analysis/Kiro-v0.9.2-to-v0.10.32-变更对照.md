@@ -52,6 +52,12 @@
   - `bugfix-workflow`
   - `elicitation/create`
 
+### Hooks 文件校验时机（v0.10.32 源码验证）
+
+- 保存路径：未发现 save-time 的 Hook Schema 阻断校验，内容会直接写入 `.kiro/hooks/*.kiro.hook`。
+- 读取/使用路径：会在 JSON 解析后进行结构校验（`HookSchema.safeParse`），不合法内容在读取阶段报错。
+- 结论：官方行为是“保存不拦截、读取时校验”。
+
 ## 对 Account Manager 文档更新建议
 
 建议采用“版本演进”写法，避免覆盖式描述：
