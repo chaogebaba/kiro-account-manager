@@ -51,16 +51,24 @@
   - `feature-requirements-first-workflow`
   - `bugfix-workflow`
   - `elicitation/create`
+- 同文件还可见：
+  - MCP 路径：`~/.kiro/settings/mcp.json` 与 `<workspace>/.kiro/settings/mcp.json`
+  - MCP 合并顺序：user → workspace → powers（后者覆盖前者）
+  - Steering `inclusion: auto` 通过 `discloseContext` 按需激活（非关键词匹配）
 
-### Hooks 文件校验时机（v0.10.32 源码验证）
+### Hooks 源码总结（v0.10.32）
 
-- 保存路径：未发现 save-time 的 Hook Schema 阻断校验，内容会直接写入 `.kiro/hooks/*.kiro.hook`。
-- 读取/使用路径：会在 JSON 解析后进行结构校验（`HookSchema.safeParse`），不合法内容在读取阶段报错。
-- 结论：官方行为是“保存不拦截、读取时校验”。
+- 存储位置：项目工作区下 `.kiro/hooks/*.kiro.hook`。
+- 文件格式：JSON；常见结构为 `name` + `when` + `then`，并包含 `enabled/description/version` 等扩展字段。
+- 触发端（when.type）：`userTriggered`、`fileEdited`、`promptSubmit`、`agentStop`。
+- 执行端（then.type）：`askAgent`、`runShellCommand`。
+- 保存行为：保存链路以写入为主，未发现 save-time 的 Hook Schema 阻断校验。
+- 读取行为：读取/使用链路会在 JSON 解析后执行结构校验（`HookSchema.safeParse`）；不合法文件在读取阶段报 invalid-data。
+- 路径约束：仅处理 hooks 目录目标文件，并对文件路径做安全限制（防止非法路径穿越）。
 
 ## 对 Account Manager 文档更新建议
 
-建议采用“版本演进”写法，避免覆盖式描述：
+建议采用“版本演进 + 源码证据”写法，避免覆盖式描述：
 
 1. 保留 `v0.9.2 引入`（Skills/Agents/Powers registry-v2）
 2. 单列 `v0.10.x 增强`（Spec/Bugfix/Hunk/Task Hooks/MCP 新能力）

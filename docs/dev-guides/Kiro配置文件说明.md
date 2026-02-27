@@ -24,6 +24,8 @@ Kiro IDE 的用户配置存放在 `~/.kiro/` 目录下（Windows: `C:\Users\<用
 
 ## 1. MCP 配置 (`settings/mcp.json`)
 
+> 路径说明：用户级为 `~/.kiro/settings/mcp.json`，项目级为 `<project>/.kiro/settings/mcp.json`。
+
 MCP (Model Context Protocol) 服务器配置，用于扩展 AI 的能力。
 
 ### 配置结构
@@ -233,7 +235,7 @@ Kiro IDE 内置了以下 agents：
 | `spec-task-execution` | Spec 任务执行器 |
 | `feature-design-first-workflow` | 功能设计优先工作流 |
 | `feature-requirements-first-workflow` | 需求优先工作流 |
-| `bugfix-workflow` | Bugfix 工作流（bugfix → design → tasks） |
+| `bugfix-workflow` | Bugfix 工作流（`bugfix.md -> design.md -> tasks.md`） |
 
 ### 调用方式
 
@@ -348,7 +350,7 @@ inclusion: manual
 | 模式 | 触发时机 | 使用场景 |
 |------|----------|----------|
 | `always` | 每次对话都加载 | 全局规则，始终生效 |
-| `auto` | 通过 discloseContext 激活 | 按需加载，节省 token |
+| `auto` | 通过 discloseContext 按需激活 | 按需加载，节省 token |
 | `fileMatch` | 匹配的文件被读取时加载 | 特定文件类型的规则 |
 | `manual` | 手动引用（`#` 语法） | 用户主动引用 |
 
@@ -368,7 +370,7 @@ inclusion: manual
   - `kiro.spec.navigateToRequirements` / `kiro.spec.navigateToDesign` / `kiro.spec.navigateToTasks` / `kiro.spec.navigateToBugfix`
   - `kiro.spec.runAllTasks`
 - Supervised hunk 级审查：`supervisedDiff.discussHunk`
-- Hook 扩展到任务阶段：Pre/Post Task Execution
+- Hook 扩展到任务阶段：Pre/Post Task Execution（Hooks 文件仍位于 `<project>/.kiro/hooks/*.kiro.hook`）
 - MCP 增强：Prompts / Resource Templates / Elicitation
 
 ---
@@ -438,8 +440,8 @@ Powers 是 Kiro 的扩展能力包，包含文档、工作流指南和 MCP 服�
 项目根目录/
 ├── AGENTS.md             # 自定义 Agents 配置（工作区级）
 └── .kiro/
-    ├── hooks/            # Agent Hooks
-    │   └── *.kiro.hook   # Hook 配置文件
+    ├── hooks/            # 项目级 Hooks
+    │   └── *.kiro.hook   # Hook JSON 文件
     ├── skills/           # 工作区级 Skills
     │   └── <skill-name>/
     │       └── SKILL.md
@@ -451,16 +453,26 @@ Powers 是 Kiro 的扩展能力包，包含文档、工作流指南和 MCP 服�
         └── *.md          # Markdown 格式的指导文件
 ```
 
-### Hooks
+### Hooks（源码总结）
 
-Agent Hooks 可以在特定事件触发时自动执行：
+Hooks 文件位于：`<project>/.kiro/hooks/*.kiro.hook`。
 
-- 发送消息时
-- Agent 执行完成时
-- 新会话创建时
-- 保存文件时
-- Spec 任务执行前（Pre Task Execution）
-- Spec 任务执行后（Post Task Execution）
+触发类型（`when.type`）：
+
+- `userTriggered`
+- `fileEdited`
+- `promptSubmit`
+- `agentStop`
+
+动作类型（`then.type`）：
+
+- `askAgent`（需 `prompt`）
+- `runShellCommand`（需 `command`）
+
+行为语义：
+
+- 保存：以写入为主，不做 save-time Hook Schema 阻断
+- 读取：JSON 解析后做结构校验（`HookSchema.safeParse`），无效文件在读取阶段报 invalid-data
 
 ---
 
@@ -485,5 +497,6 @@ Kiro IDE 的运行时数据：
 MCP 配置合并优先级（后者覆盖前者）：
 
 1. 用户全局配置 (`~/.kiro/settings/mcp.json`)
-2. 工作区配置 (`.kiro/settings/mcp.json`)
-3. 多根工作区中，后面的工作区覆盖前面的
+2. 工作区配置 (`.kiro/settings/mcp.json`)（同名服务器覆盖用户级）
+3. Powers 注入配置（`powers.mcpServers`）
+4. 多根工作区中，每个工作区读取自己的 `.kiro/settings/mcp.json`（不共享同一文件）

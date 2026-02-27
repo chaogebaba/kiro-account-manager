@@ -2,13 +2,14 @@
 
 ## 功能概述
 
-在 Kiro Account Manager 中添加 MCP 服务器配置管理，让用户可以可视化管理 `~/.kiro/settings/mcp.json`。
+在 Kiro Account Manager 中添加 MCP 服务器配置管理，让用户可以可视化管理 `~/.kiro/settings/mcp.json`（用户级）。
 
 ## 目标文件
 
-- **配置文件路径**: `~/.kiro/settings/mcp.json`
+- **用户级配置路径**: `~/.kiro/settings/mcp.json`
 - **Windows**: `C:\Users\<用户名>\.kiro\settings\mcp.json`
 - **macOS**: `/Users/<用户名>/.kiro/settings/mcp.json`
+- **工作区级配置路径**: `<project>/.kiro/settings/mcp.json`（如存在则可覆盖全局）
 
 ## 配置文件结构
 
@@ -196,8 +197,8 @@ src/components/
 
 ## 注意事项
 
-1. **文件不存在处理**: 如果 `mcp.json` 不存在，创建默认空配置
-2. **目录创建**: 如果 `~/.kiro/settings/` 目录不存在，需要先创建
+1. **文件不存在处理**: 如果目标 `mcp.json` 不存在，创建默认空配置
+2. **目录创建**: 如果 `~/.kiro/settings/` 或 `<project>/.kiro/settings/` 不存在，需要先创建
 3. **JSON 格式化**: 保存时保持 JSON 格式化（缩进 2 空格）
 4. **备份**: 修改前可选择性备份原文件
 5. **权限**: 确保有读写权限
