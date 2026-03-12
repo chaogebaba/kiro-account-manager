@@ -9,7 +9,8 @@
 ### 数据库位置
 
 **默认路径**：
-- Linux/macOS: `~/.local/share/kiro-cli/data.sqlite3`
+- Linux/WSL: `~/.local/share/kiro-cli/data.sqlite3`
+- macOS: `~/Library/Application Support/kiro-cli/data.sqlite3`
 - Windows: `%USERPROFILE%\.local\share\kiro-cli\data.sqlite3`
 
 **备用路径**（amazon-q-developer-cli）：
