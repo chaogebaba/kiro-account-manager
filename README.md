@@ -48,7 +48,7 @@
 | 🐧 **Linux** | x86_64 | AppImage | [KiroAccountManager_1.8.3_amd64.AppImage](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.3/KiroAccountManager_1.8.3_amd64.AppImage) |
 | 🐧 **Linux** | x86_64 | DEB 包 | [KiroAccountManager_1.8.3_amd64.deb](https://github.com/hj01857655/kiro-account-manager/releases/download/v1.8.3/KiroAccountManager_1.8.3_amd64.deb) |
 
-> **macOS 样式说明**：若出现样式显示异常，请基于 `public-main` 分支源码自行调整（我没有 macOS 设备，无法复现与调试）。
+> **macOS 样式说明**：若出现样式显示异常，请基于 `public` 分支源码自行调整（我没有 macOS 设备，无法复现与调试）。
 
 **系统要求**：
 - **Windows**: Windows 10/11 (64-bit)，需要 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) (Win11 已内置)
