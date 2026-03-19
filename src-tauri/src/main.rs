@@ -14,6 +14,7 @@ mod kiro_auth_client;
 mod kiro_portal_client;
 mod kiro_cli_db;
 mod mcp;
+mod gateway;
 
 mod process;
 mod providers;
@@ -62,6 +63,7 @@ use commands::machine_guid::{
 };
 use commands::mcp_cmd::{get_mcp_config, save_mcp_server, delete_mcp_server, toggle_mcp_server, get_mcp_tool_stats};
 use commands::kiro_cli_cmd::{get_kiro_cli_default_path, import_from_kiro_cli};
+use commands::gateway_cmd::{start_gateway, stop_gateway, get_gateway_status, get_gateway_config, save_gateway_config};
 
 use commands::proxy_cmd::detect_system_proxy;
 use commands::update_cmd::check_update;
@@ -161,6 +163,13 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         handle_deep_link_event(&app_handle, event.payload());
     });
     
+    let app_handle = app.handle().clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(err) = gateway::auto_start_if_enabled(&app_handle).await {
+            log::error!("自动启动网关失败: {err}");
+        }
+    });
+
     Ok(())
 }
 
@@ -178,13 +187,14 @@ fn main() {
         .plugin(tauri_plugin_http::init())
         // 单实例插件：确保只有一个实例运行，deep-link 回调传递给已运行的实例
         .plugin(tauri_plugin_single_instance::init(setup_single_instance_callback))
-        .setup(setup_app)
         .manage(AppState {
             store: Mutex::new(AccountStore::new()),
             group_tag_store: Mutex::new(GroupTagStore::new()),
             auth: AuthState::new(),
             pending_login: Mutex::new(None),
+            gateway: Mutex::new(None),
         })
+        .setup(setup_app)
         .invoke_handler(tauri::generate_handler![
             // 账号命令
             get_accounts,
@@ -283,6 +293,12 @@ fn main() {
             toggle_mcp_server,
             get_mcp_tool_stats,
 
+            // Gateway 命令
+            start_gateway,
+            stop_gateway,
+            get_gateway_status,
+            get_gateway_config,
+            save_gateway_config,
             // 代理检测命令
             detect_system_proxy,
             // 更新检查命令
