@@ -2321,6 +2321,7 @@ dependencies = [
  "encoding_rs",
  "futures-util",
  "hex",
+ "ipnet",
  "log",
  "open",
  "rand 0.8.5",

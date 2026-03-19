@@ -1,6 +1,12 @@
+mod converter;
+mod models;
+mod proxy;
+mod stream;
+mod thinking_parser;
+
 use axum::{
-    extract::State,
-    http::{HeaderMap, StatusCode},
+    extract::{ConnectInfo, State},
+    http::HeaderMap,
     response::{IntoResponse, Json, Response},
     routing::{get, post},
     Router,
@@ -10,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     fs,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -38,6 +44,24 @@ pub struct GatewayConfig {
     pub access_token: Option<String>,
     #[serde(default = "default_region")]
     pub region: String,
+    #[serde(default = "default_account_mode")]
+    pub account_mode: String,
+    #[serde(default)]
+    pub account_id: Option<String>,
+    #[serde(default)]
+    pub group_id: Option<String>,
+    #[serde(default)]
+    pub tag_id: Option<String>,
+    #[serde(default = "default_strategy")]
+    pub strategy: String,
+    #[serde(default = "default_threshold")]
+    pub threshold: i32,
+    #[serde(default = "default_local_only")]
+    pub local_only: bool,
+    #[serde(default)]
+    pub allowed_ips: Vec<String>,
+    #[serde(default = "default_log_level")]
+    pub log_level: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,10 +95,13 @@ struct RouterState {
 enum ResponseFormat {
     Anthropic,
     OpenAi,
+    Responses,
 }
 
 const CONFIG_DIR: &str = ".kiro-account-manager";
 const CONFIG_FILE: &str = "gateway-config.json";
+const LOGS_DIR: &str = "logs";
+const DEFAULT_AGENT_MODE: &str = "q-developer-converse";
 
 fn default_host() -> String {
     "127.0.0.1".to_string()
@@ -88,6 +115,26 @@ fn default_region() -> String {
     "us-east-1".to_string()
 }
 
+fn default_account_mode() -> String {
+    "local".to_string()
+}
+
+fn default_strategy() -> String {
+    "round_robin".to_string()
+}
+
+fn default_threshold() -> i32 {
+    90
+}
+
+fn default_local_only() -> bool {
+    true
+}
+
+fn default_log_level() -> String {
+    "debug".to_string()
+}
+
 impl Default for GatewayConfig {
     fn default() -> Self {
         Self {
@@ -96,6 +143,15 @@ impl Default for GatewayConfig {
             port: default_port(),
             access_token: None,
             region: default_region(),
+            account_mode: default_account_mode(),
+            account_id: None,
+            group_id: None,
+            tag_id: None,
+            strategy: default_strategy(),
+            threshold: default_threshold(),
+            local_only: default_local_only(),
+            allowed_ips: Vec::new(),
+            log_level: default_log_level(),
         }
     }
 }
@@ -122,15 +178,74 @@ fn ensure_config_valid(config: &GatewayConfig) -> Result<(), String> {
     if config.region.trim().is_empty() {
         return Err("region 不能为空".to_string());
     }
+    match config.account_mode.as_str() {
+        "single" if config.account_id.as_deref().unwrap_or_default().trim().is_empty() => {
+            return Err("single 模式必须选择账号".to_string());
+        }
+        "group" if config.group_id.as_deref().unwrap_or_default().trim().is_empty() => {
+            return Err("group 模式必须选择分组".to_string());
+        }
+        "tag" if config.tag_id.as_deref().unwrap_or_default().trim().is_empty() => {
+            return Err("tag 模式必须选择标签".to_string());
+        }
+        "local" | "single" | "group" | "tag" => {}
+        _ => return Err("accountMode 必须是 local/single/group/tag".to_string()),
+    }
+    if !matches!(config.log_level.as_str(), "debug" | "info" | "warn" | "error") {
+        return Err("logLevel 必须是 debug/info/warn/error".to_string());
+    }
+    for entry in &config.allowed_ips {
+        if !is_valid_allowlist_entry(entry) {
+            return Err(format!("白名单条目无效: {entry}"));
+        }
+    }
     Ok(())
 }
 
-fn config_path() -> Result<PathBuf, String> {
-    let data_dir = dirs::data_local_dir().ok_or_else(|| "无法定位 app data 目录".to_string())?;
+fn is_valid_allowlist_entry(entry: &str) -> bool {
+    let trimmed = entry.trim();
+    !trimmed.is_empty()
+        && (trimmed.parse::<IpAddr>().is_ok() || trimmed.parse::<ipnet::IpNet>().is_ok())
+}
 
-    let dir = data_dir.join(CONFIG_DIR);
+fn normalize_config(config: &GatewayConfig) -> GatewayConfig {
+    let mut normalized = config.clone();
+    normalized.host = normalized.host.trim().to_string();
+    normalized.region = normalized.region.trim().to_string();
+    normalized.account_mode = normalized.account_mode.trim().to_string();
+    normalized.strategy = normalized.strategy.trim().to_string();
+    normalized.log_level = normalized.log_level.trim().to_ascii_lowercase();
+    normalized.allowed_ips = normalized
+        .allowed_ips
+        .iter()
+        .map(|item| item.trim().to_string())
+        .filter(|item| !item.is_empty())
+        .fold(Vec::new(), |mut acc, item| {
+            if !acc.contains(&item) {
+                acc.push(item);
+            }
+            acc
+        });
+    normalized
+}
+
+fn config_path() -> Result<PathBuf, String> {
+    Ok(ensure_gateway_data_dir()?.join(CONFIG_FILE))
+}
+
+fn gateway_data_dir() -> PathBuf {
+    dirs::data_dir().unwrap_or_else(|| {
+        let home = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_else(|_| ".".to_string());
+        PathBuf::from(home)
+    }).join(CONFIG_DIR)
+}
+
+fn ensure_gateway_data_dir() -> Result<PathBuf, String> {
+    let dir = gateway_data_dir();
     fs::create_dir_all(&dir).map_err(|e| format!("创建配置目录失败: {e}"))?;
-    Ok(dir.join(CONFIG_FILE))
+    Ok(dir)
 }
 
 pub fn load_gateway_config() -> Result<GatewayConfig, String> {
@@ -142,7 +257,7 @@ pub fn load_gateway_config() -> Result<GatewayConfig, String> {
     let content = fs::read_to_string(&path).map_err(|e| format!("读取配置失败: {e}"))?;
     let cfg = serde_json::from_str::<GatewayConfig>(&content)
         .map_err(|e| format!("解析配置失败: {e}"))?;
-    Ok(cfg)
+    Ok(normalize_config(&cfg))
 }
 
 pub fn get_gateway_config() -> Result<GatewayConfig, String> {
@@ -150,9 +265,10 @@ pub fn get_gateway_config() -> Result<GatewayConfig, String> {
 }
 
 pub fn save_gateway_config(config: &GatewayConfig) -> Result<(), String> {
-    ensure_config_valid(config)?;
+    let normalized = normalize_config(config);
+    ensure_config_valid(&normalized)?;
     let path = config_path()?;
-    let content = serde_json::to_string_pretty(config).map_err(|e| format!("序列化配置失败: {e}"))?;
+    let content = serde_json::to_string_pretty(&normalized).map_err(|e| format!("序列化配置失败: {e}"))?;
     fs::write(path, content).map_err(|e| format!("写入配置失败: {e}"))
 }
 
@@ -160,6 +276,7 @@ pub async fn start_gateway(
     state: &tauri::State<'_, crate::state::AppState>,
     config: GatewayConfig,
 ) -> Result<GatewayStatus, String> {
+    let config = normalize_config(&config);
     ensure_config_valid(&config)?;
 
     let existing = {
@@ -246,9 +363,12 @@ fn router(state: RouterState) -> Router {
     Router::new()
         .route("/health", get(health_handler))
         .route("/v1/models", get(models_handler))
+        .route("/messages", post(messages_handler))
         .route("/v1/messages", post(messages_handler))
         .route("/v1/messages/count_tokens", post(count_tokens_handler))
         .route("/v1/chat/completions", post(chat_completions_handler))
+        .route("/v1/responses", post(responses_handler))
+        .route("/mcp", post(mcp_handler))
         .with_state(state)
 }
 
@@ -281,9 +401,10 @@ async fn spawn_runtime(config: GatewayConfig) -> Result<GatewayRuntime, String> 
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
-    let server = axum::serve(listener, app.into_make_service()).with_graceful_shutdown(async {
-        let _ = shutdown_rx.await;
-    });
+    let server = axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+        .with_graceful_shutdown(async {
+            let _ = shutdown_rx.await;
+        });
 
     let server_task = tokio::spawn(async move {
         if let Err(e) = server.await {
@@ -320,340 +441,97 @@ pub async fn auto_start_if_enabled(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+pub fn gateway_log_dir(_app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = ensure_gateway_data_dir()?.join(LOGS_DIR);
+    fs::create_dir_all(&dir).map_err(|e| format!("创建日志目录失败: {e}"))?;
+    Ok(dir)
+}
+
+pub fn get_gateway_log_dir(app: &AppHandle) -> Result<String, String> {
+    gateway_log_dir(app).map(|path| path.to_string_lossy().to_string())
+}
+
+pub fn open_gateway_log_dir(app: &AppHandle) -> Result<String, String> {
+    let dir = gateway_log_dir(app)?;
+    open::that(&dir).map_err(|e| format!("打开日志目录失败: {e}"))?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
 async fn health_handler() -> impl IntoResponse {
     Json(json!({ "ok": true }))
 }
 
 async fn models_handler() -> impl IntoResponse {
-    Json(json!({
-        "object": "list",
-        "data": [
-            {
-                "id": "claude-3-5-sonnet",
-                "object": "model",
-                "owned_by": "kiro"
-            },
-            {
-                "id": "claude-3-7-sonnet",
-                "object": "model",
-                "owned_by": "kiro"
-            }
-        ]
-    }))
+    proxy::models_handler().await
 }
 
 async fn count_tokens_handler(Json(payload): Json<Value>) -> impl IntoResponse {
-    let messages = payload
-        .get("messages")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-
-    let mut chars = 0usize;
-    for msg in messages {
-        let c = msg
-            .get("content")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        chars += c.chars().count();
-    }
-
-    Json(json!({ "input_tokens": (chars / 4).max(1) }))
+    proxy::count_tokens_handler(payload).await
 }
 
 async fn messages_handler(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<RouterState>,
     headers: HeaderMap,
     Json(payload): Json<Value>,
-) -> impl IntoResponse {
-    proxy_handler(state, headers, payload, ResponseFormat::Anthropic).await
+) -> Response {
+    proxy::proxy_handler(state, addr, headers, payload, ResponseFormat::Anthropic).await
 }
 
 async fn chat_completions_handler(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<RouterState>,
     headers: HeaderMap,
     Json(payload): Json<Value>,
-) -> impl IntoResponse {
-    proxy_handler(state, headers, payload, ResponseFormat::OpenAi).await
-}
-
-fn extract_text_content(content: Option<&Value>) -> String {
-    match content {
-        Some(Value::String(s)) => s.clone(),
-        Some(Value::Array(arr)) => arr
-            .iter()
-            .filter_map(|v| {
-                if v.get("type").and_then(Value::as_str) == Some("text") {
-                    v.get("text").and_then(Value::as_str).map(str::to_string)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n"),
-        _ => String::new(),
-    }
-}
-
-async fn proxy_handler(
-    state: RouterState,
-    headers: HeaderMap,
-    payload: Value,
-    format: ResponseFormat,
 ) -> Response {
-    state.request_count.fetch_add(1, Ordering::Relaxed);
-
-    if let Some(token) = state.config.access_token.as_ref().filter(|t| !t.trim().is_empty()) {
-        match headers.get("authorization").and_then(|h| h.to_str().ok()) {
-            Some(v) if v == format!("Bearer {token}") => {}
-            _ => {
-                return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "unauthorized" })))
-                    .into_response();
-            }
-        }
-    }
-
-    let local_token = match crate::kiro::get_kiro_local_token().await {
-        Some(v) => v,
-        None => {
-            let msg = "未找到 Kiro 本地 token，请先在 Kiro IDE 登录".to_string();
-            *state.last_error.lock().await = Some(msg.clone());
-            return (StatusCode::UNAUTHORIZED, Json(json!({ "error": msg }))).into_response();
-        }
-    };
-
-    let access_token = match local_token.access_token {
-        Some(v) if !v.trim().is_empty() => v,
-        _ => {
-            let msg = "Kiro 本地 token 缺少 accessToken".to_string();
-            *state.last_error.lock().await = Some(msg.clone());
-            return (StatusCode::UNAUTHORIZED, Json(json!({ "error": msg }))).into_response();
-        }
-    };
-
-    let upstream_url = format!(
-        "https://q.{}.amazonaws.com/generateAssistantResponse",
-        state.config.region
-    );
-
-    let upstream_payload = build_codewhisperer_payload(&payload, &local_token.profile_arn);
-
-    let req = state
-        .http
-        .post(upstream_url)
-        .header("Authorization", format!("Bearer {access_token}"))
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json")
-        .json(&upstream_payload);
-
-    let upstream_resp = match req.send().await {
-        Ok(v) => v,
-        Err(e) => {
-            let msg = format!("上游请求失败: {e}");
-            *state.last_error.lock().await = Some(msg.clone());
-            return (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response();
-        }
-    };
-
-    let status = upstream_resp.status();
-    let body_text = match upstream_resp.text().await {
-        Ok(v) => v,
-        Err(e) => {
-            let msg = format!("读取上游响应失败: {e}");
-            *state.last_error.lock().await = Some(msg.clone());
-            return (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response();
-        }
-    };
-
-    if !status.is_success() {
-        *state.last_error.lock().await = Some(format!("上游错误 {}: {}", status, body_text));
-        return (StatusCode::BAD_GATEWAY, Json(json!({ "error": body_text }))).into_response();
-    }
-
-    let text = extract_response_text(&body_text);
-
-    match format {
-        ResponseFormat::Anthropic => {
-            let response = json!({
-                "id": format!("msg_{}", short_uuid()),
-                "type": "message",
-                "role": "assistant",
-                "model": "claude-3-5-sonnet",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": text
-                    }
-                ],
-                "stop_reason": "end_turn",
-                "stop_sequence": Value::Null,
-                "usage": {
-                    "input_tokens": 0,
-                    "output_tokens": estimate_tokens(&text)
-                }
-            });
-            Json(response).into_response()
-        }
-        ResponseFormat::OpenAi => {
-            let response = json!({
-                "id": format!("chatcmpl-{}", short_uuid()),
-                "object": "chat.completion",
-                "created": chrono::Utc::now().timestamp(),
-                "model": "claude-3-5-sonnet",
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": text
-                        },
-                        "finish_reason": "stop"
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": 0,
-                    "completion_tokens": estimate_tokens(&text),
-                    "total_tokens": estimate_tokens(&text)
-                }
-            });
-            Json(response).into_response()
-        }
-    }
+    proxy::proxy_handler(state, addr, headers, payload, ResponseFormat::OpenAi).await
 }
 
-fn build_codewhisperer_payload(payload: &Value, profile_arn: &Option<String>) -> Value {
-    let model = payload
-        .get("model")
-        .and_then(Value::as_str)
-        .unwrap_or("claude-3-5-sonnet");
-
-    if payload.get("messages").is_some() {
-        let messages = payload
-            .get("messages")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-
-        let mut history = Vec::<Value>::new();
-        let mut current = String::new();
-
-        for (idx, msg) in messages.iter().enumerate() {
-            let role = msg.get("role").and_then(Value::as_str).unwrap_or("user");
-            let content = extract_text_content(msg.get("content"));
-
-            if idx + 1 == messages.len() && role == "user" {
-                current = content;
-            } else {
-                history.push(json!({
-                    "role": role,
-                    "content": content
-                }));
-            }
-        }
-
-        json!({
-            "model": model,
-            "profileArn": profile_arn,
-            "conversationState": {
-                "chatTriggerType": "MANUAL",
-                "history": history,
-                "currentMessage": {
-                    "userInputMessage": {
-                        "content": current
-                    }
-                }
-            }
-        })
-    } else {
-        let messages = payload
-            .get("messages")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-
-        let mut history = Vec::<Value>::new();
-        let mut current = String::new();
-
-        for (idx, msg) in messages.iter().enumerate() {
-            let role = msg.get("role").and_then(Value::as_str).unwrap_or("user");
-            let content = msg
-                .get("content")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
-
-            if idx + 1 == messages.len() && role == "user" {
-                current = content;
-            } else {
-                history.push(json!({
-                    "role": role,
-                    "content": content
-                }));
-            }
-        }
-
-        json!({
-            "model": model,
-            "profileArn": profile_arn,
-            "conversationState": {
-                "chatTriggerType": "MANUAL",
-                "history": history,
-                "currentMessage": {
-                    "userInputMessage": {
-                        "content": current
-                    }
-                }
-            }
-        })
-    }
+async fn responses_handler(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    State(state): State<RouterState>,
+    headers: HeaderMap,
+    Json(payload): Json<Value>,
+) -> Response {
+    proxy::proxy_handler(state, addr, headers, payload, ResponseFormat::Responses).await
 }
 
-fn extract_response_text(raw: &str) -> String {
-    if raw.trim().is_empty() {
-        return String::new();
-    }
-
-    if let Ok(v) = serde_json::from_str::<Value>(raw) {
-        if let Some(s) = v
-            .get("assistantResponse")
-            .and_then(|x| x.get("content"))
-            .and_then(Value::as_str)
-        {
-            return s.to_string();
-        }
-
-        if let Some(s) = v
-            .get("content")
-            .and_then(Value::as_str)
-        {
-            return s.to_string();
-        }
-
-        if let Some(arr) = v.get("content").and_then(Value::as_array) {
-            let text = arr
-                .iter()
-                .filter_map(|b| {
-                    if b.get("type").and_then(Value::as_str) == Some("text") {
-                        b.get("text").and_then(Value::as_str).map(str::to_string)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            if !text.is_empty() {
-                return text;
-            }
-        }
-    }
-
-    raw.to_string()
+async fn mcp_handler(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    State(state): State<RouterState>,
+    headers: HeaderMap,
+    Json(payload): Json<Value>,
+) -> Response {
+    proxy::mcp_proxy_handler(state, addr, headers, payload).await
 }
 
-fn estimate_tokens(text: &str) -> usize {
-    (text.chars().count() / 4).max(1)
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn short_uuid() -> String {
-    uuid::Uuid::new_v4().to_string().replace('-', "")
+    #[test]
+    fn config_path_uses_roaming_appdata_root() {
+        let expected = dirs::data_dir()
+            .expect("data_dir should exist in test environment")
+            .join(CONFIG_DIR)
+            .join(CONFIG_FILE);
+
+        let actual = config_path().expect("config path should resolve");
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn gateway_data_dir_puts_logs_under_same_root() {
+        let expected = dirs::data_dir()
+            .expect("data_dir should exist in test environment")
+            .join(CONFIG_DIR)
+            .join(LOGS_DIR);
+
+        let actual = ensure_gateway_data_dir()
+            .expect("gateway data dir should resolve")
+            .join(LOGS_DIR);
+
+        assert_eq!(actual, expected);
+    }
 }

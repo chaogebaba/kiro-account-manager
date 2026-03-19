@@ -1,6 +1,7 @@
 # Kiro API 网关集成清单
 
-本文档描述在 `kiro-account-manager` 内集成“Claude/Anthropic 兼容代理 → Kiro API”功能需要完成的工作项。
+本文档是 `kiro-account-manager` 内 Kiro API 网关的研发总文档，按“需求规划 -> 设计依据 -> 实现回填”组织。
+它的目标不是用户操作手册，而是给开发者、维护者和后续审阅者提供完整的方案演进链路。
 
 ## 架构流程图
 
@@ -23,7 +24,8 @@
 │    mod.rs / router.rs                                                                 │
 │    Router::new()                                                                      │
 │      POST /v1/messages         → handle_anthropic                                      │
-│      POST /v1/chat/completions → handle_openai                                         │
+│      POST /v1/responses       → handle_openai_responses                                │
+│      POST /v1/chat/completions → handle_openai_compat                                  │
 │      GET  /v1/models           → 固定列表                                              │
 │      GET  /health              → 200 OK                                                │
 │    tokio::spawn(axum::serve)                                                          │
@@ -65,6 +67,70 @@
 - 支持在应用内配置、启动、停止代理服务。
 - 提供必要的安全与合规提示，避免误用与数据泄露。
 
+## 文档定位
+- 本文档服务于研发视角下的需求、设计、实现和验证闭环。
+- 若要判断“当前代码已经做到什么”，优先看“当前实现状态”“需求对照表（代码现状）”“测试与验证”。
+- 若要理解“为什么这样设计”，继续看后续的 Kiro IDE 证据、参考实现对照、协议映射与 `web_search` 章节。
+- 若要追踪原始设计意图与首版计划，请结合 [gateway-impl-plan.md](./gateway-impl-plan.md) 一起阅读。
+
+## 当前实现状态（2026-03-20）
+
+> 说明：本节描述 `kiro-account-manager` 当前代码里已经落地的网关能力。下文其他章节包含目标态、需求项、逆向证据与参考方案，不能默认视为“已实现”。
+
+### 已落地
+- 已新增网关页面，并接入 `routes.jsx` 与侧边栏入口。
+- 已新增 Tauri 命令：`start_gateway`、`stop_gateway`、`get_gateway_status`、`get_gateway_config`、`save_gateway_config`。
+- 已支持本地配置持久化到 app data 下的 `gateway-config.json`，并在应用启动时按 `enabled` 自动拉起。
+- 已提供基础端点：`GET /health`、`GET /v1/models`、`POST /v1/messages`、`POST /v1/responses`、`POST /v1/chat/completions`、`POST /v1/messages/count_tokens`、`POST /mcp`；其中 OpenAI 兼容优先按 `/v1/responses` 设计，`/v1/chat/completions` 为兼容入口。
+- 已支持真实上游 `application/vnd.amazon.eventstream` 请求，并将 Kiro chunked stream 增量转换为 Anthropic / OpenAI / Responses SSE。
+- 已完成 `system`、`tools`、`tool_use`、`tool_result`、`reasoningContent` 的主链路转换，并补充了 Responses `input` -> 统一请求模型归一化；`/v1/chat/completions` 走同一内部模型兼容。
+- 已支持客户端 API Key 形式的入口鉴权，以及 `localOnly` + `allowedIps` 的访问限制。
+- 已接入现有账号体系：`local/single/group/tag`、`accountId/groupId/tagId`、`strategy`、`threshold`。
+- 已支持基础图片输入：Anthropic `image` base64 块与 `image_url`/Responses `input_image` data URL 会被提取到 Kiro `images` 字段。
+- 已加入错误映射与脱敏，`401/403/429/5xx` 会按兼容格式返回，错误文本会裁剪敏感字段。
+- 已提供状态展示、请求计数、客户端配置复制、重启按钮、风险提示、日志级别、打开日志目录和最近错误展示。
+
+### 已确认边界
+- **`web_search` 特殊工具已接入**：当前已支持 Anthropic 版本化 `web_search_*`（包括公开文档中的 `web_search_20250305` / `web_search_20260209`）归一化为 Kiro `web_search` 工具，并由网关代执行 `/mcp tools/call` 后回灌为服务端搜索结果。
+- **图片输入当前只支持本地 base64 / data URL**：远程图片 URL 拉取与更多格式兼容仍未扩展。
+
+### 阅读方式
+- 若要判断“现在能不能用”，以本节“已落地 / 已确认边界”为准。
+- 若要继续开发，以本文档后续需求项和 `gateway-impl-plan.md` 的阶段拆解为准。
+
+## 需求对照表（代码现状）
+
+| 需求项 | 当前状态 | 代码位置 / 说明 |
+|---|---|---|
+| 网关菜单入口 | 已完成 | `src/routes.jsx` 已注册 `gateway` 页面；`src/components/features/GatewayPage.jsx` 已存在 |
+| 启动/停止/状态/配置命令 | 已完成 | `src-tauri/src/commands/gateway_cmd.rs`、`src-tauri/src/main.rs` |
+| 配置持久化与自动启动 | 已完成 | `src-tauri/src/gateway/mod.rs` 中 `load_gateway_config` / `save_gateway_config` / `auto_start_if_enabled` |
+| 基础端点 `/health` `/v1/models` `/v1/messages` `/v1/responses` `/v1/chat/completions` `/mcp` | 已完成 | `src-tauri/src/gateway/mod.rs` 路由已注册；OpenAI 兼容路径以 `/v1/responses` 为主 |
+| Claude/OpenAI 基础客户端配置复制 | 已完成 | `src/components/features/GatewayPage.jsx` 已生成并复制 `ANTHROPIC_*` / `OPENAI_*` 配置，并提示 OpenAI 主用 `/v1/responses` |
+| 请求计数、最近错误展示 | 已完成 | `request_count` / `last_error` 已落地，前端已展示 |
+| 真实 Kiro 上游流式桥接 | 已完成 | `src-tauri/src/gateway/proxy.rs` 已消费上游 event-stream 并逐事件输出 SSE |
+| `system`、`tools`、`tool_use`、`tool_result`、`reasoningContent` 适配 | 已完成主链路 | `src-tauri/src/gateway/converter.rs` 与 `src-tauri/src/gateway/stream.rs` 已覆盖主协议转换 |
+| 上游错误码与异常格式映射 | 已完成主链路 | `src-tauri/src/gateway/proxy.rs` 已按 `authentication/rate_limit/api_error` 输出 |
+| 错误脱敏 | 已完成主链路 | `src-tauri/src/gateway/proxy.rs` 已裁剪 Bearer/token/API Key |
+| 账号来源模式 `single/group/tag` | 已完成 | `GatewayConfig` + `proxy.rs` 已接入 `local/single/group/tag` |
+| 账号池策略 `groupId/strategy/threshold` | 已完成 | `GatewayConfig` 与 `GatewayPage.jsx` 已暴露并生效 |
+| 白名单/仅本机强约束 | 已完成 | 已支持 `localOnly` 强制仅本机，以及 `allowedIps` 的 IP/CIDR 白名单 |
+| 图片输入 | 已完成基础版 | 已支持 Anthropic `image` base64 块与 data URL 形式 `image_url` / `input_image` |
+| `/mcp` 透传 | 已完成 | `src-tauri/src/gateway/proxy.rs` 已直连上游 `https://q.{region}.amazonaws.com/mcp` |
+| 前端启用开关、日志级别、重启、打开日志目录、风险提示 | 已完成 | `GatewayPage.jsx` 已补齐开关、日志级别、打开日志目录、风险提示 |
+| `web_search` 特殊工具 | 已完成 | 已支持 `web_search_*` 版本化匹配，映射为 Kiro `web_search` MCP 工具并由网关代执行 |
+
+## 代码锚点（当前实现）
+
+- 前端入口：`src/components/features/GatewayPage.jsx`
+- 路由注册：`src/routes.jsx`
+- 命令层：`src-tauri/src/commands/gateway_cmd.rs`
+- 运行时与路由：`src-tauri/src/gateway/mod.rs`
+- 协议代理：`src-tauri/src/gateway/proxy.rs`
+- 请求转换：`src-tauri/src/gateway/converter.rs`
+- 事件解析：`src-tauri/src/gateway/stream.rs`
+- 自动启动注册：`src-tauri/src/main.rs`
+
 ## 架构层级关系
 
 ```
@@ -86,7 +152,8 @@
 │    mod.rs / router.rs                                                                 │
 │    Router::new()                                                                      │
 │      POST /v1/messages         → handle_anthropic                                      │
-│      POST /v1/chat/completions → handle_openai                                         │
+│      POST /v1/responses       → handle_openai_responses                                │
+│      POST /v1/chat/completions → handle_openai_compat                                  │
 │      GET  /v1/models           → 固定列表                                              │
 │      GET  /health              → 200 OK                                                │
 │    tokio::spawn(axum::serve)                                                          │
@@ -164,6 +231,13 @@
 - `base_url` 指向本地代理。
 - 代理将 `model`、`messages`、`stream` 等字段转换到 Kiro API。
 - 处理错误码与异常格式的映射。
+
+## `web_search` 需求补充
+- 需求目标：让 Anthropic Messages API 中的版本化 `web_search_*` 特殊工具在本地网关里可直接使用，而不是报“不支持特殊工具”。
+- 兼容范围：至少兼容当前公开文档可见的 `web_search_20250305` 与 `web_search_20260209`，实现上按 `web_search_*` 版本化匹配，不再写死单个版本号。
+- 语义要求：对 Anthropic 侧保持 server tool 语义，外部历史消息应允许出现 `server_tool_use` 与 `web_search_tool_result`，不能粗暴降级成普通 function tool。
+- 约束透传：保留 `max_uses`、`allowed_domains`、`blocked_domains`、`user_location` 的配置语义；其中域名过滤当前由网关在结果侧执行，`user_location` 暂保留结构但不额外扩展 Kiro 私有能力。
+- 安全边界：`web_search` 仍受现有网关鉴权、`localOnly` 与 IP 白名单限制；网关日志继续走脱敏链路。
 
 ## 上游接口路径（参考实现）
 - `hank9999/kiro.rs` 中对话上游接口：`https://q.{region}.amazonaws.com/generateAssistantResponse`。
@@ -724,6 +798,15 @@
 - 结论：除 `q-client.log` 外，其它日志未提供可用于事件结构反推的字段样本。
 
 ### GitHub 项目中的事件流与 Tool Use 线索（辅助验证）
+- 这些参考项目不是同一层面的实现，不能混着抄；当前应分三类吸收：
+  - `hank9999/kiro.rs` 负责校准最小请求转换，也就是 Anthropic `messages` 如何压成 Kiro 上游 `generateAssistantResponse` 所需的 `conversationState`。
+  - `jwadow/kiro-gateway` 与 `cniu6/kiro-gateway` 负责校准事件流和工具调用重组，尤其是 `name` / `input` / `stop` 三段拼 `tool_use`、`tool_result` 顺序补齐、JSON 截断与重复 tool call 去重。
+  - `kkddytd/claude-api` 负责校准网关表层协议，包括客户端 API Key、Anthropic/OpenAI 双协议兼容、SSE 状态机与重复事件保护。
+- 当前优先级应明确为：请求转换学 `kiro.rs`，事件流与工具调用学 `jwadow/cniu6`，客户端 API Key 与 SSE 状态机学 `kkddytd/claude-api`。这样拼起来才是本项目最对路的实现骨架。
+- `kkddytd/claude-api`（本次实现新增主参考）：
+  - 提供 OpenAI / Anthropic 兼容入口与 SSE 转换链路，可对照 `content_block_*`、`message_*` 事件拼装。
+  - 工具调用场景采用分段增量输出思路，可作为 `tool_use` 与 `input_json_delta` 映射的实现参考。
+  - 认证口径与本项目一致采用双层模型：客户端侧使用 API Key，网关上游访问 Kiro API 使用本地 access token。
 - `jwadow/kiro-gateway` 的 `kiro/parsers.py` 实现 AWS Event Stream 解析与工具调用拼装：
   - 事件识别模式：`{"content":` / `{"name":` / `{"input":` / `{"stop":` / `{"followupPrompt":` / `{"usage":` / `{"contextUsagePercentage":`。
   - Tool Use 分段：`{"name":` 作为 tool_start，`{"input":` 作为 tool_input 续写参数，`{"stop":` 触发 tool_call 完成（`toolUseId` 映射 `id`）。
@@ -732,13 +815,15 @@
   - 截断检测：内置 JSON 截断诊断，标记 `_truncation_detected` 并提示恢复策略。
 - `petehsu/KiroProxy` README 标注“工具调用功能已全面支持”，并给出三协议工具调用矩阵与端点：
   - Anthropic：`POST /v1/messages` 与 `POST /v1/messages/count_tokens`。
-  - OpenAI：`POST /v1/chat/completions`、`POST /v1/responses`。
+  - OpenAI：主用 `POST /v1/responses`，兼容 `POST /v1/chat/completions`。
   - Gemini：`POST /v1/models/{model}:generateContent`。
   - 代理层包含“多账号轮询、会话粘性、自动刷新、封禁检测、流量统计”等运行机制，可作为账号管理联动的对照样例。
+- 这类参考更适合放在第二阶段能力增强，不应反过来主导当前网关骨架设计。
 - `cniu6/kiro-gateway`（jwadow/kiro-gateway 的二改）明确标注“修复 tools / cursor 接口 tools”，可作为 Cursor 工具调用兼容的现实案例。
 - `dext7r/KiroGate`（aliom-v/KiroGate 的 fork）在 README 标注：
   - WebSearch 通过 Kiro MCP API 实现。
   - 支持 IDC (Builder ID) 认证、图片输入、Extended Thinking、Token 刷新防抖与 Admin 面板等。
+- `justlovemaki/AIClient-2-API` 更偏客户端模拟和 OpenAI 兼容出口，可作为补充参考，但优先级低于前三类骨架参考。
 
 ### GitHub 线索补充（messageMetadata / SSE）
 - `aiclientproxy/proxycast` 文档 `docs/aiprompts/converter.md` 中给出 CW SSE 示例：
@@ -933,15 +1018,16 @@
 - `DryRunOperationException` → `400`（或 `409`，取决于调用语义）
 
 ## 2api 实现原理（核心链路）
-- 代理层：本地 HTTP 服务对外提供 Anthropic `POST /v1/messages`。
+- 代理层：本地 HTTP 服务对外提供 Anthropic `POST /v1/messages`，以及 OpenAI 主入口 `POST /v1/responses` 与兼容入口 `POST /v1/chat/completions`。
 - 鉴权层：使用 Kiro 账号获取 `access_token`，请求上游时携带 `Authorization` + Cookie。
 - 上游调用层：请求发送到 `https://q.{region}.amazonaws.com/` 的对话接口（常见路径 `generateAssistantResponse`）。
-- 协议适配层：将上游响应转换为 Anthropic 结构；若 `stream: true` 则输出 SSE。
+- 协议适配层：将上游响应按客户端协议转换为 Anthropic / OpenAI Responses / OpenAI chat.completions 结构；若 `stream: true` 则输出对应 SSE。
 
 ## 原理细化（请求到响应的全流程）
 ### 1) 客户端请求进入本地代理
-- 入口固定为 Anthropic `POST /v1/messages`。
-- 关键字段包含：`model`、`messages`、`system`、`max_tokens`、`stream`、`temperature`、`tools`。
+- 入口支持 Anthropic `POST /v1/messages`、OpenAI `POST /v1/responses` 与兼容入口 `POST /v1/chat/completions`。
+- OpenAI 路径以 `POST /v1/responses` 为主；`POST /v1/chat/completions` 仅做兼容。
+- 关键字段按协议归一化：Anthropic `messages/system/tools`，Responses `input/instructions/tools/tool_choice`，chat.completions `messages/tools/tool_choice`。
 - 代理先做基础校验：JSON 解析、必填字段、`stream` 取值。
 
 ### 2) 账号与 Token 准备
@@ -983,6 +1069,28 @@
 - Thinking 与高级字段：若上游支持则透传，否则忽略并提示。
 - SSE chunk 合并策略：按 token/文本片段组装到 `content_block_delta`。
 
+## `web_search` 设计与实现
+### 设计目标
+- 不把 Anthropic `web_search_*` 当作普通客户端 function tool 直接抛给调用方，而是在网关内完成 server tool 代理闭环。
+- 三协议入口共用同一套内部模型：Anthropic `POST /v1/messages`、OpenAI `POST /v1/responses`、兼容入口 `POST /v1/chat/completions` 最终都走统一归一化，再决定是否进入 `web_search` 代执行分支。
+
+### 设计决策
+- 工具归一化：`web_search_*` 会被识别为特殊工具类型，但统一映射到底层 Kiro MCP 的 `web_search` 工具名。
+- 执行方式：首轮请求先发 `generateAssistantResponse`；若 Kiro 返回 `web_search` tool call，则网关调用 `/mcp` 的 `tools/call` 执行搜索，再把结果回灌给后续对话轮次。
+- 历史兼容：Anthropic 历史消息中的 `server_tool_use` / `web_search_tool_result` 会被归一化进统一消息模型，避免上下文断链。
+- 结果过滤：Kiro 返回的搜索结果若包含 `results[].url`，网关按 `allowed_domains` / `blocked_domains` 做结果侧过滤；当前不伪造 Anthropic 更细粒度 citations。
+
+### 实现链路
+1. 请求归一化阶段识别 `web_search_*`，补齐统一 schema，并保留 `max_uses` 与域名过滤配置。
+2. 首轮 Kiro 请求若无 `web_search` tool call，则按普通消息链路直接返回。
+3. 若出现 `web_search` tool call，网关通过 `POST /mcp` 的 JSON-RPC `tools/call` 代执行。
+4. 网关把 MCP 结果转成内部 `web_search_tool_result` 内容块，再作为下一轮用户侧 tool result 回灌给 Kiro。
+5. 最终返回 Anthropic 响应时，额外组装 `server_tool_use` 与 `web_search_tool_result` 内容块，保持外部协议语义。
+
+### 当前实现边界
+- 已完成：版本化 `web_search_*` 识别、Kiro `web_search` MCP 代执行、Anthropic `server_tool_use` / `web_search_tool_result` 输出组装。
+- 未完全复刻：Anthropic 官方结果中的 citation 细粒度结构当前未完整还原；现阶段优先保证主链路可用与结果块可读。
+
 ## Anthropic 请求结构（参考 kiro.rs 类型定义）
 ### MessagesRequest 字段
 - `model`: string。
@@ -1015,7 +1123,7 @@
 ## Tool Use 结构（参考 kiro.rs）
 ### 工具定义（tools）
 - 普通工具：`{ name, description, input_schema }`。
-- WebSearch 工具：`{ type: "web_search_20250305", name: "web_search", max_uses }`。
+- WebSearch 工具：`{ type: "web_search_*", name: "web_search", max_uses }`；当前公开官方文档可见版本包括 `web_search_20250305` 与 `web_search_20260209`。
 
 ### ContentBlock（响应/消息块字段）
 `kiro.rs` 在 Anthropic 类型定义里，ContentBlock 包含以下字段（用于 `text` / `thinking` / `tool_use` / `tool_result` 等块类型）：
@@ -1086,15 +1194,17 @@ data: {"type":"message_stop"}
 
 ## 账号管理接入方案（基于当前项目）
 ### 账号来源模式
-- `single_account`：固定使用一个账号（默认，最稳）。
-- `group_account`：按 `group_id` 选择账号池（适合团队/分组）。
-- `tag_account`：按标签选择账号池（可选，后续再做）。
+- `local`：直接复用当前本地 Kiro 登录态，适合单机、最少配置场景。
+- `single`：固定使用一个指定账号，适合强绑定调试与可复现问题排查。
+- `group`：按 `groupId` 选择账号池，适合团队/分组统一调度。
+- `tag`：按 `tagId` 选择账号池，适合跨分组的灵活路由。
 
 ### 账号选择策略
 - 复用 `auto_switch::AccountSwitcher` 的三种策略：
 - `round_robin`：轮询。
 - `most_quota`：优先剩余额度最多（依赖 `usage_data`）。
 - `random`：随机。
+- `threshold`：当当前账号使用率达到阈值且仍有其它候选账号时，优先尝试切换。
 - 过滤不可用账号：`status == "banned"` 的账号不参与选择。
 
 ### Token 刷新与降级
@@ -1108,12 +1218,15 @@ data: {"type":"message_stop"}
 - `usage_data` 不存在时降级到 `round_robin`。
 
 ### 网关配置建议
-- 新增网关配置字段：
-- `accountMode`（single/group/tag）。
+- 当前网关配置字段：
+- `accountMode`（`local/single/group/tag`）。
 - `accountId`（single 模式）。
 - `groupId`（group 模式）。
+- `tagId`（tag 模式）。
 - `strategy`（round_robin/most_quota/random）。
 - `threshold`（可选，控制切换阈值）。
+- `localOnly` / `allowedIps`（入口访问限制）。
+- `logLevel`（应用日志级别）。
 
 ## 参考项目（Kiro 2api）
 - `hank9999/kiro.rs`：Rust 编写的 Anthropic `/v1/messages` 兼容代理，将 Anthropic 请求转换为 Kiro API 请求。
@@ -1151,10 +1264,12 @@ data: {"type":"message_stop"}
 - 端口占用时的错误提示。
 - 启动/停止状态一致性。
 - Claude 兼容客户端可正常请求与流式返回。
+- OpenAI 客户端主用 `/v1/responses`、兼容 `/v1/chat/completions` 的行为一致性。
+- 配置文件与日志目录是否同落在 `%APPDATA%\.kiro-account-manager`。
 
-## 文档与发布
-- 更新用户手册与 FAQ。
-- 提供 Claude Code 等客户端的最小配置示例。
+## 研发文档与发布
+- 持续维护需求、设计、实现回填三段内容的一致性，避免“代码已更新、章节仍停留在计划时态”。
+- 提供 Claude Code 等客户端的最小接入示例，但以研发验证为目的，不把本文档扩展成用户手册。
 - 发布前同步版本号（`package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`）。
 
 ## packages/kiro-agent/dist 模块分析（2026-03-17）

@@ -63,7 +63,10 @@ use commands::machine_guid::{
 };
 use commands::mcp_cmd::{get_mcp_config, save_mcp_server, delete_mcp_server, toggle_mcp_server, get_mcp_tool_stats};
 use commands::kiro_cli_cmd::{get_kiro_cli_default_path, import_from_kiro_cli};
-use commands::gateway_cmd::{start_gateway, stop_gateway, get_gateway_status, get_gateway_config, save_gateway_config};
+use commands::gateway_cmd::{
+    start_gateway, stop_gateway, get_gateway_status, get_gateway_config, save_gateway_config,
+    get_gateway_log_dir, open_gateway_log_dir
+};
 
 use commands::proxy_cmd::detect_system_proxy;
 use commands::update_cmd::check_update;
@@ -80,8 +83,18 @@ use process::{close_kiro_ide, is_kiro_ide_running, start_kiro_ide};
 
 /// 配置日志插件
 fn setup_log_plugin() -> tauri_plugin_log::Builder {
+    let log_level = gateway::load_gateway_config()
+        .ok()
+        .map(|config| match config.log_level.as_str() {
+            "info" => log::LevelFilter::Info,
+            "warn" => log::LevelFilter::Warn,
+            "error" => log::LevelFilter::Error,
+            _ => log::LevelFilter::Debug,
+        })
+        .unwrap_or(log::LevelFilter::Debug);
+
     tauri_plugin_log::Builder::new()
-        .level(log::LevelFilter::Debug)
+        .level(log_level)
         // 只显示我们自己的日志，过滤掉第三方库的日志
         .filter(|metadata| {
             let target = metadata.target();
@@ -299,6 +312,8 @@ fn main() {
             get_gateway_status,
             get_gateway_config,
             save_gateway_config,
+            get_gateway_log_dir,
+            open_gateway_log_dir,
             // 代理检测命令
             detect_system_proxy,
             // 更新检查命令

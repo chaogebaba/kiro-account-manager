@@ -47,6 +47,7 @@ hex = "0.4"
 encoding_rs = "0.8"
 async-trait = "0.1"
 dirs = "5"
+ipnet = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 
 [target.'cfg(windows)'.dependencies]
