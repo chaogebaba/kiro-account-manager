@@ -25,7 +25,6 @@
 │    Router::new()                                                                      │
 │      POST /v1/messages         → handle_anthropic                                      │
 │      POST /v1/responses       → handle_openai_responses                                │
-│      POST /v1/chat/completions → handle_openai_compat                                  │
 │      GET  /v1/models           → 固定列表                                              │
 │      GET  /health              → 200 OK                                                │
 │    tokio::spawn(axum::serve)                                                          │
@@ -77,34 +76,37 @@
 - 上游端点：`https://q.us-east-1.amazonaws.com/generateAssistantResponse`
 - 流式传输：Anthropic SSE (`text/event-stream`) ← CodeWhisperer chunked stream
 - 参考实现：`kkddytd/claude-api`（用于 OpenAI/Anthropic 兼容端点与 SSE 事件映射对照）
+- 方向说明：入站是 Anthropic/OpenAI 请求归一化为 Kiro conversationState；出站是 Kiro / CodeWhisperer 响应事件再投影为 Anthropic/OpenAI 响应。像 `citationEvent` 这样的字段属于后者。
 
 ## 当前落地快照（2026-03-20）
 
 ### 已完成
 - `src-tauri/src/gateway/mod.rs` 已存在，网关运行时、配置读写、自动启动、基础路由和本地 API Key 校验已接通。
-- `src-tauri/src/gateway/proxy.rs` 已接入真实上游 `application/vnd.amazon.eventstream`，并向 Anthropic / OpenAI 输出增量流；其中 OpenAI 兼容以 Responses SSE/JSON 为主，`chat.completions` 为兼容输出。
+- `src-tauri/src/gateway/proxy.rs` 已接入真实上游 `application/vnd.amazon.eventstream`，并向 Anthropic / OpenAI Responses 输出增量流。
 - `src-tauri/src/gateway/converter.rs` / `stream.rs` / `thinking_parser.rs` 已完成请求归一化、事件解析、thinking 与工具调用主链路；内部已收敛为统一请求模型，不再把 Responses 语义表述成 chat-first。
-- `GatewayConfig` 已扩展 `accountMode/accountId/groupId/tagId/strategy/threshold/localOnly`，并已接入账号存储与刷新链路。
+- `GatewayConfig` 已扩展 `accountMode/accountId/groupId/strategy/threshold/localOnly`，并已接入账号存储与刷新链路。
 - `GatewayConfig` 已补齐 `allowedIps`、`logLevel`，后端已执行 IP/CIDR 白名单校验，前端已支持编辑、保存与查看状态。
+- 关闭 `localOnly` 时，后端配置校验已强制要求客户端 API Key，避免远程裸暴露。
 - 已支持 `POST /mcp` 透传，并可打开应用日志目录；日志级别配置会在下次应用启动时生效。
-- 已支持基础图片输入：Anthropic `image` base64 块与 `image_url`/Responses `input_image` 的 data URL 会被提取到 Kiro `images` 字段。
+- 已支持基础图片输入：Anthropic `image` base64 块，以及 `image_url`/Responses `input_image` 的 data URL / 远程 HTTP(S) 图片 URL，会被提取到 Kiro `images` 字段；远程抓取当前已限制私网/本机地址、有限重定向与单张图片大小。
 - `src-tauri/src/commands/gateway_cmd.rs` 已提供 `start/stop/status/config` 命令并注册到 `main.rs`。
 - `src/components/features/GatewayPage.jsx` 已可配置 host/port/region/API Key、账号来源模式、策略、阈值、本机限制、白名单、日志级别，并支持启动、停止、重启、保存、复制客户端配置、打开日志目录；OpenAI 配置文案已明确 `/v1/responses` 为主。
 - `routes.jsx` 与侧边导航已添加网关入口。
 
 ### 已完成：`web_search`
-- **`web_search` 特殊工具已补齐**：当前已支持 Anthropic 版本化 `web_search_*`（包括公开文档中的 `web_search_20250305` / `web_search_20260209`）映射为 Kiro `web_search` MCP 工具，并由网关执行 `/mcp tools/call` 后把结果回灌给上游对话链路。
+- **`web_search` 特殊工具已补齐**：当前已支持 Anthropic 版本化 `web_search_*` 映射为 Kiro `web_search` MCP 工具，并由网关执行 `/mcp tools/call` 后把结果回灌给上游对话链路。公开文档已能证明 `web_search_20250305` / `web_search_20260209` 这类命名存在，但当前实现证明的是“按 `web_search_*` 模式兼容”，不是“Kiro 上游已经被抓到真实发出每个版本号”。
+- **citation 取证入口已收敛**：若要继续验证 Kiro 原始 `citationEvent`，优先看本地 Kiro 源码里的 `Q Chat API -> debug.log / execution-log.json` 调试导出链，而不是普通 `q-client.log`。另外 GitHub 上游当前能直接搜到 `codeReferenceEvent.references` 与 `supplementaryWebLinksEvent.supplementaryWebLinks` 的业务消费代码，但暂未在非生成代码里搜到对应的 `citationEvent` 消费；因此现阶段对 `citationEvent` 的把握是“协议层存在已坐实，业务层现成渲染链仍缺直接源码证据”。`codeReferenceEvent.references -> code-references` 属于代码引用/license trace，不等于 citation。
 
 ### 当前优先级建议
-1. 若要继续对齐 Kiro IDE 能力，当前主链路缺口已从 `web_search` 收敛到结果展示细节增强，例如更完整的 citations 还原与更多搜索结果字段透传。
-2. 若需要更强图片兼容，再补远程 URL 拉取与更多输入格式。
-3. 持续清理 `gateway/models.rs` 的未使用结构，收敛编译警告。
+1. 若要继续对齐 Kiro IDE 能力，当前主链路缺口已从基础 `web_search` 接入收敛到更高精度的 citations 还原与更多搜索结果字段透传。
+2. 若需要更强图片兼容，再补鉴权下载、尺寸限制、失败回退与更多输入格式。
+3. 增加真实监听端口的运行时集成测试，覆盖 `/health`、`/v1/responses`、`/mcp` 等实际入口。
 
 ## `web_search` 专项规划
 
 ### 需求
 - Anthropic `web_search_*` 需要作为特殊工具接入，而不是退化成普通 function tool。
-- 公开版本号会变化，因此实现应匹配 `web_search_*`，至少覆盖当前公开文档可见的 `20250305` 与 `20260209`。
+- 公开版本号会变化，因此实现应匹配 `web_search_*`；当前至少以公开文档可见的 `20250305` 与 `20260209` 作为兼容样例，而不是把它们表述成已从 Kiro 上游抓到的实证版本。
 - 调用结果需要能回到 Anthropic 历史消息里，允许 `server_tool_use` 与 `web_search_tool_result` 继续参与后续轮次。
 
 ### 方案选择
@@ -162,7 +164,7 @@
 
 - [x] 已写入 app data 下 `gateway-config.json`
 - [x] 已支持读取配置并自动启动
-- [x] 已补齐 `accountMode`、`accountId`、`groupId`、`tagId`、`strategy`、`threshold`、`localOnly`
+- [x] 已补齐 `accountMode`、`accountId`、`groupId`、`strategy`、`threshold`、`localOnly`
 
 ### 当前建议的最小闭环
 
@@ -218,9 +220,8 @@
 #### 3. 计划新增 `src-tauri/src/gateway/router.rs`
 
 axum 路由：
-- `POST /v1/messages` → Anthropic Messages API 兼容入口
+- `POST /v1/messages` → Anthropic Messages API 入口
 - `POST /v1/responses` → OpenAI Responses 主入口
-- `POST /v1/chat/completions` → OpenAI 兼容入口
 - `GET /v1/models` → 返回固定模型列表
 - `GET /health` → 健康检查
 
@@ -231,7 +232,7 @@ axum 路由：
 统一请求模型 → CodeWhisperer conversationState 转换：
 - Anthropic `POST /v1/messages` 先归一化为统一请求模型。
 - OpenAI `POST /v1/responses` 作为主入口归一化为统一请求模型。
-- OpenAI `POST /v1/chat/completions` 作为兼容入口归一化为同一模型。
+- OpenAI 仅保留 `POST /v1/responses` 归一化为统一模型。
 - `messages` 最后一条 role=user → `currentMessage.userInputMessage`
 - 其余 messages → `history[]`
 - assistant messages → `assistantResponseMessage { content }`
@@ -320,5 +321,5 @@ CodeWhisperer 事件流 → Anthropic SSE 转换：
 
 
 - `cachePoint` / `clientCacheConfig`
-- 完整 citations 细粒度还原
+- citation 增量事件已按 SDK 结构输出：Responses 侧发 `response.output_text.annotation.added`，Anthropic 侧发 `citations_delta`；后续若继续增强，重点应转向更完整的 SSE item lifecycle 对齐，而不是继续缺省 citation。
 - 更丰富的 `web_search` 结果字段映射（除 `results[].url/title/...` 之外的扩展字段）

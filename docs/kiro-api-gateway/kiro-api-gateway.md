@@ -25,7 +25,6 @@
 │    Router::new()                                                                      │
 │      POST /v1/messages         → handle_anthropic                                      │
 │      POST /v1/responses       → handle_openai_responses                                │
-│      POST /v1/chat/completions → handle_openai_compat                                  │
 │      GET  /v1/models           → 固定列表                                              │
 │      GET  /health              → 200 OK                                                │
 │    tokio::spawn(axum::serve)                                                          │
@@ -64,6 +63,8 @@
 
 ## 目标与范围
 - 提供 Claude/Anthropic API 兼容的本地代理能力，将请求转换为 Kiro API 调用。
+- 当前仅提供 OpenAI Responses 入口，这只是网关对外协议壳；上游对话接口始终是 Kiro / CodeWhisperer。
+- 方向必须区分为两段：入站是 Anthropic/OpenAI 请求归一化为 Kiro 请求，出站是 Kiro 响应再投影为 Anthropic/OpenAI 响应。
 - 支持在应用内配置、启动、停止代理服务。
 - 提供必要的安全与合规提示，避免误用与数据泄露。
 
@@ -81,18 +82,21 @@
 - 已新增网关页面，并接入 `routes.jsx` 与侧边栏入口。
 - 已新增 Tauri 命令：`start_gateway`、`stop_gateway`、`get_gateway_status`、`get_gateway_config`、`save_gateway_config`。
 - 已支持本地配置持久化到 app data 下的 `gateway-config.json`，并在应用启动时按 `enabled` 自动拉起。
-- 已提供基础端点：`GET /health`、`GET /v1/models`、`POST /v1/messages`、`POST /v1/responses`、`POST /v1/chat/completions`、`POST /v1/messages/count_tokens`、`POST /mcp`；其中 OpenAI 兼容优先按 `/v1/responses` 设计，`/v1/chat/completions` 为兼容入口。
+- 已提供基础端点：`GET /health`、`GET /v1/models`、`POST /v1/messages`、`POST /v1/responses`、`POST /v1/messages/count_tokens`、`POST /mcp`；OpenAI 仅保留 `/v1/responses`。
 - 已支持真实上游 `application/vnd.amazon.eventstream` 请求，并将 Kiro chunked stream 增量转换为 Anthropic / OpenAI / Responses SSE。
-- 已完成 `system`、`tools`、`tool_use`、`tool_result`、`reasoningContent` 的主链路转换，并补充了 Responses `input` -> 统一请求模型归一化；`/v1/chat/completions` 走同一内部模型兼容。
+- 已完成 `system`、`tools`、`tool_use`、`tool_result`、`reasoningContent` 的主链路转换，并补充了 Responses `input` -> 统一请求模型归一化。
 - 已支持客户端 API Key 形式的入口鉴权，以及 `localOnly` + `allowedIps` 的访问限制。
-- 已接入现有账号体系：`local/single/group/tag`、`accountId/groupId/tagId`、`strategy`、`threshold`。
-- 已支持基础图片输入：Anthropic `image` base64 块与 `image_url`/Responses `input_image` data URL 会被提取到 Kiro `images` 字段。
+- 已接入现有账号体系：`single/group`、`accountId/groupId`、`strategy`、`threshold`。
+- 已支持基础图片输入：Anthropic `image` base64 块，以及 `image_url`/Responses `input_image` 的 data URL 与远程 HTTP(S) 图片 URL，会被提取到 Kiro `images` 字段。
 - 已加入错误映射与脱敏，`401/403/429/5xx` 会按兼容格式返回，错误文本会裁剪敏感字段。
 - 已提供状态展示、请求计数、客户端配置复制、重启按钮、风险提示、日志级别、打开日志目录和最近错误展示。
 
 ### 已确认边界
-- **`web_search` 特殊工具已接入**：当前已支持 Anthropic 版本化 `web_search_*`（包括公开文档中的 `web_search_20250305` / `web_search_20260209`）归一化为 Kiro `web_search` 工具，并由网关代执行 `/mcp tools/call` 后回灌为服务端搜索结果。
-- **图片输入当前只支持本地 base64 / data URL**：远程图片 URL 拉取与更多格式兼容仍未扩展。
+- **`web_search` 特殊工具已接入**：当前已支持 Anthropic 版本化 `web_search_*` 归一化为 Kiro `web_search` 工具，并由网关代执行 `/mcp tools/call` 后回灌为服务端搜索结果。公开文档已能确认 `web_search_20250305` / `web_search_20260209` 这类版本化命名真实存在；但截至目前，我们掌握的是“网关按 `web_search_*` 模式兼容”，不是“Kiro 上游已被实证会发出上述每个版本号”。
+- **Responses / Anthropic citations 已按 SDK 结构输出**：OpenAI Responses 输出已补 `web_search_call`，非流式 `output_text.annotations` 与流式 `response.output_text.annotation.added` 都支持 Kiro 原始 `citationEvent` 的映射；其中仍保留 `target` / `citationText` / `citationLink`，且仅当上游 `target.range` 明确存在时才补 `start_index/end_index`，不会再把 `citationText` 硬塞到 `url_citation.title`。Anthropic 侧则按官方 `TextCitation` / `citations_delta` 结构输出：非流式 `content[].citations` 和流式 `content_block_delta.delta.citation` 现在都会把 Kiro 原始 citation 映射成 `char_location`。若上游只给 `target.location`，Anthropic 侧会用 `citationText` 长度补 `end_char_index`；Responses 侧仍不额外猜 `start_index/end_index`。运行时若要继续取证 citation 原始事件，优先看 Kiro 源码中的 `Q Chat API -> debug.log / execution-log.json` 导出链路，不要把普通 `q-client.log` 当成 citation 主样本。
+- **图片输入已支持远程 HTTP(S) URL**：当前会按响应 `Content-Type` 或 URL 扩展名识别 `png/jpeg/gif/webp`；更复杂的鉴权下载、重定向策略与尺寸限制仍未增强。
+- **远程暴露必须配置客户端 API Key**：当前只要关闭 `localOnly`，配置校验就会要求 `accessToken` / 客户端 API Key 非空，避免把网关裸暴露到局域网或公网。
+- **远程图片输入已加基础安全边界**：仅允许 `http/https`，会拒绝 `localhost`、loopback、私网/链路本地/文档保留地址，并限制有限次重定向与单张图片大小；更复杂的鉴权下载策略仍未增强。
 
 ### 阅读方式
 - 若要判断“现在能不能用”，以本节“已落地 / 已确认边界”为准。
@@ -105,17 +109,17 @@
 | 网关菜单入口 | 已完成 | `src/routes.jsx` 已注册 `gateway` 页面；`src/components/features/GatewayPage.jsx` 已存在 |
 | 启动/停止/状态/配置命令 | 已完成 | `src-tauri/src/commands/gateway_cmd.rs`、`src-tauri/src/main.rs` |
 | 配置持久化与自动启动 | 已完成 | `src-tauri/src/gateway/mod.rs` 中 `load_gateway_config` / `save_gateway_config` / `auto_start_if_enabled` |
-| 基础端点 `/health` `/v1/models` `/v1/messages` `/v1/responses` `/v1/chat/completions` `/mcp` | 已完成 | `src-tauri/src/gateway/mod.rs` 路由已注册；OpenAI 兼容路径以 `/v1/responses` 为主 |
+| 基础端点 `/health` `/v1/models` `/v1/messages` `/v1/responses` `/mcp` | 已完成 | `src-tauri/src/gateway/mod.rs` 路由已注册；OpenAI 仅保留 `/v1/responses` |
 | Claude/OpenAI 基础客户端配置复制 | 已完成 | `src/components/features/GatewayPage.jsx` 已生成并复制 `ANTHROPIC_*` / `OPENAI_*` 配置，并提示 OpenAI 主用 `/v1/responses` |
 | 请求计数、最近错误展示 | 已完成 | `request_count` / `last_error` 已落地，前端已展示 |
 | 真实 Kiro 上游流式桥接 | 已完成 | `src-tauri/src/gateway/proxy.rs` 已消费上游 event-stream 并逐事件输出 SSE |
 | `system`、`tools`、`tool_use`、`tool_result`、`reasoningContent` 适配 | 已完成主链路 | `src-tauri/src/gateway/converter.rs` 与 `src-tauri/src/gateway/stream.rs` 已覆盖主协议转换 |
 | 上游错误码与异常格式映射 | 已完成主链路 | `src-tauri/src/gateway/proxy.rs` 已按 `authentication/rate_limit/api_error` 输出 |
 | 错误脱敏 | 已完成主链路 | `src-tauri/src/gateway/proxy.rs` 已裁剪 Bearer/token/API Key |
-| 账号来源模式 `single/group/tag` | 已完成 | `GatewayConfig` + `proxy.rs` 已接入 `local/single/group/tag` |
+| 账号来源模式 `single/group` | 已完成 | `GatewayConfig` + `proxy.rs` 已接入 `single/group` |
 | 账号池策略 `groupId/strategy/threshold` | 已完成 | `GatewayConfig` 与 `GatewayPage.jsx` 已暴露并生效 |
 | 白名单/仅本机强约束 | 已完成 | 已支持 `localOnly` 强制仅本机，以及 `allowedIps` 的 IP/CIDR 白名单 |
-| 图片输入 | 已完成基础版 | 已支持 Anthropic `image` base64 块与 data URL 形式 `image_url` / `input_image` |
+| 图片输入 | 已完成增强版 | 已支持 Anthropic `image` base64 块，以及 data URL / 远程 HTTP(S) 形式的 `image_url` / `input_image` |
 | `/mcp` 透传 | 已完成 | `src-tauri/src/gateway/proxy.rs` 已直连上游 `https://q.{region}.amazonaws.com/mcp` |
 | 前端启用开关、日志级别、重启、打开日志目录、风险提示 | 已完成 | `GatewayPage.jsx` 已补齐开关、日志级别、打开日志目录、风险提示 |
 | `web_search` 特殊工具 | 已完成 | 已支持 `web_search_*` 版本化匹配，映射为 Kiro `web_search` MCP 工具并由网关代执行 |
@@ -153,7 +157,6 @@
 │    Router::new()                                                                      │
 │      POST /v1/messages         → handle_anthropic                                      │
 │      POST /v1/responses       → handle_openai_responses                                │
-│      POST /v1/chat/completions → handle_openai_compat                                  │
 │      GET  /v1/models           → 固定列表                                              │
 │      GET  /health              → 200 OK                                                │
 │    tokio::spawn(axum::serve)                                                          │
@@ -719,54 +722,45 @@
 - `clientCacheConfig`：`{ useClientCachingOnly: boolean }`。
 
 ### AWS Toolkit CodeWhisperer Streaming SDK 补充定义（models_0.ts）
-- `ChatResponseStream` 联合仅包含：`messageMetadataEvent` / `assistantResponseEvent` / `codeReferenceEvent` / `supplementaryWebLinksEvent` / `followupPromptEvent` / `error`。citeturn5view0
+- `ChatResponseStream` 联合当前至少包含：`messageMetadataEvent` / `assistantResponseEvent` / `dryRunSucceedEvent` / `codeReferenceEvent` / `supplementaryWebLinksEvent` / `followupPromptEvent` / `codeEvent` / `intentsEvent` / `interactionComponentsEvent` / `toolUseEvent` / `citationEvent` / `invalidStateEvent` / `error`，并带 `$unknown` 兜底成员。
 - `CursorState` 为 `position` 或 `range` 之一；`Position` 字段为 `line`/`character`（0-based），`Range` 为 `{ start, end }`。citeturn3view0
 - `UserInputMessageContext` 仅包含 `editorState` / `diagnostic`（该 SDK 版本未包含 `tools`/`toolResults` 等扩展字段）。citeturn3view0
+- GitHub 上游仓库当前可直接搜到 `codeReferenceEvent.references` 与 `supplementaryWebLinksEvent.supplementaryWebLinks` 的业务消费代码，但未搜到非生成代码中的 `citationEvent` 对应消费；因此 `citationEvent` 目前是“协议/反序列化层有硬证据，业务渲染链暂无直接源码实证”。
 
-### 运行时抓包线索（Kiro IDE 内置日志）
-- Kiro 内置 `Q Chat API` Output Channel 会记录 Q 请求与完整事件流：
-  - `qChatLogger.appendLine(JSON.stringify({ response: { ... events } }))`
-  - 环形缓冲区长度 500 行。
-- 调试命令 `kiroAgent.debug.captureLog` 会输出：
-  - `Q Request Logs`（包含事件流 JSON）
-- 所有流式事件字段结构已通过 SDK 官方类型定义确认，无需抓包补齐。
+### 运行时取证线索（Kiro IDE 内置日志与调试导出）
+- Kiro 源码里真正记录“完整事件流”的不是普通 `q-client.log`，而是 `Q Chat API` 这条调试链：
+  - `qChatLogger.appendLine(JSON.stringify({ response: { ... events: h27 } }))`
+  - `qChatLogger` 自带环形缓冲区，长度 500 行。
+- `kiroAgent.debug.captureLog` 会把 `Q Request Logs` 拼进调试导出。
+- `kiroAgent.createDebugLogZip` 会把调试导出落到当前工作区 `workspace/.kiro/debug/`：
+  - `debug.log`
+  - `execution-log.json`
+- 这意味着：如果要继续验证 `citationEvent` 是否真实出现、字段形态是什么，主取证入口应是 `debug.log / execution-log.json`，不是普通 exthost 文件日志。
 
-> 路径
+> 已确认的本地源码链路
 
-- 已全量扫描 `C:\Users\12925\AppData\Roaming\Kiro\logs` 下 159 个 `.log` 文件，其中只有 3 个 `Q Chat API` 日志包含事件流。
-- 已观测到的事件类型仅有：
-  - `assistantResponseEvent`
-  - `toolUseEvent`
-  - `contextUsageEvent`
-  - `meteringEvent`
-- `assistantResponseEvent` 字段：
-  - `content`（文本块）
-  - `modelId`
-- `toolUseEvent` 分段模式（同一 `toolUseId`）：
-  - `{"name": "...", "toolUseId": "..."}`
-  - `{"input": "...", "name": "...", "toolUseId": "..."}`（`input` 为字符串分片，可能为空或分段 JSON）
-  - `{"name": "...", "stop": true, "toolUseId": "..."}`
-- `contextUsageEvent`：`{ contextUsagePercentage: number }`
-- `meteringEvent`：`{ unit, unitPlural, usage }`
-- 未在该批样本中出现：`citationEvent` / `messageMetadataEvent` / `invalidStateEvent` / `dryRunSucceedEvent` / `codeReferenceEvent` 等。
-- `request.conversationState` 实测键集合（3 个样本）：
-  - `conversationId`
-  - `agentContinuationId`
-  - `agentTaskType`
-  - `chatTriggerType`
-  - `currentMessage`
-  - `history`
-- `currentMessage.userInputMessage` 实测键：
-  - `content`
-  - `modelId`
-  - `origin`
-  - `userInputMessageContext`
-- `currentMessage.userInputMessage.userInputMessageContext` 实测键：
-  - `tools`
-  - `toolResults`
-- `history.assistantResponseMessage` 实测键：
-  - `content`
-  - `toolUses`
+- `Q Chat API` 事件流写入：
+  - `C:\Users\12925\AppData\Local\Programs\Kiro\resources\app\extensions\kiro.kiro-agent\dist\extension.js:377689`
+  - `C:\Users\12925\AppData\Local\Programs\Kiro\resources\app\extensions\kiro.kiro-agent\dist\extension.js:377842`
+  - `C:\Users\12925\AppData\Local\Programs\Kiro\resources\app\extensions\kiro.kiro-agent\dist\extension.js:931201`
+  - `C:\Users\12925\AppData\Local\Programs\Kiro\resources\app\extensions\kiro.kiro-agent\dist\extension.js:931206`
+- 调试导出写文件：
+  - `C:\Users\12925\AppData\Local\Programs\Kiro\resources\app\extensions\kiro.kiro-agent\dist\extension.js:931328`
+  - `C:\Users\12925\AppData\Local\Programs\Kiro\resources\app\extensions\kiro.kiro-agent\dist\extension.js:931470`
+  - `C:\Users\12925\AppData\Local\Programs\Kiro\resources\app\extensions\kiro.kiro-agent\dist\extension.js:931521`
+  - `C:\Users\12925\AppData\Local\Programs\Kiro\resources\app\extensions\kiro.kiro-agent\dist\extension.js:931526`
+
+### 普通 exthost 文件日志（能证明什么，不能证明什么）
+- `q-client.log` 仍然有价值，但主要用于证明：
+  - `CodeWhispererStreamingClient` 请求结构
+  - `GenerateAssistantResponseCommand` 调用存在
+  - `InvokeMCPCommand -> tools/list -> web_search` 真实出现
+- `q-client.log` 不能替代 `Q Chat API` 调试链去证明 citation 事件，因为它主要记录请求/响应元信息，不是 `events: h27` 的主落盘位置。
+- `Kiro Logs.log` 主要给会话时序、telemetry、agent 生命周期，不提供 citation 结构本体。
+- `Kiro - MCP Logs.log`、`KiroLLMLogs.log` 在本机样本里长期为空，不能作为 citation 证据来源。
+- `codeReferenceEvent` 与 citation 必须分开看：
+  - `codeReferenceEvent.references` 会走 `kiroAgent.recordReferences`
+  - 它写入的是 `code-references` Output Channel，属于代码引用/license trace，不是 `citationEvent`
 
 ### q-client.log（请求/响应结构）
 > 路径：`C:\Users\12925\AppData\Roaming\Kiro\logs\*\window1\exthost\kiro.kiroAgent\q-client.log`
@@ -804,7 +798,7 @@
   - `kkddytd/claude-api` 负责校准网关表层协议，包括客户端 API Key、Anthropic/OpenAI 双协议兼容、SSE 状态机与重复事件保护。
 - 当前优先级应明确为：请求转换学 `kiro.rs`，事件流与工具调用学 `jwadow/cniu6`，客户端 API Key 与 SSE 状态机学 `kkddytd/claude-api`。这样拼起来才是本项目最对路的实现骨架。
 - `kkddytd/claude-api`（本次实现新增主参考）：
-  - 提供 OpenAI / Anthropic 兼容入口与 SSE 转换链路，可对照 `content_block_*`、`message_*` 事件拼装。
+- 提供 Anthropic 与 OpenAI Responses 入口及 SSE 转换链路，可对照 `content_block_*`、`message_*` 事件拼装。
   - 工具调用场景采用分段增量输出思路，可作为 `tool_use` 与 `input_json_delta` 映射的实现参考。
   - 认证口径与本项目一致采用双层模型：客户端侧使用 API Key，网关上游访问 Kiro API 使用本地 access token。
 - `jwadow/kiro-gateway` 的 `kiro/parsers.py` 实现 AWS Event Stream 解析与工具调用拼装：
@@ -815,7 +809,7 @@
   - 截断检测：内置 JSON 截断诊断，标记 `_truncation_detected` 并提示恢复策略。
 - `petehsu/KiroProxy` README 标注“工具调用功能已全面支持”，并给出三协议工具调用矩阵与端点：
   - Anthropic：`POST /v1/messages` 与 `POST /v1/messages/count_tokens`。
-  - OpenAI：主用 `POST /v1/responses`，兼容 `POST /v1/chat/completions`。
+  - OpenAI：仅保留 `POST /v1/responses`。
   - Gemini：`POST /v1/models/{model}:generateContent`。
   - 代理层包含“多账号轮询、会话粘性、自动刷新、封禁检测、流量统计”等运行机制，可作为账号管理联动的对照样例。
 - 这类参考更适合放在第二阶段能力增强，不应反过来主导当前网关骨架设计。
@@ -1018,16 +1012,18 @@
 - `DryRunOperationException` → `400`（或 `409`，取决于调用语义）
 
 ## 2api 实现原理（核心链路）
-- 代理层：本地 HTTP 服务对外提供 Anthropic `POST /v1/messages`，以及 OpenAI 主入口 `POST /v1/responses` 与兼容入口 `POST /v1/chat/completions`。
+- 代理层：本地 HTTP 服务对外提供 Anthropic `POST /v1/messages`，以及 OpenAI `POST /v1/responses`。
 - 鉴权层：使用 Kiro 账号获取 `access_token`，请求上游时携带 `Authorization` + Cookie。
 - 上游调用层：请求发送到 `https://q.{region}.amazonaws.com/` 的对话接口（常见路径 `generateAssistantResponse`）。
-- 协议适配层：将上游响应按客户端协议转换为 Anthropic / OpenAI Responses / OpenAI chat.completions 结构；若 `stream: true` 则输出对应 SSE。
+- 协议适配层：将上游响应按客户端协议转换为 Anthropic / OpenAI Responses 结构；若 `stream: true` 则输出对应 SSE。
 
 ## 原理细化（请求到响应的全流程）
+> 核心边界：Anthropic / OpenAI 只是本地网关的入口/出口协议；`citationEvent`、`toolUseEvent`、`assistantResponseEvent` 等原始字段都来自 Kiro 上游响应，而不是外部客户端协议自带字段。
+
 ### 1) 客户端请求进入本地代理
-- 入口支持 Anthropic `POST /v1/messages`、OpenAI `POST /v1/responses` 与兼容入口 `POST /v1/chat/completions`。
-- OpenAI 路径以 `POST /v1/responses` 为主；`POST /v1/chat/completions` 仅做兼容。
-- 关键字段按协议归一化：Anthropic `messages/system/tools`，Responses `input/instructions/tools/tool_choice`，chat.completions `messages/tools/tool_choice`。
+- 入口支持 Anthropic `POST /v1/messages`，以及 OpenAI `POST /v1/responses`。
+- OpenAI 仅提供 `POST /v1/responses`。
+- 关键字段按协议归一化：Anthropic `messages/system/tools`，Responses `input/instructions/tools/tool_choice`。
 - 代理先做基础校验：JSON 解析、必填字段、`stream` 取值。
 
 ### 2) 账号与 Token 准备
@@ -1049,6 +1045,8 @@
 - Anthropic `stream` -> Kiro 流式参数。
 
 ### 4) 上游返回处理
+- 上游返回后，网关先按 Kiro 语义解析/聚合事件流，再根据客户端入口协议序列化为 Anthropic / OpenAI Responses。
+- 因此像 `citationEvent` 这样的字段，如果出现在 Anthropic / OpenAI 响应里，本质上也是“Kiro 字段经网关映射后的投影”，不是外部协议原生字段。
 - 非流式：把上游 JSON 响应转换为 Anthropic `message` 响应。
 - 流式：将上游流式 chunk 转换成 Anthropic SSE 事件。
 - 常见 SSE 事件顺序：
@@ -1072,7 +1070,7 @@
 ## `web_search` 设计与实现
 ### 设计目标
 - 不把 Anthropic `web_search_*` 当作普通客户端 function tool 直接抛给调用方，而是在网关内完成 server tool 代理闭环。
-- 三协议入口共用同一套内部模型：Anthropic `POST /v1/messages`、OpenAI `POST /v1/responses`、兼容入口 `POST /v1/chat/completions` 最终都走统一归一化，再决定是否进入 `web_search` 代执行分支。
+- 双协议入口共用同一套内部模型：Anthropic `POST /v1/messages` 与 OpenAI `POST /v1/responses` 最终都走统一归一化，再决定是否进入 `web_search` 代执行分支。
 
 ### 设计决策
 - 工具归一化：`web_search_*` 会被识别为特殊工具类型，但统一映射到底层 Kiro MCP 的 `web_search` 工具名。
@@ -1088,8 +1086,8 @@
 5. 最终返回 Anthropic 响应时，额外组装 `server_tool_use` 与 `web_search_tool_result` 内容块，保持外部协议语义。
 
 ### 当前实现边界
-- 已完成：版本化 `web_search_*` 识别、Kiro `web_search` MCP 代执行、Anthropic `server_tool_use` / `web_search_tool_result` 输出组装。
-- 未完全复刻：Anthropic 官方结果中的 citation 细粒度结构当前未完整还原；现阶段优先保证主链路可用与结果块可读。
+- 已完成：版本化 `web_search_*` 识别、Kiro `web_search` MCP 代执行、Anthropic `server_tool_use` / `web_search_tool_result` 输出组装，以及 Kiro 原始 `citationEvent` 在 OpenAI Responses 非流式 `output_text.annotations` / 流式 `response.output_text.annotation.added`、Anthropic 非流式 `content[].citations` / 流式 `citations_delta` 的 SDK 结构输出。
+- 仍有限制：Anthropic 当前采用的是“按 SDK 形态兼容”的 `char_location` 投影，不是已经由 Kiro 上游源码直接证明的原生 1:1 语义；其中当上游只给 `target.location` 时，会用 `citationText` 长度补 `end_char_index`。OpenAI Responses 侧则继续保持保守，只在 `target.range` 存在时公开 `start_index/end_index`。
 
 ## Anthropic 请求结构（参考 kiro.rs 类型定义）
 ### MessagesRequest 字段
@@ -1194,10 +1192,8 @@ data: {"type":"message_stop"}
 
 ## 账号管理接入方案（基于当前项目）
 ### 账号来源模式
-- `local`：直接复用当前本地 Kiro 登录态，适合单机、最少配置场景。
 - `single`：固定使用一个指定账号，适合强绑定调试与可复现问题排查。
 - `group`：按 `groupId` 选择账号池，适合团队/分组统一调度。
-- `tag`：按 `tagId` 选择账号池，适合跨分组的灵活路由。
 
 ### 账号选择策略
 - 复用 `auto_switch::AccountSwitcher` 的三种策略：
@@ -1219,10 +1215,9 @@ data: {"type":"message_stop"}
 
 ### 网关配置建议
 - 当前网关配置字段：
-- `accountMode`（`local/single/group/tag`）。
+- `accountMode`（`single/group`）。
 - `accountId`（single 模式）。
 - `groupId`（group 模式）。
-- `tagId`（tag 模式）。
 - `strategy`（round_robin/most_quota/random）。
 - `threshold`（可选，控制切换阈值）。
 - `localOnly` / `allowedIps`（入口访问限制）。
@@ -1264,7 +1259,7 @@ data: {"type":"message_stop"}
 - 端口占用时的错误提示。
 - 启动/停止状态一致性。
 - Claude 兼容客户端可正常请求与流式返回。
-- OpenAI 客户端主用 `/v1/responses`、兼容 `/v1/chat/completions` 的行为一致性。
+- OpenAI 客户端仅支持 `/v1/responses` 的行为一致性。
 - 配置文件与日志目录是否同落在 `%APPDATA%\.kiro-account-manager`。
 
 ## 研发文档与发布
