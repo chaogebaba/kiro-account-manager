@@ -11,6 +11,7 @@ pub struct NormalizedRequest {
     pub top_p: Option<f32>,
     pub stop: Option<Vec<String>>,
     pub tools: Option<Vec<Tool>>,
+    #[allow(dead_code)] // 当前归一化层保留该字段用于协议对齐与测试校验，后续 Kiro payload 尚未消费
     pub tool_choice: Option<serde_json::Value>,
 }
 
@@ -60,6 +61,7 @@ pub struct ToolCallFunction {
     pub arguments: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct ChatCompletionResponse {
     pub id: String,
@@ -70,6 +72,7 @@ pub struct ChatCompletionResponse {
     pub usage: Option<Usage>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct Choice {
     pub index: i32,
@@ -77,6 +80,7 @@ pub struct Choice {
     pub finish_reason: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseMessage {
     pub role: String,
@@ -84,6 +88,7 @@ pub struct ResponseMessage {
     pub tool_calls: Option<Vec<ToolCall>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct Usage {
     pub prompt_tokens: i32,
@@ -91,6 +96,7 @@ pub struct Usage {
     pub total_tokens: i32,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct ChatCompletionChunk {
     pub id: String,
@@ -100,6 +106,7 @@ pub struct ChatCompletionChunk {
     pub choices: Vec<ChunkChoice>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct ChunkChoice {
     pub index: i32,
@@ -107,6 +114,7 @@ pub struct ChunkChoice {
     pub finish_reason: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct Delta {
     pub role: Option<String>,
@@ -114,6 +122,7 @@ pub struct Delta {
     pub tool_calls: Option<Vec<DeltaToolCall>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct DeltaToolCall {
     pub index: i32,
@@ -123,12 +132,14 @@ pub struct DeltaToolCall {
     pub function: Option<DeltaToolCallFunction>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct DeltaToolCallFunction {
     pub name: Option<String>,
     pub arguments: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelsResponse {
     pub object: String,
@@ -303,6 +314,7 @@ pub struct AnthropicMessagesRequest {
     pub stop_sequences: Option<Vec<String>>,
     pub tools: Option<Vec<AnthropicTool>>,
     pub tool_choice: Option<serde_json::Value>,
+    #[allow(dead_code)]
     pub metadata: Option<serde_json::Value>,
 }
 

@@ -1294,7 +1294,7 @@ mod tests {
         });
 
         let converted = normalize_responses_request(&payload).expect("responses payload should convert");
-        assert_eq!(converted.stream, true);
+        assert!(converted.stream);
         assert_eq!(converted.messages.len(), 1);
         assert_eq!(converted.messages[0].role, "user");
         assert_eq!(

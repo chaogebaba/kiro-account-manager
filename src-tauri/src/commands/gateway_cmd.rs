@@ -15,23 +15,26 @@ use crate::gateway::{
 };
 use crate::state::AppState;
 
+fn config_for_manual_start(config: &GatewayConfig) -> GatewayConfig {
+    config.clone()
+}
+
+#[cfg(test)]
+fn config_after_manual_stop(config: &GatewayConfig) -> GatewayConfig {
+    config.clone()
+}
+
 #[tauri::command]
 pub async fn start_gateway(
     state: State<'_, AppState>,
     config: GatewayConfig,
 ) -> Result<GatewayStatus, String> {
-    let mut next = config.clone();
-    next.enabled = true;
-    save_gateway_config_inner(&next)?;
-    start_gateway_inner(&state, next).await
+    start_gateway_inner(&state, config_for_manual_start(&config)).await
 }
 
 #[tauri::command]
 pub async fn stop_gateway(state: State<'_, AppState>) -> Result<(), String> {
-    stop_gateway_inner(&state).await?;
-    let mut cfg = get_gateway_config_inner()?;
-    cfg.enabled = false;
-    save_gateway_config_inner(&cfg)
+    stop_gateway_inner(&state).await
 }
 
 #[tauri::command]
@@ -57,4 +60,33 @@ pub async fn get_gateway_log_dir(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub async fn open_gateway_log_dir(app: AppHandle) -> Result<String, String> {
     open_gateway_log_dir_inner(&app)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manual_start_preserves_auto_start_preference() {
+        let config = GatewayConfig {
+            enabled: false,
+            ..GatewayConfig::default()
+        };
+
+        let next = config_for_manual_start(&config);
+
+        assert!(!next.enabled, "manual start should not force auto-start preference on");
+    }
+
+    #[test]
+    fn manual_stop_preserves_auto_start_preference() {
+        let config = GatewayConfig {
+            enabled: true,
+            ..GatewayConfig::default()
+        };
+
+        let next = config_after_manual_stop(&config);
+
+        assert!(next.enabled, "manual stop should not clear auto-start preference");
+    }
 }

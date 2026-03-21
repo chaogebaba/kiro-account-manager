@@ -108,6 +108,7 @@ impl ThinkingParser {
         segments
     }
 
+    #[cfg(test)]
     pub fn has_extracted_thinking(&self) -> bool {
         self.thinking_extracted
     }
@@ -126,8 +127,8 @@ impl ThinkingParser {
             return None;
         }
 
-        if stripped.starts_with(Self::OPEN_TAG) {
-            self.buffer = stripped[Self::OPEN_TAG.len()..].to_string();
+        if let Some(stripped) = stripped.strip_prefix(Self::OPEN_TAG) {
+            self.buffer = stripped.to_string();
             self.state = ParseState::InThinking;
             return Some(true);
         }
