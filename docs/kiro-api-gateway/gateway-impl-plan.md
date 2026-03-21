@@ -97,8 +97,23 @@
 - **`web_search` 特殊工具已补齐**：当前已支持 Anthropic 版本化 `web_search_*` 映射为 Kiro `web_search` MCP 工具，并由网关执行 `/mcp tools/call` 后把结果回灌给上游对话链路。公开文档已能证明 `web_search_20250305` / `web_search_20260209` 这类命名存在，但当前实现证明的是“按 `web_search_*` 模式兼容”，不是“Kiro 上游已经被抓到真实发出每个版本号”。
 - **citation 取证入口已收敛**：若要继续验证 Kiro 原始 `citationEvent`，优先看本地 Kiro 源码里的 `Q Chat API -> debug.log / execution-log.json` 调试导出链，而不是普通 `q-client.log`。另外 GitHub 上游当前能直接搜到 `codeReferenceEvent.references` 与 `supplementaryWebLinksEvent.supplementaryWebLinks` 的业务消费代码，但暂未在非生成代码里搜到对应的 `citationEvent` 消费；因此现阶段对 `citationEvent` 的把握是“协议层存在已坐实，业务层现成渲染链仍缺直接源码证据”。`codeReferenceEvent.references -> code-references` 属于代码引用/license trace，不等于 citation。
 
+### 已新增逆向结论：模型列表、模型缓存与会话体
+- **`ListAvailableModels` 的消费字段已坐实**：Kiro 本地会把上游响应转换为 `models/defaultModel` 两层；每个模型至少依赖 `modelId`、`modelName`、`description`、`rateMultiplier`、`rateUnit`、`tokenLimits.maxInputTokens`。这意味着网关若自行维护模型列表，不能只保留 `id/name`。
+- **模型缓存存在，但只是内存缓存**：`setAvailableModels()` 仅更新进程内 `availableModels`，随后触发 `kiro.updateModelsList` 刷新 webview；不存在复杂持久化模型缓存。
+- **`InvalidModelError` 的恢复动作已坐实**：Kiro 会重新拉取可用模型、覆盖缓存，并把当前模型重置为 `defaultModel.id`。这对网关的“模型失效自动回退”策略很有参考价值。
+- **`modelSelection` 存的是真实 `modelId`**：VS Code 配置与 session config 里保存/同步的都是 raw `modelId`；`qdev::modelId` 只是 Kiro 内部 runtime 的 provider 化标识，不能把它误当成外部 API 值。
+- **`modelSelection -> active session` 的同步链已坐实**：`registerConfigSync()` 监听 `kiroAgent.modelSelection` 后会调用 `pushModelToSession()`，最终发送 `setSessionConfigOption({ configId: "model", value: modelId })`；active session 内部拿到的仍是 raw `modelId`。
+- **`conversationState` 的真实重点已坐实**：不是简单 `messages[]`，而是 `conversationId + agentContinuationId + agentTaskType + currentMessage + history + chatTriggerType`；最后一条 user 消息还会承载 `userInputMessageContext.tools`。
+- **模型下拉是 `configOptions` select，不只是 models API**：Kiro 新建 session、加载 session、会话内改模型时，都会向 webview 推送 `configOptions`；其中 model 项会消费 `defaultModel.id`、`description`、`rateMultiplier`、`rateUnit`。协议 schema 虽然定义了独立的 `models.availableModels/currentModelId`，但当前本地实现更依赖本地 `availableModels` 缓存与 `configOptions`。
+- **请求头需要按端点分开模拟**：`generateAssistantResponse` 才有 `x-amzn-kiro-agent-mode`，且仅在内容采集关闭时才带 `x-amzn-codewhisperer-optout`；`ListAvailableModels` 与 `/mcp` 当前坐实的是 `authorization + x-amz-user-agent`，外加 `external_idp` 场景的 `TokenType: EXTERNAL_IDP`，不应把三类请求强行揉成一套 header 模板。
+- **`/mcp` 的 `profileArn` 承载位已补证**：Kiro 本地 `InvokeMCPCommand` / `InvokeMCPStreamCommand` 不是把 `profileArn` 放进 JSON body，而是通过请求头 `x-amzn-kiro-profile-arn` 发送；网关若要继续逼近本地行为，MCP 上游请求应补这个 header。
+- **流式事件协议层比当前业务消费层更宽**：`ChatResponseStream` 除了常见的 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / codeReferenceEvent / meteringEvent` 外，还定义了 `toolResultEvent / metadataEvent / supplementaryWebLinksEvent / contextUsageEvent / citationEvent / invalidStateEvent`；目前本地主对话链主循环 `extension.js:377716-377834` 已直接坐实的业务分支只有 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / meteringEvent / codeReferenceEvent / contextUsageEvent`，其余事件仍需区分“协议存在”与“业务已消费”。
+- **`InvokeMCPStream` 已找到真实业务使用**：规格分析链 `requirements-analyzer` 会通过 `/mcp/stream -> tools/call(spec_disambiguation)` 获取增量结果，逐条消费 `response.stream.message`。
+- **`SendMessageStreaming` / `exportResultArchive` 目前仍主要停在协议层证据**：当前打包版 Kiro 源码已确认它们的 serializer / deserializer、事件流结构与路径，但尚未在业务层搜到明确的直接调用点；这一轮全文件搜索也没有发现新的 `new ...SendMessageCommand(...)` 或 `new ...ExportResultArchiveCommand(...)` 构造点，现阶段不应把它们表述成“当前主链真实在用”。
+- **region 选择链已收敛**：Kiro 本地 runtime 不是机械使用单一配置值，而是按“显式 region > `profileArn.region` > 默认 region”选区；本项目当前对托管账号场景已统一为“最终 `profileArn.region` > 账号 region > 网关默认 region”，并同时应用到对话链与 `ListAvailableModels`，避免跨区导致的 `Invalid model` / 模型列表错位。
+
 ### 当前优先级建议
-1. 若要继续对齐 Kiro IDE 能力，当前主链路缺口已从基础 `web_search` 接入收敛到更高精度的 citations 还原与更多搜索结果字段透传。
+1. 若要继续对齐 Kiro IDE 能力，当前主链路缺口已从基础 `web_search` 接入收敛到更高精度的 citations 还原、模型失效回退策略，以及更多搜索结果字段透传。
 2. 若需要更强图片兼容，再补鉴权下载、尺寸限制、失败回退与更多输入格式。
 3. 增加真实监听端口的运行时集成测试，覆盖 `/health`、`/v1/responses`、`/mcp` 等实际入口。
 
@@ -275,7 +290,9 @@ CodeWhisperer 事件流 → Anthropic SSE 转换：
   get_kiro_local_token()
     → access_token -> Authorization: Bearer <token>
     → profile_arn（social）或从 ProfileStorage 获取
-    → region（IdC）或默认 us-east-1
+    → region 优先取最终 profile_arn 中的 ARN region
+    → 无 ARN region 时退回账号 region
+    → 再退回默认 us-east-1
 ```
 
 ---

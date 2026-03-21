@@ -245,7 +245,7 @@
 ## 上游接口路径（参考实现）
 - `hank9999/kiro.rs` 中对话上游接口：`https://q.{region}.amazonaws.com/generateAssistantResponse`。
 - `hank9999/kiro.rs` 中 MCP 上游接口：`https://q.{region}.amazonaws.com/mcp`。
-- `{region}` 由配置决定（如 `us-east-1` / `eu-central-1`），代理侧需按配置拼接。
+- `{region}` 不是简单固定配置值；Kiro 本地 runtime 会先解析最终可用的 region，再拼到 `q.{region}.amazonaws.com`。
 
 ## Kiro IDE 源码证据（extension.js）
 > 路径：`C:\Users\12925\AppData\Local\Programs\Kiro\resources\app\extensions\kiro.kiro-agent\dist\extension.js`
@@ -265,7 +265,12 @@
 #### `/generateAssistantResponse`
 - Request headers：
   - `content-type: application/json`
+  - `accept: application/vnd.amazon.eventstream`
+  - `authorization: Bearer <accessToken>`
+  - `x-amz-user-agent`（来自 AWS SDK user-agent middleware；源值来自 `customUserAgent: KiroIDE <kiroVersion> <machineId>`）
   - `x-amzn-kiro-agent-mode: <agentMode>`（由 `addAgentModeHeadersMiddleware` 注入）
+  - `x-amzn-codewhisperer-optout: true`（仅在内容采集关闭时，由 `addPrivacyHeadersMiddleware` 注入）
+  - `TokenType: EXTERNAL_IDP`（仅 `authMethod == "external_idp"` 时，由 `addExternalIdpTokenTypeMiddleware` 注入）
 - Request body：
   - `conversationState`
   - `profileArn`
@@ -273,6 +278,20 @@
   - `x-amzn-codewhisperer-conversation-id`（会被映射到返回对象的 `conversationId`）
 - Response stream：
   - `generateAssistantResponseResponse`（`ChatResponseStream`）
+
+#### `/ListAvailableModels`
+- Request method / query：
+  - `GET /ListAvailableModels`
+  - query 至少包含 `origin=AI_EDITOR`
+  - 分页时追加 `nextToken`
+  - 已登录 profile 场景追加 `profileArn`
+- Request headers：
+  - `authorization: Bearer <accessToken>`
+  - `x-amz-user-agent`（同样来自 runtime client 的 `customUserAgent`）
+  - `TokenType: EXTERNAL_IDP`（仅 `authMethod == "external_idp"`）
+- 当前源码证据下，**没有**看到 `ListAvailableModels` 调用链显式追加：
+  - `x-amzn-kiro-agent-mode`
+  - `x-amzn-codewhisperer-optout`
 
 #### `/SendMessageStreaming`
 - Request body：
@@ -282,6 +301,11 @@
   - `source`
 - Response stream：
   - `sendMessageResponse`（`ChatResponseStream`）
+- 当前本地 Kiro 打包源码里，已经能确认协议 serializer / deserializer 存在，但**暂未在业务层搜到明确的直接调用方**；现阶段更像是 SDK 暴露能力，而不是当前主 agent 对话链的核心入口。
+- 更具体地说，这一轮对打包版 `extension.js` 的全文件搜索里：
+  - 能稳定命中的只有 serializer / deserializer / SDK export：`extension.js:332171-332267`、`extension.js:333132-333199`
+  - 但没有搜到新的 `new ...SendMessageCommand(...)` 业务构造点
+  - 因此目前只能确认“协议与 SDK 能力存在”，不能确认“当前 Kiro 主链真实在用”
 
 #### `/mcp`
 - Request body（JSON-RPC 透传）：
@@ -289,11 +313,25 @@
   - `jsonrpc`
   - `method`
   - `params`
+- Request headers（当前已坐实的公共部分）：
+  - `authorization: Bearer <accessToken>`
+  - `content-type: application/json`
+  - `accept: application/json`
+  - `x-amz-user-agent`（来自 streaming client 的 `customUserAgent`）
+  - `x-amzn-kiro-profile-arn: <profileArn>`（`InvokeMCPCommand` / `InvokeMCPStreamCommand` 的协议 serializer 直接放到 header，不在 body）
+  - `TokenType: EXTERNAL_IDP`（仅 `authMethod == "external_idp"`）
+- 当前源码证据下，远程工具调用链 `InvokeMCPCommand` / `InvokeMCPStreamCommand` **没有直接坐实**会像 `generateAssistantResponse` 一样追加：
+  - `x-amzn-kiro-agent-mode`
+  - `x-amzn-codewhisperer-optout`
 - `MCPMethod` 枚举：
   - `initialize`
   - `notifications/initialized`
   - `tools/call`
   - `tools/list`
+- `InvokeMCPStreamCommand` 已找到真实业务调用方：
+  - `requirements-analyzer` 会通过 `tools/call` 调 `spec_disambiguation`
+  - 返回 `response.stream`，逐条消费 `message` 事件
+- 这说明 `/mcp/stream` 不是纯协议壳，Kiro 本地至少在规格分析链里真实使用它。
 
 #### `/exportResultArchive`
 - Request body：
@@ -308,6 +346,16 @@
 - `ExportContext` 联合：
   - `transformationExportContext`
   - `unitTestGenerationExportContext`
+- `ResultArchiveStream` 事件：
+  - `binaryMetadataEvent`
+  - `binaryPayloadEvent`
+  - `internalServerException`
+- 当前本地 Kiro 打包源码里，已经能确认协议 serializer / deserializer 与事件流形状，但**暂未在业务层搜到明确的直接调用方**。
+- 更具体地说，这一轮全文件搜索只命中了：
+  - serializer / deserializer：`extension.js:332086-332199`
+  - SDK command 导出：`extension.js:333001-333024`
+  - 枚举 / schema 定义：`extension.js:331913-331931`
+- 但没有搜到新的 `new ...ExportResultArchiveCommand(...)` 业务构造点，所以它当前仍应归类为“协议层已坐实，业务层调用待继续取证”。
 - `TransformationDownloadArtifactType` 枚举：
   - `ClientInstructions`
   - `GeneratedCode`
@@ -318,13 +366,35 @@
 
 ### 真实调用链
 - 读取配置：`kiroAgent.configuration.getCodeWhispererConfig` 提供 `region` 与 `endpoint`。
-- 构建 `CodeWhispererStreaming` 客户端（AWS SDK）。
+- 构建 `CodeWhispererStreaming` / `CodeWhispererRuntimeClient` 客户端（AWS SDK）。
+- 两类 client 的公共基线：
+  - 都会带 `authorization: Bearer <token>`。
+  - 都会带 `x-amz-user-agent`；其源值来自 `customUserAgent: KiroIDE <kiroVersion> <machineId>`。
+  - 本机当前安装包 `C:\Users\12925\AppData\Local\Programs\Kiro\resources\app\product.json` 显示版本为 `0.11.34`，因此这一轮逆向时对应源字符串可视为 `KiroIDE 0.11.34 <machineId>`。
 - 注入中间件：
-  - `addPrivacyHeadersMiddleware`（隐私开关关闭时加 `x-amzn-codewhisperer-optout: true`）。
-  - `addAgentModeHeadersMiddleware`（设置 `x-amzn-kiro-agent-mode`，常见值 `autocomplete` / `q-developer-converse`）。
-  - `addExternalIdpTokenTypeMiddleware`（`authMethod == "external_idp"` 时加 `TokenType: EXTERNAL_IDP`）。
+  - `addExternalIdpTokenTypeMiddleware`：runtime client 和 streaming client 基线都会按需追加 `TokenType: EXTERNAL_IDP`。
+  - `addPrivacyHeadersMiddleware`：不是全局基线，只在特定聊天调用方显式加到 streaming client 上。
+  - `addAgentModeHeadersMiddleware`：同样不是全局基线，只在特定聊天调用方显式加到 streaming client 上。
 - 调用 `generateAssistantResponse({ conversationState, profileArn })`。
 - 读取流式事件中的 `assistantResponseEvent.content` 与 `assistantResponseEvent.modelId`，拼装最终输出，并处理 `codeReferenceEvent`。
+
+### region / profileArn 选择链（Kiro 本地实证）
+- `getCodeWhispererConfig(region)` 的 region 选择优先级是：
+  - 显式传入的 region
+  - `authProvider.getProfileArn()` 解析出的 ARN region
+  - 默认 region
+- `authProvider.getProfileArn()` 的优先级是：
+  - 当前 token 内的 `profileArn`
+  - `ProfileStorage` / 固定 profile 配置里的 ARN
+- 这意味着 social 账号场景下，真正决定上游落区的往往是“当前 token 里的 `profileArn.region`”，不是本地静态配置。
+- 网关当前实现已按同一思路收敛：
+  - 对话链与 `ListAvailableModels` 都先看最终 `profileArn`
+  - 若 ARN 里能解析出受支持的 region，则优先使用
+  - 否则退回账号 region，再退回网关默认 region
+- 这样可以避免：
+  - token / profileArn 已刷新到 A 区
+  - 但请求仍错误发往 B 区
+  - 最终触发 `Invalid model`、401/403、模型列表与对话链不一致
 
 ### 流式事件处理（Kiro IDE 行为）
 - `assistantResponseEvent`：
@@ -339,6 +409,28 @@
   - 抽取 `references` 并调用 `kiroAgent.recordReferences`。
 - `meteringEvent`：
   - 仅在 usage 开关开启时处理，用于统计。
+- `contextUsageEvent`：
+  - 当前主对话消费链会把 `contextUsagePercentage` 写入 `additional_kwargs.contextUsagePercentage`。
+- 当前打包版 Kiro 主对话循环里，能直接看到的业务分支只有：
+  - `assistantResponseEvent`
+  - `reasoningContentEvent`
+  - `toolUseEvent`
+  - `meteringEvent`
+  - `codeReferenceEvent`
+  - `contextUsageEvent`
+- 对应主循环位置：
+  - `extension.js:377716-377834`
+- 协议层还定义了更多 `ChatResponseStream` 事件：
+  - `toolResultEvent`
+  - `metadataEvent`
+  - `supplementaryWebLinksEvent`
+  - `citationEvent`
+  - `invalidStateEvent`
+- 但到目前为止，Kiro 主对话业务链里直接坐实消费到的，除了 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / codeReferenceEvent / meteringEvent` 外，新增只明确看到 `contextUsageEvent`；其余事件已在协议反序列化层存在，但业务层现成消费链证据仍不完整。
+- 结合当前搜索结果，更准确的说法是：
+  - `toolResultEvent / metadataEvent / supplementaryWebLinksEvent / citationEvent / invalidStateEvent` 目前已确认存在于协议层
+  - 但在当前打包版 Kiro 的主 agent 对话消费链里，尚未找到与 `assistantResponseEvent` / `toolUseEvent` 同等级的直接处理代码
+  - 因此它们目前更适合被标注为“协议已定义，业务消费待继续取证”
 
 ### 客户端配置与鉴权
 - `getCodeWhispererClientConfig()`：
@@ -349,6 +441,10 @@
 - `authProvider.getProfileArn()`：
   - 若 token 包含 `profileArn`，直接使用。
   - 否则从 `ProfileStorage` 读取 `profile.arn`。
+- `getCodeWhispererConfig(region)`：
+  - 显式传入 region 时直接使用该 region。
+  - 否则会尝试从最终 `profileArn` 解析 region。
+  - 若 ARN region 不可用，才回退默认 region。
 
 #### Auth Token 结构（Kiro IDE）
 - Social token：
@@ -384,6 +480,130 @@
 - `agentTaskType`（枚举：`spectask` / `vibe`）
 - `customizationArn`
 - `workspaceId`
+
+### `convertToGenerateAssistantMessages()` 组装结论（本地 Kiro 实证）
+- `conversationState` 不是简单的 `messages[]` 透传，而是显式拆成：
+  - `conversationId`
+  - `agentContinuationId`
+  - `agentTaskType`
+  - `currentMessage`
+  - `history`
+  - `chatTriggerType: "MANUAL"`
+- user 消息会映射为 `userInputMessage`：
+  - `content` 只拼接文本块
+  - `modelId`
+  - `origin: "AI_EDITOR"`
+  - `images`
+  - `documents`
+  - `userInputMessageContext`
+- assistant 消息会映射为 `assistantResponseMessage`：
+  - `content`
+  - `toolUses`
+  - `reasoningContent`
+- 最后一条 user 消息会额外写入 `userInputMessageContext.tools`，历史里的 tool 结果会写入 `userInputMessageContext.toolResults`。
+- `conversationId` 优先复用历史 `additional_kwargs.conversationId`，否则本地生成 `crypto.randomUUID()`。
+- 实证位置：
+  - `convertToGenerateAssistantMessages()`：`extension.js:377875-377941`
+  - `se_ConversationState()`：`extension.js:332711-332721`
+  - `se_UserInputMessage()`：`extension.js:332828-332839`
+  - `se_UserInputMessageContext()`：`extension.js:332841-332853`
+  - `se_AssistantResponseMessage()`：`extension.js:332687-332697`
+
+### `ListAvailableModels` 响应结构（本地 Kiro 实证）
+- Kiro 本地命令 `kiro.agentModels.getAvailableModels` 会循环调用上游 `ListAvailableModels`，直到 `nextToken` 为空。
+- 原始上游返回，Kiro 至少实际消费这些字段：
+  - `nextToken`
+  - `models[]`
+  - `defaultModel`
+- 每个模型对象至少依赖：
+  - `modelId`
+  - `modelName`
+  - `description`
+  - `rateMultiplier`
+  - `rateUnit`
+  - `tokenLimits.maxInputTokens`
+- 本地转换后的前端结构是：
+  - `models: [{ id, name, description, rateMultiplier, rateUnit, maxInputTokens }]`
+  - `defaultModel: { id, name, description, rateMultiplier, rateUnit, maxInputTokens }`
+- 这说明如果网关要伪造或缓存模型列表，最少要满足上面这一层语义，不能只回 `id/name`。
+- `ListAvailableModels` 的落区也不能只看静态配置；若账号当前 `profileArn` 已切到别的 region，模型列表请求也必须跟着走，否则会出现“模型列表来自一套 region、对话请求落到另一套 region”的偏差。
+- 实证位置：
+  - `transformOutput3()`：`extension.js:932280-932303`
+  - `kiro.agentModels.getAvailableModels`：`extension.js:932307-932330`
+
+### 模型缓存与选中模型链路（本地 Kiro 实证）
+- Kiro 本地确实有模型缓存，但只是内存缓存，不是持久化缓存。
+- 缓存初始值：
+  - `availableModels = { models: [], defaultModel: { id: "", name: "" } }`
+- 刷新链路：
+  1. `initializeAvailableModelsCache()` 调 `kiro.agentModels.getAvailableModels`
+  2. `setAvailableModels(availableModels)`
+  3. 触发 `kiro.updateModelsList`
+  4. `agentController.updateModel(M2())`
+- `InvalidModelError` 时也会走这条链，并把选中模型重置成 `models.defaultModel.id`。
+- 实证位置：
+  - `model-cache.ts`：`extension.js:970353-970362`
+  - 初始化缓存：`extension.js:990256-990268`
+  - `InvalidModelError` 恢复：`extension.js:971094-971099`
+  - webview 更新入口：`extension.js:824227-824229`
+
+### `modelSelection` 与 `qdev::modelId` 的关系（本地 Kiro 实证）
+- VS Code 配置 `kiroAgent.modelSelection` 存的是真实 `modelId`，不是 `qdev::modelId`。
+- Kiro 同步到 session 时，发送的是：
+  - `configId: "model"`
+  - `value: modelId`
+- 配置变更监听也直接围绕 raw `modelId` 展开：
+  - `registerConfigSync()` 监听 `kiroAgent.modelSelection`，命中后调用 `pushModelToSession()`
+  - `pushModelToSession()` 会执行 `setSessionConfigOption({ configId: "model", value: modelId })`
+- 这说明 active session 内部拿到的也是原始 `modelId`，不是 `qdev::modelId`。
+- `qdev::modelId` 只是本地内部的 provider 化标识，用于：
+  - `getModelIdentifier()`
+  - `getModelConfiguration()`
+  - runtime 内部的模型客户端分派
+- 这意味着本项目若要兼容 Kiro IDE 行为：
+  - 前端保存当前模型值时，应以 raw `modelId` 为主
+  - 若内部需要 provider 化标识，可以在运行时临时拼接，不要把它当作持久化值或外部 API 值
+- 实证位置：
+  - `getIdeModelId()` / `pushModelToSession()` / `registerConfigSync()`：`extension.js:946573-946614`
+  - `setSessionConfigOption(model)`：`extension.js:952871-952873`
+  - `getSelectedModelIdFromSettings()`：`extension.js:973099-973101`
+  - `getModelIdentifier()` / `getModelConfiguration()`：`extension.js:973112-973137`
+  - `formatModelIdentifier()`：`extension.js:973145-973146`
+
+### 会话配置面板里的模型下拉（本地 Kiro 实证）
+- Kiro 会把模型选项构造成一个 `configOptions` 里的 `select` 项，而不是只靠某个独立的 models API 响应对象。
+- 模型配置项形状：
+  - `type: "select"`
+  - `id: "model"`
+  - `name: "Model"`
+  - `category: "model"`
+  - `currentValue: 当前 modelId，若为空则回退 defaultModel.id，再回退 models[0].id`
+  - `options: [{ value, name, description, _meta.kiro.rateMultiplier, _meta.kiro.rateUnit }]`
+- 这说明 UI 下拉本身还会消费：
+  - `defaultModel.id`
+  - `rateMultiplier`
+  - `rateUnit`
+  - `description`
+- Kiro 在新建 session、加载 session、会话中途修改配置时，都会重新返回 `configOptions` 给 webview。
+- 实证位置：
+  - 模型 select 构造：`extension.js:402821-402843`
+  - `newSession()` 返回 `configOptions`：`extension.js:403274-403308`
+  - `setSessionConfigOption()` 返回 `configOptions`：`extension.js:403416-403433`
+  - `pushConfigOptions()` 推给 active session webview：`extension.js:939725-939730`
+
+### `models` schema 与实际实现的区别（本地 Kiro 实证）
+- ACP / session 协议 schema 里确实定义了：
+  - `models.availableModels: zModelInfo[]`
+  - `models.currentModelId: zModelId`
+- 但本地 Kiro 当前实际返回新建/加载/恢复 session 时，更明确走的是：
+  - `configOptions`
+  - `modes`
+- 也就是说，`models` 这个独立承载位在协议层存在，但当前本地实现里，模型选择 UI 更依赖本地 `availableModels` 缓存和 `configOptions` select 项，而不是单独依赖 session 响应里的 `models` 字段。
+- 实证位置：
+  - `zSessionModelState`：`extension.js:140085-140113`
+  - `zSetSessionConfigOptionResponse.configOptions`：`extension.js:140158-140160`
+  - `newSession()` 实际返回：`extension.js:403301-403308`
+  - `loadSession()` / `setSessionConfigOption()` 实际返回：`extension.js:403396-403433`
 
 ### ContextTruncationScheme（枚举）
 - `ANALYSIS`
@@ -1287,6 +1507,8 @@ q-developer-converse
        完整映射含 toolUses / toolResults / reasoningContent
        最后一条 user 消息写入 userInputMessageContext.tools
        优先复用历史 additional_kwargs.conversationId
+       user content 仅拼接 text 块，image/document 会拆到 images/documents
+       reasoningContent 仅在 reasoningModelId 与当前 modelId 一致时透传
 
 chat-agent
   ├─ 依赖：shared-types, token-monitor, context-chat-message
@@ -1326,6 +1548,10 @@ intent-detection-service
 - `_convertMessages` 与 `convertToGenerateAssistantMessages` 是消息格式转换的两条路径：前者用于普通 Chat，后者用于含工具调用的 Agent 模式。
 - `AutonomyMode` 决定 `x-amzn-kiro-agent-mode` header 的值（`Autopilot` / `Supervised`）。
 - `token-monitor` 订阅 `contextUsageEvent`，可用于代理层的配额预警与账号切换触发。
+- 模型值存储层面要区分两种语义：
+  - IDE 配置与 session config 里存的是 raw `modelId`
+  - Kiro 内部 runtime 才会临时拼成 `qdev::modelId`
+- `ListAvailableModels` 的本地消费不是“拿到一串名字就结束”，而是依赖 `modelId/modelName/description/rateMultiplier/rateUnit/tokenLimits.maxInputTokens/defaultModel` 这组字段；网关若自行构造模型列表，至少要满足这一层语义。
 
 ## 第二批模块分析（2026-03-17）
 
