@@ -95,7 +95,18 @@
 
 ### 已完成：`web_search`
 - **`web_search` 特殊工具已补齐**：当前已支持 Anthropic 版本化 `web_search_*` 映射为 Kiro `web_search` MCP 工具，并由网关执行 `/mcp tools/call` 后把结果回灌给上游对话链路。公开文档已能证明 `web_search_20250305` / `web_search_20260209` 这类命名存在，但当前实现证明的是“按 `web_search_*` 模式兼容”，不是“Kiro 上游已经被抓到真实发出每个版本号”。
+- **`tools/list -> web_search` 的运行时工具定义已坐实**：本机 `q-client.log` 已抓到 `InvokeMCPCommand` 的真实 `tools/list` 响应，确认远端工具名就是 `web_search`，输入 schema 只有 `query: string`，并明确限制“200 字符以内”；工具描述里还写死了返回结果字段至少包含 `title / url / snippet / publishedDate / isPublicDomain / id / domain`。
+- **`tools/call` 的发包结构已被本地安装包源码坐实**：Kiro 安装包中的 `acp-remote-mcp-client-*.js` 明确显示远端 MCP 调用发送的是 `jsonrpc: "2.0" + method: "tools/call" + profileArn + params: { name, arguments }`；这与当前网关对 `/mcp tools/call` 的模拟方向一致。
+- **`web_search` 的运行时执行样本已补齐**：`2026-03-22 15:14:59` 这轮日志里，`q-client.log` 已抓到真实 `InvokeMCPCommand`，其 `id` 为 `web_search_tooluse_HBDsi00WRBobYdARUrKeqd_1774163698353_756aa2ec`、`method` 为 `tools/call`、HTTP 200 成功；同轮 `Kiro Logs.log` 还能看到 `[Remote tool web_search] Calling tool`、`Fetched URLs` 与后续 `WebFetch` 命中 `docs.anthropic.com/en/docs/about-claude/models/all-models`、`anthropic.com/news/claude-opus-4-5`、`anthropic.com/claude/opus` 的抓取完成记录。这说明“本机运行时确实执行过 `tools/call(web_search)`”已从缺口变成实证。
+- **`web_search` 的回包解析方式已被本地安装包源码坐实**：Kiro 安装包中的 `disclose-context-*.js` 明确把 `web_search` 结果解析为“从 `content[]` 中找 `type === "text"` 的项，再 `JSON.parse(text)`，然后读取 `results` 数组”；当前网关 `parse_web_search_mcp_result()` 采用的就是这一路径，不是臆造。
 - **citation 取证入口已收敛**：若要继续验证 Kiro 原始 `citationEvent`，优先看本地 Kiro 源码里的 `Q Chat API -> debug.log / execution-log.json` 调试导出链，而不是普通 `q-client.log`。另外 GitHub 上游当前能直接搜到 `codeReferenceEvent.references` 与 `supplementaryWebLinksEvent.supplementaryWebLinks` 的业务消费代码，但暂未在非生成代码里搜到对应的 `citationEvent` 消费；因此现阶段对 `citationEvent` 的把握是“协议层存在已坐实，业务层现成渲染链仍缺直接源码证据”。`codeReferenceEvent.references -> code-references` 属于代码引用/license trace，不等于 citation。
+- **本地安装包主循环的消费边界已进一步坐实**：`q-developer-converse` 的聊天主循环当前明确消费的是 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / meteringEvent / codeReferenceEvent / contextUsageEvent`；同级没有看到 `citationEvent / supplementaryWebLinksEvent / toolResultEvent` 的业务处理分支。聊天 webview 的 `session-view/main.js` 里这轮也未搜到 `citation` / `supplementaryWebLinks` 相关命中，因此现阶段不能把它们表述成“本地 IDE 已确认渲染”。
+- **Execution Log 落盘链已打透**：`StorageManager` 会把 `workspaceId`、`folderKey`、`key` 都算成 `sha256(...).substring(0, 32)`；因此 `%APPDATA%\\Kiro\\User\\globalStorage\\kiro.kiroagent\\<workspaceHash>\\` 下的 32 位 hash 目录和文件名，都是源码规则生成的稳定路径。当前已坐实：
+  - `KIRO::EXECUTION::SAVES` -> `414d1636299d2b9e4ce7e17fb11f63e9`
+  - `KIRO::EXECUTION::METADATA` -> `f62de366d0006e17ea00a01f6624aabf`
+- **Execution save 里的 `actionType: search` 不是远端 `web_search`**：当前机器真实样本里，这类动作的输入形态是 `{ why, query }`，对应本地代理搜索上下文/代码的审计记录，不能把它误当成 `tools/call(web_search)` 已抓到。
+- **`web_search` 的取证结论需要更新**：截至 `2026-03-22 15:14:59` 这轮样本，本机已经抓到真实的 `tools/call(web_search)` 请求/响应与后续抓取链路；现在已可同时坐实“协议定义 + 客户端发包代码 + 客户端结果解析代码 + 本机运行时执行样本”。剩余缺口不再是 `web_search` 是否真实执行，而是 `citationEvent` 等搜索后续事件是否在当前样本中继续落盘。
+- **`citationEvent` 的下一步取证方法已经固定**：先查安装包 `extension.js` 的协议定义、反序列化和 `debug.log / execution-log.json` 写盘代码，再查 `*Q Chat API.log` 是否已有真实样本，最后回到工作区 `.kiro/debug/` 搜 `debug.log` / `execution-log.json`。如果 `Q Chat API.log` 仍无命中，只能说明“当前样本未覆盖”，不能反推协议不存在。
 
 ### 已新增逆向结论：模型列表、模型缓存与会话体
 - **`ListAvailableModels` 的消费字段已坐实**：Kiro 本地会把上游响应转换为 `models/defaultModel` 两层；每个模型至少依赖 `modelId`、`modelName`、`description`、`rateMultiplier`、`rateUnit`、`tokenLimits.maxInputTokens`。这意味着网关若自行维护模型列表，不能只保留 `id/name`。
@@ -104,6 +115,7 @@
 - **`modelSelection` 存的是真实 `modelId`**：VS Code 配置与 session config 里保存/同步的都是 raw `modelId`；`qdev::modelId` 只是 Kiro 内部 runtime 的 provider 化标识，不能把它误当成外部 API 值。
 - **`modelSelection -> active session` 的同步链已坐实**：`registerConfigSync()` 监听 `kiroAgent.modelSelection` 后会调用 `pushModelToSession()`，最终发送 `setSessionConfigOption({ configId: "model", value: modelId })`；active session 内部拿到的仍是 raw `modelId`。
 - **`conversationState` 的真实重点已坐实**：不是简单 `messages[]`，而是 `conversationId + agentContinuationId + agentTaskType + currentMessage + history + chatTriggerType`；最后一条 user 消息还会承载 `userInputMessageContext.tools`。
+- **对话接口的运行时真样本也已补齐**：`2026-03-22 15:13:13.181` 与 `15:13:16.211` 的 `q-client.log` 已抓到真实 `GenerateAssistantResponseCommand`，同一 `conversationId=4752bae7-249f-40c8-9087-e7681f99b1bb` 在 `5-Q Chat API.log` 里还能对上完整 `conversationState` 请求与最终回答落盘；这说明当前文档对上游对话接口的表述，已经不再只是安装包源码推断，而有本机运行时样本支撑。
 - **模型下拉是 `configOptions` select，不只是 models API**：Kiro 新建 session、加载 session、会话内改模型时，都会向 webview 推送 `configOptions`；其中 model 项会消费 `defaultModel.id`、`description`、`rateMultiplier`、`rateUnit`。协议 schema 虽然定义了独立的 `models.availableModels/currentModelId`，但当前本地实现更依赖本地 `availableModels` 缓存与 `configOptions`。
 - **请求头需要按端点分开模拟**：`generateAssistantResponse` 才有 `x-amzn-kiro-agent-mode`，且仅在内容采集关闭时才带 `x-amzn-codewhisperer-optout`；`ListAvailableModels` 与 `/mcp` 当前坐实的是 `authorization + x-amz-user-agent`，外加 `external_idp` 场景的 `TokenType: EXTERNAL_IDP`，不应把三类请求强行揉成一套 header 模板。
 - **`/mcp` 的 `profileArn` 承载位已补证**：Kiro 本地 `InvokeMCPCommand` / `InvokeMCPStreamCommand` 不是把 `profileArn` 放进 JSON body，而是通过请求头 `x-amzn-kiro-profile-arn` 发送；网关若要继续逼近本地行为，MCP 上游请求应补这个 header。
@@ -146,7 +158,9 @@
 ### 当前状态
 - 主链路已落地。
 - 回归测试已覆盖版本化归一化、MCP 结果解析、Anthropic server-tool 输出块组装。
-- 后续增强点只剩结果细节兼容，不再是“能不能用”的问题。
+- 与 Kiro 本体安装包源码对照后，当前实现对 `tools/call` 请求结构和 `web_search` 回包解析路径都已对齐。
+- `web_search` 本身已补齐运行时执行实证；剩余缺口主要收敛为 `citationEvent` 等搜索后续事件是否在当前样本中继续落盘，而不是功能可用性或 `web_search` 是否真实执行。
+- `execution save` 里的 `actionType: search` 仍不能当成远端 MCP `web_search` 调用证据；它只是本地搜索动作审计记录，这条边界继续成立。
 
 ## 阶段验收清单（按当前代码回填）
 

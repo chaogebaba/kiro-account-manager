@@ -957,6 +957,24 @@
   - `execution-log.json`
 - 这意味着：如果要继续验证 `citationEvent` 是否真实出现、字段形态是什么，主取证入口应是 `debug.log / execution-log.json`，不是普通 exthost 文件日志。
 
+### Execution Log 真实落盘映射（本轮新增）
+- `ExecutionLogController` 不是把执行记录塞进 `workspace-sessions`，而是走独立的 `StorageManager` 落盘。
+- `StorageManager.initialize()` 会把 `workspaceId` 设为 `sha256(workspace.fsPath).substring(0, 32)`，并在 `context.globalStorageUri/<workspaceId>/` 下建目录。
+- `StorageManager.hash()`、`buildPath()`、`buildFolderPath()` 说明：
+  - `key` -> `sha256(key).substring(0, 32)` 作为文件名
+  - `folderKey` -> `sha256(folderKey).substring(0, 32)` 作为目录名
+- 因此当前机器上的这类路径：
+  - `%APPDATA%\Kiro\User\globalStorage\kiro.kiroagent\bcc6908e3d8382789e844289ec147d8a\`
+  - 不是随机串，而是工作区路径 hash
+- `ExecutionLogController` 的两个关键常量：
+  - `KIRO::EXECUTION::SAVES`
+  - `KIRO::EXECUTION::METADATA`
+- 结合源码与本机实盘可得出：
+  - `KIRO::EXECUTION::METADATA` -> 根目录下无扩展名元数据文件（当前样本是 `f62de366d0006e17ea00a01f6624aabf`）
+  - `KIRO::EXECUTION::SAVES` -> 根目录下固定 hash 子目录（当前样本是 `414d1636299d2b9e4ce7e17fb11f63e9`）
+  - 子目录内每个无扩展名文件就是一个 execution save entity
+- 本机真实样本已经证明 `extractLastExecutionLogDiskPaths()` 所说的“磁盘 execution 对象”就是这批文件，不是抽象接口。
+
 > 已确认的本地源码链路
 
 - `Q Chat API` 事件流写入：
@@ -975,12 +993,48 @@
   - `CodeWhispererStreamingClient` 请求结构
   - `GenerateAssistantResponseCommand` 调用存在
   - `InvokeMCPCommand -> tools/list -> web_search` 真实出现
+- 对 `web_search` 来说，`q-client.log` 目前还能进一步证明：
+  - 远端工具名就是 `web_search`
+  - `inputSchema` 只有 `query: string`
+  - query 长度限制是“200 字符以内”
+  - 工具描述里声明的返回字段至少包含 `title / url / snippet / publishedDate / isPublicDomain / id / domain`
 - `q-client.log` 不能替代 `Q Chat API` 调试链去证明 citation 事件，因为它主要记录请求/响应元信息，不是 `events: h27` 的主落盘位置。
 - `Kiro Logs.log` 主要给会话时序、telemetry、agent 生命周期，不提供 citation 结构本体。
 - `Kiro - MCP Logs.log`、`KiroLLMLogs.log` 在本机样本里长期为空，不能作为 citation 证据来源。
+- `Q Chat API.log` 目前在本机真实样本里已直接落出：
+  - `assistantResponseEvent`
+  - `toolUseEvent`
+  - `contextUsageEvent`
+  - `meteringEvent`
+- 但这轮全量 grep 仍未在现有 `Q Chat API.log` 样本中抓到：
+  - `citationEvent`
+  - `supplementaryWebLinksEvent`
+  - `codeReferenceEvent`
+  - `toolResultEvent`
+- 这进一步说明：当前机器上已有的运行时日志样本，只能证明“这些事件在协议和主循环里存在/被支持到什么程度”，还不能证明“这些事件在本机会话里确实出现过”。
 - `codeReferenceEvent` 与 citation 必须分开看：
   - `codeReferenceEvent.references` 会走 `kiroAgent.recordReferences`
   - 它写入的是 `code-references` Output Channel，属于代码引用/license trace，不是 `citationEvent`
+- 本地安装包当前还能直接坐实一条更强的结论：
+  - `q-developer-converse` 的聊天主循环只明确消费了 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / meteringEvent / codeReferenceEvent / contextUsageEvent`
+  - 同级分支里没有看到 `citationEvent` / `supplementaryWebLinksEvent` / `toolResultEvent` 的业务处理
+  - `packages/kiro-ui-agent-chat/dist/session-view/main.js` 中也未搜到 `citation` / `supplementaryWebLinks` / `recordReferences` / `code-references` 命中，说明聊天 webview 这层至少没有显式渲染链证据
+
+### `citationEvent` 具体怎么找（本轮新增）
+- 查找顺序应固定为三层：
+  - 先查本地安装包 `extension.js`，确认 `citationEvent` 在协议定义与反序列化层真实存在
+  - 再查 `Q Chat API.log`，确认当前机器已有会话样本里是否真的出现过该事件
+  - 最后查工作区 `.kiro/debug/debug.log` 与 `.kiro/debug/execution-log.json`，这是当前最值得追的调试导出主证据
+- 本轮已再次确认：
+  - `extension.js` 中同时存在 `citationEvent -> visitor.citationEvent(...)`、`event["citationEvent"]` 反序列化，以及 `debug.log` / `execution-log.json` 写盘代码
+  - 当前机器已有 `Q Chat API.log` 样本里，能直接抓到的是 `assistantResponseEvent / toolUseEvent / contextUsageEvent / meteringEvent`
+  - 但仍未在这些现有样本里抓到真实 `citationEvent`
+- 因此当前正确表述只能是：
+  - `citationEvent` 在协议层和本地安装包源码中已坐实
+  - 但本机现有运行时样本仍未覆盖到它，不能把“没抓到样本”误写成“事件不存在”
+- 下轮若要继续补证，建议先主动触发一条高概率带外部来源的回答，再立刻搜索：
+  - `rg -n "citationEvent" "%APPDATA%\\Kiro\\logs" -g "*Q Chat API.log"`
+  - `rg -n "citationEvent" "<workspace>\\.kiro\\debug" -g "debug.log" -g "execution-log.json"`
 
 ### q-client.log（请求/响应结构）
 > 路径：`C:\Users\12925\AppData\Roaming\Kiro\logs\*\window1\exthost\kiro.kiroAgent\q-client.log`
@@ -1001,6 +1055,18 @@
   - `requestId`
   - `attempts`
   - `totalRetryDelay`
+- `2026-03-22 15:13:13.181` 与 `15:13:16.211` 的真实样本已经证明：`GenerateAssistantResponseCommand` 会先以 `simple-task` 形态提交当前问题，再以正式模型（当前样本是 `claude-sonnet-4.5`）携带 `userInputMessageContext.tools` 发起同一轮对话请求；两次请求共享同一个 `conversationId=4752bae7-249f-40c8-9087-e7681f99b1bb`。
+- 已抓到的 `InvokeMCPCommand -> tools/list` 实样还可补充出：
+  - `method: "tools/list"`
+  - `output.result.tools[0].name: "web_search"`
+  - `output.result.tools[0].inputSchema.properties.query.description` 明确要求 `Must be 200 characters or less`
+  - `output.result.tools[0].description` 明确列出 `title / url / snippet / publishedDate / isPublicDomain / id / domain`
+- `2026-03-22 15:14:59.919` 的 `q-client.log` 已新增真实 `InvokeMCPCommand -> tools/call` 样本：`id` 为 `web_search_tooluse_HBDsi00WRBobYdARUrKeqd_1774163698353_756aa2ec`，HTTP 200 成功；同轮 `GenerateAssistantResponseCommand` 历史里还能对上 `toolUseId: "tooluse_HBDsi00WRBobYdARUrKeqd"` 与后续 `toolResults.status: "success"`。
+- 结合 `Kiro Logs.log` 同轮 `[Remote tool web_search] Calling tool`、`Fetched URLs` 与 `WebFetch` 命中 `docs.anthropic.com/en/docs/about-claude/models/all-models`、`anthropic.com/news/claude-opus-4-5`、`anthropic.com/claude/opus` 的抓取完成记录，`web_search` 执行态现在已经达到运行时实证。
+- 额外边界：`ExecutionLogController` 里的 `actionType: "search"` 不能直接等同于远端 MCP `web_search`。
+  - 本机 execution save 样本中，`search` 动作的已知输入形态是 `{ why, query }`
+  - 当前抓到的是本地代理做代码/内容搜索的动作记录
+  - 不是 `tools/call(web_search)` 的远端 MCP 执行真包
 
 ### kiro.kiroAgent 其它日志（结论）
 > 目录：`C:\Users\12925\AppData\Roaming\Kiro\logs\*\window1\exthost\kiro.kiroAgent\`
@@ -1008,8 +1074,11 @@
 - `Kiro - MCP Logs.log`：文件为空（本机样本 4 份均为 0 字节）。
 - `KiroLLMLogs.log`：文件为空（本机样本 4 份均为 0 字节）。
 - `Kiro - Powers.log`：仅包含 Powers/Registry 初始化与自动安装日志。
-- `Kiro Logs.log`：仅包含 telemetry、EnterpriseSettings、notification-service、agent-event-polling 等初始化日志。
-- 结论：除 `q-client.log` 外，其它日志未提供可用于事件结构反推的字段样本。
+- `Kiro Logs.log`：不能再只归类为初始化日志。`2026-03-22 15:14:58` 这轮样本里，它已经提供了 `[Remote tool web_search] Calling tool`、`Fetched URLs`、`[WebFetch] Fetch completed` 等运行时证据，可直接辅助确认搜索执行链与命中来源。
+- `output_logging_*/4-Kiro - LLM PromptCompletion.log`：可补“原始问题文本”证据，例如当前样本已明文记录 `请搜索并总结 Anthropic 官方文档里对 Claude 4.5/4.6 的说明，并附来源`。
+- `output_logging_*/5-Q Chat API.log`：可补“最终回答文本 + 来源链接”证据，当前样本已记录同一问题的完整回答与引用链接。
+- `output_logging_*/5-Q Chat API.log` 还可直接补“对话接口请求体”证据：当前样本同时落出了 `conversationState.currentMessage.userInputMessage.content`、`agentContinuationId`、`agentTaskType`、`history`、`chatTriggerType`，因此它不仅能证明“答了什么”，还能补“当时是怎么向上游对话接口发请求的”。
+- 结论：现在不应再写成“除 `q-client.log` 外都没有事件样本”。更准确的说法是：`q-client.log` 负责补 `InvokeMCPCommand/GenerateAssistantResponseCommand` 真包，`Kiro Logs.log` 负责补远端工具执行与抓取链路，`PromptCompletion/Q Chat API.log` 则补原始问题与最终回答落盘。
 
 ### GitHub 项目中的事件流与 Tool Use 线索（辅助验证）
 - 这些参考项目不是同一层面的实现，不能混着抄；当前应分三类吸收：
@@ -1298,6 +1367,16 @@
 - 历史兼容：Anthropic 历史消息中的 `server_tool_use` / `web_search_tool_result` 会被归一化进统一消息模型，避免上下文断链。
 - 结果过滤：Kiro 返回的搜索结果若包含 `results[].url`，网关按 `allowed_domains` / `blocked_domains` 做结果侧过滤；当前不伪造 Anthropic 更细粒度 citations。
 
+### 本轮新增实证
+- **运行时工具定义已坐实**：本机 `q-client.log` 里已经抓到 `InvokeMCPCommand -> tools/list -> web_search` 真包，说明远端 MCP 工具名就是 `web_search`，输入只有 `{ query }`，且 query 受 200 字符上限约束。
+- **安装包里的 `tools/call` 发包结构已坐实**：Kiro 安装包 `acp-remote-mcp-client-*.js` 明确发送 `jsonrpc: "2.0"`、`method: "tools/call"`、`profileArn`、`params: { name, arguments }`。
+- **运行时 `tools/call(web_search)` 真包已补齐**：`2026-03-22 15:14:59.919` 的 `q-client.log` 已抓到 `InvokeMCPCommand` 真包，`id` 为 `web_search_tooluse_HBDsi00WRBobYdARUrKeqd_1774163698353_756aa2ec`、`method` 为 `tools/call`、HTTP 200；同轮 `Kiro Logs.log` 记录了 `[Remote tool web_search] Calling tool`、`Fetched URLs`，并在数秒后完成对 `docs.anthropic.com/en/docs/about-claude/models/all-models`、`anthropic.com/news/claude-opus-4-5`、`anthropic.com/claude/opus` 的抓取。
+- **安装包里的 `web_search` 回包解析已坐实**：Kiro 安装包 `disclose-context-*.js` 明确从 `result.content[]` 中挑 `type === "text"` 的项，`JSON.parse(text)` 后要求存在 `results` 数组；若没有 `text` 或 `results`，就按异常结构处理。
+- **本地业务消费层的边界也更清楚了**：安装包 `q-developer-converse-*.js` 已直接消费 `codeReferenceEvent.references` 并调用 `recordReferences`；但同轮搜索仍未在本地业务代码里搜到 `citationEvent` 或 `supplementaryWebLinksEvent` 的直接消费分支。
+- **Execution Log 的 `search` 动作已抓到真实样本，但不能误判为 `web_search`**：当前机器的 execution save 文件里，`actionType: "search"` 的落盘输入是 `{ why, query }`，用于本地代理搜索上下文/代码；它和远端 MCP 的 `tools/call(web_search)` 不是同一层东西。
+- **Execution Log 落盘路径也已彻底打透**：`workspaceId`、`folderKey`、`key` 都是 `sha256(...).substring(0, 32)`；本机 `bcc6908e3d8382789e844289ec147d8a` 这类目录就是工作区 hash，`414d1636299d2b9e4ce7e17fb11f63e9` 对应 `KIRO::EXECUTION::SAVES`，`f62de366d0006e17ea00a01f6624aabf` 对应 `KIRO::EXECUTION::METADATA`。
+- **问题与回答落盘链也已补齐**：同一轮 `4-Kiro - LLM PromptCompletion.log` 已明文记录原始问题“请搜索并总结 Anthropic 官方文档里对 Claude 4.5/4.6 的说明，并附来源”，`5-Q Chat API.log` 已记录最终回答与 Anthropic 官方来源链接。这说明当前日志链已经能把“提问 -> web_search 执行 -> 官方页面抓取 -> 最终回答”串起来。
+
 ### 实现链路
 1. 请求归一化阶段识别 `web_search_*`，补齐统一 schema，并保留 `max_uses` 与域名过滤配置。
 2. 首轮 Kiro 请求若无 `web_search` tool call，则按普通消息链路直接返回。
@@ -1307,7 +1386,11 @@
 
 ### 当前实现边界
 - 已完成：版本化 `web_search_*` 识别、Kiro `web_search` MCP 代执行、Anthropic `server_tool_use` / `web_search_tool_result` 输出组装，以及 Kiro 原始 `citationEvent` 在 OpenAI Responses 非流式 `output_text.annotations` / 流式 `response.output_text.annotation.added`、Anthropic 非流式 `content[].citations` / 流式 `citations_delta` 的 SDK 结构输出。
+- 已与 Kiro 本体安装包源码对齐：当前网关对 `tools/call` 的请求结构模拟，以及对 `web_search` 回包 `content[].text -> JSON.parse -> results[]` 的解析路径，都与本地 Kiro 安装包一致。
+- 已与本地安装包主循环证据对齐：Kiro 聊天主循环目前明确消费的事件只有 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / meteringEvent / codeReferenceEvent / contextUsageEvent`；因此网关把 `citationEvent` / `supplementaryWebLinksEvent` 映射给外部协议是“协议增强”，不能表述成“本地 IDE 已被 1:1 证实会渲染这些字段”。
 - 仍有限制：Anthropic 当前采用的是“按 SDK 形态兼容”的 `char_location` 投影，不是已经由 Kiro 上游源码直接证明的原生 1:1 语义；其中当上游只给 `target.location` 时，会用 `citationText` 长度补 `end_char_index`。OpenAI Responses 侧则继续保持保守，只在 `target.range` 存在时公开 `start_index/end_index`。
+- `web_search` 本身已达到运行时取证：截至 `2026-03-22 15:14:59` 的样本，本机已经抓到真实 `tools/call(web_search)` 请求/响应与后续抓取链。当前剩余缺口已经收敛为 `citationEvent` 等搜索后续事件是否在现有样本中出现，而不是 `web_search` 是否真的被执行。
+- 同时也不能把 execution save 里的 `actionType: "search"` 当成这个缺口已经补齐；那只是本地搜索动作的审计记录，不是远端 `web_search` 的 MCP 调用证据。
 
 ## Anthropic 请求结构（参考 kiro.rs 类型定义）
 ### MessagesRequest 字段
