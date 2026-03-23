@@ -1,0 +1,152 @@
+{
+  "serialized": {
+    "clientId": {
+      "value": "z9Ce-if5EqxVu6V09Cw1CWFwLXNvdXRoZWFzdC0y"
+    },
+    "idempotentKey": null,
+    "tenantId": null,
+    "clientName": "Kiro IDE",
+    "backfillVersion": null,
+    "clientType": "PUBLIC",
+    "templateArn": null,
+    "templateContext": null,
+    "expirationTimestamp": 1776780153.807864,
+    "createdTimestamp": 1769004153.807864,
+    "updatedTimestamp": 1769004153.807864,
+    "createdBy": null,
+    "updatedBy": null,
+    "status": null,
+    "initiateLoginUri": "https://d-9767936181.awsapps.com/start/",
+    "entitledResourceId": null,
+    "entitledResourceContainerId": null,
+    "externalId": null,
+    "softwareId": null,
+    "scopes": [
+      {
+        "fullScope": "codewhisperer:completions",
+        "status": "INITIAL",
+        "applicationArn": null,
+        "friendlyId": "codewhisperer",
+        "useCaseAction": "completions",
+        "type": "ImmutableAccessScope",
+        "scopeType": "ACCESS_SCOPE"
+      },
+      {
+        "fullScope": "codewhisperer:analysis",
+        "status": "INITIAL",
+        "applicationArn": null,
+        "friendlyId": "codewhisperer",
+        "useCaseAction": "analysis",
+        "type": "ImmutableAccessScope",
+        "scopeType": "ACCESS_SCOPE"
+      },
+      {
+        "fullScope": "codewhisperer:conversations",
+        "status": "INITIAL",
+        "applicationArn": null,
+        "friendlyId": "codewhisperer",
+        "useCaseAction": "conversations",
+        "type": "ImmutableAccessScope",
+        "scopeType": "ACCESS_SCOPE"
+      },
+      {
+        "fullScope": "codewhisperer:transformations",
+        "status": "INITIAL",
+        "applicationArn": null,
+        "friendlyId": "codewhisperer",
+        "useCaseAction": "transformations",
+        "type": "ImmutableAccessScope",
+        "scopeType": "ACCESS_SCOPE"
+      },
+      {
+        "fullScope": "codewhisperer:taskassist",
+        "status": "INITIAL",
+        "applicationArn": null,
+        "friendlyId": "codewhisperer",
+        "useCaseAction": "taskassist",
+        "type": "ImmutableAccessScope",
+        "scopeType": "ACCESS_SCOPE"
+      }
+    ],
+    "authenticationConfiguration": null,
+    "shadowAuthenticationConfiguration": null,
+    "enabledGrants": {
+      "AUTH_CODE": {
+        "type": "ImmutableAuthorizationCodeGrantOptions",
+        "redirectUris": [
+          "http://127.0.0.1/oauth/callback"
+        ]
+      },
+      "REFRESH_TOKEN": {
+        "type": "ImmutableRefreshTokenGrantOptions"
+      }
+    },
+    "enforceAuthNConfiguration": null,
+    "ownerAccountId": null,
+    "ssoInstanceAccountId": null,
+    "userConsent": null,
+    "nonInteractiveSessionsEnabled": null,
+    "associatedInstanceArn": null,
+    "isBackfilled": false,
+    "hasInitialScopes": true,
+    "areAllScopesConsentedTo": false,
+    "isExpired": false,
+    "groupScopesByFriendlyId": {
+      "codewhisperer": [
+        {
+          "fullScope": "codewhisperer:analysis",
+          "status": "INITIAL",
+          "applicationArn": null,
+          "friendlyId": "codewhisperer",
+          "useCaseAction": "analysis",
+          "type": "ImmutableAccessScope",
+          "scopeType": "ACCESS_SCOPE"
+        },
+        {
+          "fullScope": "codewhisperer:conversations",
+          "status": "INITIAL",
+          "applicationArn": null,
+          "friendlyId": "codewhisperer",
+          "useCaseAction": "conversations",
+          "type": "ImmutableAccessScope",
+          "scopeType": "ACCESS_SCOPE"
+        },
+        {
+          "fullScope": "codewhisperer:taskassist",
+          "status": "INITIAL",
+          "applicationArn": null,
+          "friendlyId": "codewhisperer",
+          "useCaseAction": "taskassist",
+          "type": "ImmutableAccessScope",
+          "scopeType": "ACCESS_SCOPE"
+        },
+        {
+          "fullScope": "codewhisperer:completions",
+          "status": "INITIAL",
+          "applicationArn": null,
+          "friendlyId": "codewhisperer",
+          "useCaseAction": "completions",
+          "type": "ImmutableAccessScope",
+          "scopeType": "ACCESS_SCOPE"
+        },
+        {
+          "fullScope": "codewhisperer:transformations",
+          "status": "INITIAL",
+          "applicationArn": null,
+          "friendlyId": "codewhisperer",
+          "useCaseAction": "transformations",
+          "type": "ImmutableAccessScope",
+          "scopeType": "ACCESS_SCOPE"
+        }
+      ]
+    },
+    "shouldGetValueFromTemplate": false,
+    "hasRequestedScopes": false,
+    "containsOnlySsoScopes": false,
+    "ssoScopes": [],
+    "isV1Backfilled": false,
+    "isV2Backfilled": false,
+    "isV3Backfilled": false,
+    "isV4Backfilled": false
+  }
+}

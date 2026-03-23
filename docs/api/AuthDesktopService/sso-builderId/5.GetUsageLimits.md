@@ -1,0 +1,70 @@
+# GetUsageLimits - 获取配额 (IdC)
+
+## 说明
+
+IdC 账号使用 CodeWhisperer API 获取配额，与 Social 相同。
+
+## 请求
+
+```
+GET https://codewhisperer.us-east-1.amazonaws.com/getUsageLimits
+Authorization: Bearer {accessToken}
+```
+
+## 参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| isEmailRequired | boolean | 是 | 固定 `true` |
+| origin | string | 是 | 固定 `AI_EDITOR` |
+| profileArn | string | 是 | Profile ARN (URL 编码) |
+
+## 响应
+
+与 Social 相同，但有以下区别：
+
+| 字段 | Social | IdC |
+|------|--------|-----|
+| usageLimitWithPrecision | ❌ 无 | ✅ 有 |
+| currentUsageWithPrecision | ❌ 无 | ✅ 有 |
+| bonuses[].description | ✅ 有 | ❌ 无 |
+| bonuses[].redeemedAt | ✅ 有 | ❌ 无 |
+
+## 响应示例
+
+```json
+{
+  "daysUntilReset": 0,
+  "nextDateReset": 1767225600.0,
+  "subscriptionInfo": {
+    "subscriptionTitle": "KIRO PRO+",
+    "type": "Q_DEVELOPER_STANDALONE_PRO_PLUS"
+  },
+  "usageBreakdownList": [
+    {
+      "usageLimit": 2000,
+      "usageLimitWithPrecision": 2000.0,
+      "currentUsage": 666,
+      "currentUsageWithPrecision": 666.26,
+      "bonuses": [
+        {
+          "bonusCode": "day-3-reinvent-gav-lemo-mit",
+          "displayName": "Day 3 Re:Invent",
+          "usageLimit": 1000.0,
+          "currentUsage": 305.1,
+          "expiresAt": 1767410695.352,
+          "status": "ACTIVE"
+        }
+      ]
+    }
+  ],
+  "userInfo": {
+    "email": "user@example.com",
+    "userId": "d-xxx.xxx-xxx-xxx"
+  }
+}
+```
+
+## 注意
+
+IdC 账号不支持兑换奖励码 (没有 csrfToken)。
