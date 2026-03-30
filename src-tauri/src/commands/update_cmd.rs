@@ -66,6 +66,13 @@ pub struct UpdateCheckResult {
     pub download_url: Option<String>,
 }
 
+fn extract_http_proxy_from_json(json: &serde_json::Value) -> Option<String> {
+    json.get("http.proxy")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(std::string::ToString::to_string)
+}
+
 /// 获取 Kiro IDE 设置中的代理
 fn get_proxy_from_kiro_settings() -> Option<String> {
     #[cfg(target_os = "windows")]
@@ -105,12 +112,7 @@ fn get_proxy_from_kiro_settings() -> Option<String> {
     .and_then(|content| {
         serde_json::from_str::<serde_json::Value>(&content).ok()
     })
-    .and_then(|json| {
-        json.get("http.proxy")
-            .and_then(serde_json::Value::as_str)
-            .filter(|s| !s.is_empty())
-            .map(std::string::ToString::to_string)
-    })
+    .and_then(|json| extract_http_proxy_from_json(&json))
 }
 
 /// 构建 HTTP 客户端（支持代理）
@@ -129,6 +131,13 @@ fn build_http_client() -> Result<reqwest::Client, String> {
 }
 
 /// 获取当前平台的下载 URL
+fn get_download_url_for_platform(platforms: &serde_json::Value, platform_key: &str) -> Option<String> {
+    platforms.get(platform_key)
+        .and_then(|platform| platform.get("url"))
+        .and_then(serde_json::Value::as_str)
+        .map(std::string::ToString::to_string)
+}
+
 fn get_platform_download_url(platforms: &serde_json::Value) -> Option<String> {
     #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     let platform_key = "windows-x86_64-nsis";
@@ -150,10 +159,7 @@ fn get_platform_download_url(platforms: &serde_json::Value) -> Option<String> {
     )))]
     let platform_key = "";
     
-    platforms.get(platform_key)
-        .and_then(|p| p.get("url"))
-        .and_then(serde_json::Value::as_str)
-        .map(std::string::ToString::to_string)
+    get_download_url_for_platform(platforms, platform_key)
 }
 
 #[tauri::command]
@@ -195,16 +201,17 @@ pub async fn check_update() -> Result<UpdateCheckResult, String> {
 }
 
 /// 比较版本号，返回 true 表示有新版本
+fn parse_version_parts(version: &str) -> Vec<u32> {
+    version
+        .trim_start_matches('v')
+        .split('.')
+        .filter_map(|segment| segment.parse().ok())
+        .collect()
+}
+
 fn compare_versions(current: &str, latest: &str) -> bool {
-    let parse_version = |v: &str| -> Vec<u32> {
-        v.trim_start_matches('v')
-            .split('.')
-            .filter_map(|s| s.parse().ok())
-            .collect()
-    };
-    
-    let current_parts = parse_version(current);
-    let latest_parts = parse_version(latest);
+    let current_parts = parse_version_parts(current);
+    let latest_parts = parse_version_parts(latest);
     
     for i in 0..std::cmp::max(current_parts.len(), latest_parts.len()) {
         let c = current_parts.get(i).copied().unwrap_or(0);
@@ -216,4 +223,66 @@ fn compare_versions(current: &str, latest: &str) -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        compare_versions, extract_http_proxy_from_json, get_download_url_for_platform,
+        parse_version_parts,
+    };
+
+    #[test]
+    fn parse_version_parts_ignores_prefix_and_invalid_segments() {
+        assert_eq!(parse_version_parts("v1.2.3"), vec![1, 2, 3]);
+        assert_eq!(parse_version_parts("1.2.beta.4"), vec![1, 2, 4]);
+    }
+
+    #[test]
+    fn compare_versions_treats_missing_segments_as_zero() {
+        assert!(compare_versions("1.2.3", "1.2.4"));
+        assert!(!compare_versions("1.2.3", "v1.2.3"));
+        assert!(!compare_versions("1.2.3", "1.2.3.0"));
+        assert!(compare_versions("1.2", "1.2.0.1"));
+    }
+
+    #[test]
+    fn extract_http_proxy_from_json_reads_non_empty_proxy_only() {
+        let json = serde_json::json!({
+            "http.proxy": "http://127.0.0.1:7890"
+        });
+        let empty = serde_json::json!({
+            "http.proxy": ""
+        });
+
+        assert_eq!(
+            extract_http_proxy_from_json(&json),
+            Some("http://127.0.0.1:7890".to_string())
+        );
+        assert_eq!(extract_http_proxy_from_json(&empty), None);
+        assert_eq!(extract_http_proxy_from_json(&serde_json::json!({})), None);
+    }
+
+    #[test]
+    fn get_download_url_for_platform_reads_nested_url_only() {
+        let platforms = serde_json::json!({
+            "windows-x86_64-nsis": {
+                "url": "https://example.com/app.exe"
+            },
+            "linux-x86_64": {}
+        });
+
+        assert_eq!(
+            get_download_url_for_platform(&platforms, "windows-x86_64-nsis"),
+            Some("https://example.com/app.exe".to_string())
+        );
+        assert_eq!(
+            get_download_url_for_platform(&platforms, "linux-x86_64"),
+            None
+        );
+        assert_eq!(
+            get_download_url_for_platform(&platforms, "missing"),
+            None
+        );
+    }
 }

@@ -1,61 +1,29 @@
-import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { Copy, Play, Square, Activity, Shield, Server, RefreshCw, Radio, Check, RotateCcw, FolderOpen, Search, AlertTriangle } from 'lucide-react'
 import { Alert, Button, Card, Group, Stack, Text, TextInput, Textarea, NumberInput, Select, Badge, Code, Tooltip, Switch, Tabs } from '@mantine/core'
 import { useApp } from '../../hooks/useApp'
-import { applyGatewayLocalOnlyChange, buildClientSamples, buildGatewayActionSummary, buildGatewayIntegrationSummary, buildGatewayMetricsSummary, buildGatewayRequestLogSummary, buildGatewayRoutingSummary, buildGatewaySecuritySummary, buildGatewayStatusSummary, createGatewayFieldErrors, filterGatewayRequestLogs, formatGatewayAccountOptionLabel, formatGatewayRequestDuration, formatGatewayTimestamp, getGatewayRequestOutcomeColor, mergeErrorHistory, parseAllowedIps } from './gatewayPageUtils'
-
-const DEFAULT_CONFIG = {
-  enabled: false,
-  host: '127.0.0.1',
-  port: 8765,
-  apiKey: '',
-  region: 'us-east-1',
-  accountMode: 'single',
-  accountId: null,
-  groupId: null,
-  strategy: 'round_robin',
-  threshold: 90,
-  localOnly: true,
-  allowedIpsText: '',
-  logLevel: 'debug',
-}
-
-const buildConfigSnapshot = (config) => JSON.stringify({
-  enabled: !!config.enabled,
-  host: config.host || '',
-  port: Number(config.port) || 0,
-  apiKey: config.apiKey || '',
-  region: config.region || 'us-east-1',
-  accountMode: config.accountMode || 'single',
-  accountId: config.accountId || null,
-  groupId: config.groupId || null,
-  strategy: config.strategy || 'round_robin',
-  threshold: Number(config.threshold) || 90,
-  localOnly: !!config.localOnly,
-  allowedIpsText: config.allowedIpsText || '',
-  logLevel: config.logLevel || 'debug',
-})
-
-const buildRuntimeConfigSnapshot = (config) => JSON.stringify({
-  host: config.host || '',
-  port: Number(config.port) || 0,
-  apiKey: config.apiKey || '',
-  region: config.region || 'us-east-1',
-  accountMode: config.accountMode || 'single',
-  accountId: config.accountId || null,
-  groupId: config.groupId || null,
-  strategy: config.strategy || 'round_robin',
-  threshold: Number(config.threshold) || 90,
-  localOnly: !!config.localOnly,
-  allowedIpsText: config.allowedIpsText || '',
-  logLevel: config.logLevel || 'debug',
-})
+import { applyGatewayLocalOnlyChange, buildClientSamples, buildGatewayActionSummary, buildGatewayIntegrationSummary, buildGatewayMetricsSummary, buildGatewayRequestLogSummary, buildGatewayRoutingSummary, buildGatewaySecuritySummary, buildGatewayStatusSummary, createGatewayFieldErrors, filterGatewayRequestLogs, formatGatewayAccountOptionLabel, formatGatewayRequestDuration, formatGatewayTimestamp, getGatewayRequestOutcomeColor, mergeErrorHistory } from './gatewayPageUtils'
+import {
+  buildGatewayConfigSnapshot,
+  buildGatewayRuntimeSnapshot,
+  buildGatewayStatusState,
+  clearGatewayRequestLogs,
+  DEFAULT_GATEWAY_CONFIG,
+  DEFAULT_GATEWAY_STATUS,
+  fetchGatewayRequestLogs,
+  hydrateGatewayConfig,
+  loadGatewayPageData,
+  openGatewayLogDir,
+  saveGatewayConfig,
+  startGateway,
+  stopGateway,
+} from './gatewayPageState'
+import { useGatewayPolling } from './useGatewayPolling'
 
 function GatewayPage() {
   const { colors } = useApp()
-  const [config, setConfig] = useState(DEFAULT_CONFIG)
-  const [status, setStatus] = useState({ running: false, host: '127.0.0.1', port: 8765, requestCount: 0, lastError: null })
+  const [config, setConfig] = useState(DEFAULT_GATEWAY_CONFIG)
+  const [status, setStatus] = useState(DEFAULT_GATEWAY_STATUS)
   const [errorHistory, setErrorHistory] = useState([])
   const [accounts, setAccounts] = useState([])
   const [groups, setGroups] = useState([])
@@ -69,7 +37,7 @@ function GatewayPage() {
   const [requestLogOutcome, setRequestLogOutcome] = useState('all')
   const [requestLogQuery, setRequestLogQuery] = useState('')
   const [lastRequestLogsSyncAt, setLastRequestLogsSyncAt] = useState('-')
-  const [savedConfigSnapshot, setSavedConfigSnapshot] = useState(() => buildConfigSnapshot(DEFAULT_CONFIG))
+  const [savedConfigSnapshot, setSavedConfigSnapshot] = useState(() => buildGatewayConfigSnapshot(DEFAULT_GATEWAY_CONFIG))
   const [appliedRuntimeSnapshot, setAppliedRuntimeSnapshot] = useState(null)
   const [lastStatusSyncAt, setLastStatusSyncAt] = useState('-')
 
@@ -89,8 +57,8 @@ function GatewayPage() {
   const baseUrl = useMemo(() => `http://${config.host}:${config.port}`, [config.host, config.port])
   const fieldErrors = useMemo(() => createGatewayFieldErrors(config), [config])
   const hasFieldErrors = Object.keys(fieldErrors).length > 0
-  const configSnapshot = useMemo(() => buildConfigSnapshot(config), [config])
-  const runtimeSnapshot = useMemo(() => buildRuntimeConfigSnapshot(config), [config])
+  const configSnapshot = useMemo(() => buildGatewayConfigSnapshot(config), [config])
+  const runtimeSnapshot = useMemo(() => buildGatewayRuntimeSnapshot(config), [config])
   const hasUnsavedChanges = configSnapshot !== savedConfigSnapshot
   const hasRuntimeChanges = !!status.running && !!appliedRuntimeSnapshot && runtimeSnapshot !== appliedRuntimeSnapshot
   const clientSamples = useMemo(() => buildClientSamples(baseUrl, config.apiKey), [baseUrl, config.apiKey])
@@ -149,6 +117,13 @@ function GatewayPage() {
   )
   const runtimeBadgeColor = status.running ? 'green' : 'gray'
   const endpointBadgeColor = config.localOnly ? 'teal' : 'yellow'
+  const pollingFallbackConfig = useMemo(
+    () => ({
+      host: config.host,
+      port: config.port,
+    }),
+    [config.host, config.port]
+  )
   const renderMetricList = (items, emptyLabel) => {
     if (!items.length) {
       return <Text size="sm" className={colors.textMuted}>{emptyLabel}</Text>
@@ -172,65 +147,33 @@ function GatewayPage() {
     setErrorHistory(prev => mergeErrorHistory(prev, normalized, formatGatewayTimestamp(), 8))
   }
 
-  const loadRequestLogs = async (limit = 120) => {
+  const loadRequestLogs = useCallback(async (limit = 120) => {
     setRequestLogsLoading(true)
     try {
-      const logs = await invoke('get_gateway_request_logs', { limit })
-      setRequestLogs(Array.isArray(logs) ? logs : [])
+      const logs = await fetchGatewayRequestLogs(limit)
+      setRequestLogs(logs)
       setLastRequestLogsSyncAt(formatGatewayTimestamp())
     } catch (e) {
       pushError(e)
     } finally {
       setRequestLogsLoading(false)
     }
-  }
+  }, [])
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [gatewayConfig, gatewayStatus, accountList, groupList, gatewayLogDir] = await Promise.all([
-        invoke('get_gateway_config'),
-        invoke('get_gateway_status'),
-        invoke('get_accounts'),
-        invoke('get_groups'),
-        invoke('get_gateway_log_dir'),
-      ])
+      const { gatewayConfig, gatewayStatus, accounts: accountList, groups: groupList, logDir: gatewayLogDir } = await loadGatewayPageData()
 
-      const nextConfig = {
-        enabled: gatewayConfig?.enabled ?? false,
-        host: gatewayConfig?.host || '127.0.0.1',
-        port: gatewayConfig?.port || 8765,
-        apiKey: gatewayConfig?.access_token || gatewayConfig?.accessToken || '',
-        region: gatewayConfig?.region || 'us-east-1',
-        accountMode: gatewayConfig?.account_mode === 'local'
-          ? 'single'
-          : (gatewayConfig?.account_mode || gatewayConfig?.accountMode || 'single'),
-        accountId: gatewayConfig?.account_id || gatewayConfig?.accountId || null,
-        groupId: gatewayConfig?.group_id || gatewayConfig?.groupId || null,
-        strategy: gatewayConfig?.strategy || 'round_robin',
-        threshold: gatewayConfig?.threshold ?? 90,
-        localOnly: gatewayConfig?.local_only ?? gatewayConfig?.localOnly ?? true,
-        allowedIpsText: Array.isArray(gatewayConfig?.allowed_ips || gatewayConfig?.allowedIps)
-          ? (gatewayConfig.allowed_ips || gatewayConfig.allowedIps).join('\n')
-          : '',
-        logLevel: gatewayConfig?.log_level || gatewayConfig?.logLevel || 'debug',
-      }
+      const nextConfig = hydrateGatewayConfig(gatewayConfig)
       setConfig(nextConfig)
-      setSavedConfigSnapshot(buildConfigSnapshot(nextConfig))
-      setAppliedRuntimeSnapshot(gatewayStatus?.running ? buildRuntimeConfigSnapshot(nextConfig) : null)
-
-      setStatus({
-        running: gatewayStatus?.running ?? false,
-        host: gatewayStatus?.host || gatewayConfig?.host || '127.0.0.1',
-        port: gatewayStatus?.port || gatewayConfig?.port || 8765,
-        requestCount: gatewayStatus?.requestCount || 0,
-        lastError: gatewayStatus?.lastError || null,
-      })
+      setSavedConfigSnapshot(buildGatewayConfigSnapshot(nextConfig))
+      setAppliedRuntimeSnapshot(gatewayStatus?.running ? buildGatewayRuntimeSnapshot(nextConfig) : null)
+      setStatus(buildGatewayStatusState(gatewayStatus, gatewayConfig, nextConfig))
       setLastStatusSyncAt(formatGatewayTimestamp())
-
-      setAccounts(Array.isArray(accountList) ? accountList : [])
-      setGroups(Array.isArray(groupList) ? groupList : [])
-      setLogDir(String(gatewayLogDir || ''))
+      setAccounts(accountList)
+      setGroups(groupList)
+      setLogDir(gatewayLogDir)
 
       if (gatewayStatus?.lastError) {
         pushError(gatewayStatus.lastError)
@@ -240,48 +183,33 @@ function GatewayPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    loadAll()
-    const timer = setInterval(() => {
-      invoke('get_gateway_status')
-        .then((st) => {
-          setStatus({
-            running: st?.running ?? false,
-            host: st?.host || config.host,
-            port: st?.port || config.port,
-            requestCount: st?.requestCount || 0,
-            lastError: st?.lastError || null,
-          })
-          setLastStatusSyncAt(formatGatewayTimestamp())
-          if (st?.lastError) {
-            pushError(st.lastError)
-          }
-        })
-        .catch(() => {})
-    }, 2000)
-
-    return () => clearInterval(timer)
   }, [])
 
   useEffect(() => {
-    if (activeTab !== 'requestLogs') {
-      return undefined
+    startTransition(() => {
+      loadAll()
+    })
+  }, [loadAll])
+
+  const handleStatusPoll = useCallback(({ status: nextStatus, fallbackConfig, syncedAt }) => {
+    setStatus(buildGatewayStatusState(nextStatus, nextStatus, fallbackConfig))
+    setLastStatusSyncAt(syncedAt)
+    if (nextStatus?.lastError) {
+      pushError(nextStatus.lastError)
     }
+  }, [])
 
-    loadRequestLogs()
-    const timer = setInterval(() => {
-      invoke('get_gateway_request_logs', { limit: 120 })
-        .then((logs) => {
-          setRequestLogs(Array.isArray(logs) ? logs : [])
-          setLastRequestLogsSyncAt(formatGatewayTimestamp())
-        })
-        .catch(() => {})
-    }, 5000)
+  const handleRequestLogsPoll = useCallback(({ logs, syncedAt }) => {
+    setRequestLogs(logs)
+    setLastRequestLogsSyncAt(syncedAt)
+  }, [])
 
-    return () => clearInterval(timer)
-  }, [activeTab])
+  useGatewayPolling({
+    activeTab,
+    fallbackConfig: pollingFallbackConfig,
+    onStatus: handleStatusPoll,
+    onRequestLogs: handleRequestLogsPoll,
+  })
 
   const setField = (key, value) => setConfig(prev => ({ ...prev, [key]: value }))
 
@@ -304,7 +232,7 @@ function GatewayPage() {
 
   const handleOpenLogDir = async () => {
     try {
-      const dir = await invoke('open_gateway_log_dir')
+      const dir = await openGatewayLogDir()
       setLogDir(String(dir || ''))
     } catch (e) {
       pushError(e)
@@ -314,7 +242,7 @@ function GatewayPage() {
   const handleClearRequestLogs = async () => {
     setRequestLogsLoading(true)
     try {
-      await invoke('clear_gateway_request_logs')
+      await clearGatewayRequestLogs()
       setRequestLogs([])
       setLastRequestLogsSyncAt(formatGatewayTimestamp())
     } catch (e) {
@@ -336,24 +264,8 @@ function GatewayPage() {
     if (guardInvalidConfig()) return
     setSaving(true)
     try {
-      await invoke('save_gateway_config', {
-        config: {
-          enabled: config.enabled,
-          host: config.host,
-          port: Number(config.port),
-          accessToken: config.apiKey || null,
-          region: config.region,
-          accountMode: config.accountMode,
-          accountId: config.accountId || null,
-          groupId: config.groupId || null,
-          strategy: config.strategy,
-          threshold: Number(config.threshold) || 90,
-          localOnly: !!config.localOnly,
-          allowedIps: parseAllowedIps(config.allowedIpsText),
-          logLevel: config.logLevel,
-        },
-      })
-      setSavedConfigSnapshot(buildConfigSnapshot(config))
+      await saveGatewayConfig(config)
+      setSavedConfigSnapshot(buildGatewayConfigSnapshot(config))
     } catch (e) {
       pushError(e)
     } finally {
@@ -365,25 +277,9 @@ function GatewayPage() {
     if (guardInvalidConfig()) return
     setSaving(true)
     try {
-      const st = await invoke('start_gateway', {
-        config: {
-          enabled: !!config.enabled,
-          host: config.host,
-          port: Number(config.port),
-          accessToken: config.apiKey || null,
-          region: config.region,
-          accountMode: config.accountMode,
-          accountId: config.accountId || null,
-          groupId: config.groupId || null,
-          strategy: config.strategy,
-          threshold: Number(config.threshold) || 90,
-          localOnly: !!config.localOnly,
-          allowedIps: parseAllowedIps(config.allowedIpsText),
-          logLevel: config.logLevel,
-        },
-      })
+      const st = await startGateway(config)
       setStatus(st)
-      setAppliedRuntimeSnapshot(buildRuntimeConfigSnapshot(config))
+      setAppliedRuntimeSnapshot(buildGatewayRuntimeSnapshot(config))
       setLastStatusSyncAt(formatGatewayTimestamp())
     } catch (e) {
       pushError(e)
@@ -397,27 +293,11 @@ function GatewayPage() {
     setSaving(true)
     try {
       if (status.running) {
-        await invoke('stop_gateway')
+        await stopGateway()
       }
-      const st = await invoke('start_gateway', {
-        config: {
-          enabled: !!config.enabled,
-          host: config.host,
-          port: Number(config.port),
-          accessToken: config.apiKey || null,
-          region: config.region,
-          accountMode: config.accountMode,
-          accountId: config.accountId || null,
-          groupId: config.groupId || null,
-          strategy: config.strategy,
-          threshold: Number(config.threshold) || 90,
-          localOnly: !!config.localOnly,
-          allowedIps: parseAllowedIps(config.allowedIpsText),
-          logLevel: config.logLevel,
-        },
-      })
+      const st = await startGateway(config)
       setStatus(st)
-      setAppliedRuntimeSnapshot(buildRuntimeConfigSnapshot(config))
+      setAppliedRuntimeSnapshot(buildGatewayRuntimeSnapshot(config))
       setLastStatusSyncAt(formatGatewayTimestamp())
     } catch (e) {
       pushError(e)
@@ -429,7 +309,7 @@ function GatewayPage() {
   const handleStop = async () => {
     setSaving(true)
     try {
-      await invoke('stop_gateway')
+      await stopGateway()
       setStatus(prev => ({ ...prev, running: false }))
       setAppliedRuntimeSnapshot(null)
       setLastStatusSyncAt(formatGatewayTimestamp())

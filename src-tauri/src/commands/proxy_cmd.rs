@@ -20,6 +20,27 @@ pub struct SystemProxyInfo {
 // ============================================================
 
 #[cfg(target_os = "windows")]
+fn extract_windows_http_proxy(enabled: bool, proxy_server: &str) -> Option<String> {
+    if !enabled || proxy_server.is_empty() {
+        return None;
+    }
+
+    let proxy = if proxy_server.contains('=') {
+        proxy_server
+            .split(';')
+            .find(|segment| segment.starts_with("http="))
+            .map_or_else(
+                || proxy_server.to_string(),
+                |segment| segment.trim_start_matches("http=").to_string(),
+            )
+    } else {
+        proxy_server.to_string()
+    };
+
+    Some(proxy)
+}
+
+#[cfg(target_os = "windows")]
 fn detect_tun_mode() -> (bool, Option<String>) {
     use std::process::Command;
     
@@ -84,26 +105,7 @@ fn detect_system_proxy_inner() -> Result<SystemProxyInfo, String> {
     let proxy_server: String = internet_settings.get_value("ProxyServer").unwrap_or_default();
     
     let enabled = proxy_enable == 1;
-    let http_proxy = if enabled && !proxy_server.is_empty() {
-        // 处理不同格式的代理设置
-        // 格式1: 127.0.0.1:7890
-        // 格式2: http=127.0.0.1:7890;https=127.0.0.1:7890
-        let proxy = if proxy_server.contains('=') {
-            // 多协议格式，提取 http 代理
-            proxy_server
-                .split(';')
-                .find(|s| s.starts_with("http="))
-                .map_or_else(|| proxy_server.clone(), |s| s.trim_start_matches("http=").to_string())
-        } else {
-            proxy_server.clone()
-        };
-        
-        // 保留原始格式，不自动添加协议前缀
-        // 用户可以在设置页面手动输入完整地址（http://、https://、socks5://）
-        Some(proxy)
-    } else {
-        None
-    };
+    let http_proxy = extract_windows_http_proxy(enabled, &proxy_server);
     
     let (tun_mode, tun_interface) = detect_tun_mode();
     
@@ -334,4 +336,37 @@ pub async fn detect_system_proxy() -> Result<SystemProxyInfo, String> {
     tokio::task::spawn_blocking(detect_system_proxy_inner)
         .await
         .map_err(|e| format!("Task failed: {e}"))?
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod tests {
+    use super::extract_windows_http_proxy;
+
+    #[test]
+    fn extract_windows_http_proxy_supports_simple_and_multi_protocol_values() {
+        assert_eq!(
+            extract_windows_http_proxy(true, "127.0.0.1:7890"),
+            Some("127.0.0.1:7890".to_string())
+        );
+        assert_eq!(
+            extract_windows_http_proxy(
+                true,
+                "http=127.0.0.1:7890;https=127.0.0.1:7891"
+            ),
+            Some("127.0.0.1:7890".to_string())
+        );
+        assert_eq!(
+            extract_windows_http_proxy(
+                true,
+                "https=127.0.0.1:7891;socks=127.0.0.1:1080"
+            ),
+            Some("https=127.0.0.1:7891;socks=127.0.0.1:1080".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_windows_http_proxy_returns_none_when_disabled_or_empty() {
+        assert_eq!(extract_windows_http_proxy(false, "127.0.0.1:7890"), None);
+        assert_eq!(extract_windows_http_proxy(true, ""), None);
+    }
 }

@@ -2,6 +2,7 @@
 
 pub mod common;
 
+pub(crate) mod account_models;
 pub mod account_cmd;
 pub mod app_settings_cmd;
 pub mod auth_cmd;

@@ -2,20 +2,19 @@
 
 #![allow(clippy::needless_pass_by_value)] // Tauri 命令需要按值传递参数
 
+use crate::commands::common::run_blocking_task;
 use crate::mcp::{McpConfig, McpServer};
 
 /// 获取 MCP 配置（支持项目级合并）
 #[tauri::command]
 pub async fn get_mcp_config(project_dir: Option<String>) -> Result<McpConfig, String> {
-    tokio::task::spawn_blocking(move || McpConfig::load_merged(project_dir.as_deref()))
-        .await
-        .map_err(|e| e.to_string())?
+    run_blocking_task(move || McpConfig::load_merged(project_dir.as_deref())).await
 }
 
 /// 保存/更新服务器配置
 #[tauri::command]
 pub async fn save_mcp_server(name: String, config: McpServer, project_dir: Option<String>) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || {
+    run_blocking_task(move || {
         // 验证配置
         validate_mcp_server(&config)?;
 
@@ -31,7 +30,6 @@ pub async fn save_mcp_server(name: String, config: McpServer, project_dir: Optio
         }
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 /// 验证 MCP 服务器配置
@@ -71,7 +69,7 @@ fn validate_mcp_server(config: &McpServer) -> Result<(), String> {
 /// 删除服务器
 #[tauri::command]
 pub async fn delete_mcp_server(name: String, project_dir: Option<String>) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || {
+    run_blocking_task(move || {
         if let Some(pd) = project_dir {
             let path = McpConfig::project_config_path(&pd);
             let mut mcp_config = McpConfig::load_from_path(&path)?;
@@ -84,13 +82,12 @@ pub async fn delete_mcp_server(name: String, project_dir: Option<String>) -> Res
         }
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 /// 启用/禁用服务器
 #[tauri::command]
 pub async fn toggle_mcp_server(name: String, disabled: bool, project_dir: Option<String>) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || {
+    run_blocking_task(move || {
         if let Some(pd) = project_dir {
             let path = McpConfig::project_config_path(&pd);
             let mut mcp_config = McpConfig::load_from_path(&path)?;
@@ -117,13 +114,12 @@ pub async fn toggle_mcp_server(name: String, disabled: bool, project_dir: Option
         }
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 /// 获取 MCP 工具统计信息（支持项目级合并）
 #[tauri::command]
 pub async fn get_mcp_tool_stats(project_dir: Option<String>) -> Result<serde_json::Value, String> {
-    tokio::task::spawn_blocking(move || {
+    run_blocking_task(move || {
         let mcp_config = McpConfig::load_merged(project_dir.as_deref())?;
         
         let total_servers = mcp_config.mcp_servers.len();
@@ -147,5 +143,4 @@ pub async fn get_mcp_tool_stats(project_dir: Option<String>) -> Result<serde_jso
         }))
     })
     .await
-    .map_err(|e| e.to_string())?
 }

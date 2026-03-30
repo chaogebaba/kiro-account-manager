@@ -9,23 +9,73 @@ use crate::auth::User;
 use crate::auth_social;
 use crate::providers::{AuthMethod, AuthProvider, cancel_pending_idc_login, get_provider_config, create_social_provider, create_idc_provider};
 use crate::commands::common::{get_usage_by_provider, extract_user_info, find_existing_account_idx, calc_status};
+use std::sync::{Mutex, MutexGuard};
+
+fn lock_state<'a, T>(mutex: &'a Mutex<T>, label: &str) -> Result<MutexGuard<'a, T>, String> {
+    mutex
+        .lock()
+        .map_err(|_| format!("Failed to acquire {label} lock"))
+}
+
+fn save_store(store: &crate::account::AccountStore) -> Result<(), String> {
+    if store.save_to_file() {
+        Ok(())
+    } else {
+        Err("保存账号数据失败".to_string())
+    }
+}
+
+fn require_login_email(email: Option<String>) -> Result<String, String> {
+    email.ok_or("获取邮箱失败，请检查账号状态".to_string())
+}
+
+fn resolve_idc_login_email(
+    provider_id: &str,
+    email: Option<String>,
+    user_id: Option<String>,
+) -> Result<String, String> {
+    if provider_id == "Enterprise" {
+        email
+            .or(user_id)
+            .ok_or("Enterprise 账号缺少 email 和 userId".to_string())
+    } else {
+        require_login_email(email)
+    }
+}
 
 #[tauri::command]
 pub fn get_current_user(state: State<AppState>) -> Option<User> {
-    state.auth.user.lock().expect("Failed to acquire lock").clone()
+    match lock_state(&state.auth.user, "auth user") {
+        Ok(user) => user.clone(),
+        Err(err) => {
+            eprintln!("[auth_cmd] {err}");
+            None
+        }
+    }
 }
 
 #[tauri::command]
 pub fn logout(state: State<AppState>) {
-    *state.auth.user.lock().expect("Failed to acquire lock") = None;
-    *state.auth.access_token.lock().expect("Failed to acquire lock") = None;
+    if let Ok(mut user) = lock_state(&state.auth.user, "auth user") {
+        *user = None;
+    }
+    if let Ok(mut access_token) = lock_state(&state.auth.access_token, "auth access_token") {
+        *access_token = None;
+    }
 }
 
 #[tauri::command]
 pub fn cancel_kiro_login(state: State<'_, AppState>) -> bool {
     let cancelled_social = crate::deep_link_handler::cancel_waiter();
     let cancelled_idc = cancel_pending_idc_login();
-    *state.pending_login.lock().expect("Failed to acquire lock") = None;
+    match lock_state(&state.pending_login, "pending_login") {
+        Ok(mut pending_login) => {
+            *pending_login = None;
+        }
+        Err(err) => {
+            eprintln!("[auth_cmd] {err}");
+        }
+    }
     cancelled_social || cancelled_idc
 }
 
@@ -77,9 +127,9 @@ async fn login_social(
     let (new_email, user_id) = extract_user_info(&usage_result.usage_data);
     
     // 获取不到邮箱直接报错
-    let _final_email = new_email.clone().ok_or("获取邮箱失败，请检查账号状态")?;
+    let _final_email = require_login_email(new_email.clone())?;
 
-    let mut store = state.store.lock().expect("Failed to acquire lock");
+    let mut store = lock_state(&state.store, "store")?;
     let existing_idx = find_existing_account_idx(&store.accounts, new_email.as_ref(), &provider_id, &auth_result.refresh_token, user_id.as_ref());
     
     let account = if let Some(idx) = existing_idx {
@@ -95,7 +145,7 @@ async fn login_social(
         existing.status = calc_status(usage_result.is_banned, usage_result.is_auth_error);
         existing.clone()
     } else {
-        let final_email = new_email.ok_or("获取邮箱失败")?;
+        let final_email = require_login_email(new_email)?;
         let mut account = Account::new(final_email.clone(), format!("Kiro {provider_id} 账号"));
         account.access_token = Some(auth_result.access_token.clone());
         account.refresh_token = Some(auth_result.refresh_token.clone());
@@ -110,11 +160,11 @@ async fn login_social(
         account
     };
     
-    store.save_to_file();
+    save_store(&store)?;
     drop(store);
 
     let display_id = account.get_display_id();
-    update_auth_state(&state, account.email.as_ref(), &provider_id, &auth_result.access_token, &auth_result.refresh_token);
+    update_auth_state(&state, account.email.as_ref(), &provider_id, &auth_result.access_token, &auth_result.refresh_token)?;
     println!("\n[{auth_method}] LOGIN SUCCESS: {display_id}");
 
     let _ = app_handle.emit("login-success", account.id.clone());
@@ -142,13 +192,10 @@ async fn login_idc(
     let (new_email, user_id) = extract_user_info(&usage_result.usage_data);
     
     // Enterprise 账号允许没有 email,使用 userId 作为标识
-    let final_email = if provider_id == "Enterprise" {
-        new_email.clone().or_else(|| user_id.clone()).ok_or("Enterprise 账号缺少 email 和 userId")?
-    } else {
-        new_email.clone().ok_or("获取邮箱失败，请检查账号状态")?
-    };
+    let final_email =
+        resolve_idc_login_email(&provider_id, new_email.clone(), user_id.clone())?;
 
-    let mut store = state.store.lock().expect("Failed to acquire lock");
+    let mut store = lock_state(&state.store, "store")?;
     let existing_idx = find_existing_account_idx(&store.accounts, new_email.as_ref(), &provider_id, &auth_result.refresh_token, user_id.as_ref());
     
     let account = if let Some(idx) = existing_idx {
@@ -192,18 +239,24 @@ async fn login_idc(
         account
     };
     
-    store.save_to_file();
+    save_store(&store)?;
     drop(store);
 
     let display_id = account.get_display_id();
-    update_auth_state(&state, account.email.as_ref(), &provider_id, &auth_result.access_token, &auth_result.refresh_token);
+    update_auth_state(&state, account.email.as_ref(), &provider_id, &auth_result.access_token, &auth_result.refresh_token)?;
     println!("\n[{auth_method}] LOGIN SUCCESS: {display_id}");
 
     let _ = app_handle.emit("login-success", account.id.clone());
     Ok(format!("{auth_method} login completed for {display_id}"))
 }
 
-fn update_auth_state(state: &State<'_, AppState>, email: Option<&String>, provider: &str, access_token: &str, refresh_token: &str) {
+fn update_auth_state(
+    state: &State<'_, AppState>,
+    email: Option<&String>,
+    provider: &str,
+    access_token: &str,
+    refresh_token: &str,
+) -> Result<(), String> {
     let user = User {
         id: uuid::Uuid::new_v4().to_string(),
         email: email.cloned(),
@@ -211,10 +264,11 @@ fn update_auth_state(state: &State<'_, AppState>, email: Option<&String>, provid
         avatar: None,
         provider: provider.to_string(),
     };
-    *state.auth.user.lock().expect("Failed to acquire lock") = Some(user);
-    *state.auth.access_token.lock().expect("Failed to acquire lock") = Some(access_token.to_string());
-    *state.auth.refresh_token.lock().expect("Failed to acquire lock") = Some(refresh_token.to_string());
-    *state.pending_login.lock().expect("Failed to acquire lock") = None;
+    *lock_state(&state.auth.user, "auth user")? = Some(user);
+    *lock_state(&state.auth.access_token, "auth access_token")? = Some(access_token.to_string());
+    *lock_state(&state.auth.refresh_token, "auth refresh_token")? = Some(refresh_token.to_string());
+    *lock_state(&state.pending_login, "pending_login")? = None;
+    Ok(())
 }
 
 #[tauri::command]
@@ -225,7 +279,7 @@ pub async fn handle_kiro_social_callback(
     callback_state: String,
 ) -> Result<(), String> {
     let pending = {
-        let lock = state.pending_login.lock().expect("Failed to acquire lock");
+        let lock = lock_state(&state.pending_login, "pending_login")?;
         lock.clone().ok_or("No pending login found")?
     };
     
@@ -249,9 +303,9 @@ pub async fn handle_kiro_social_callback(
     let (new_email, user_id) = extract_user_info(&usage_result.usage_data);
     
     // 获取不到邮箱直接报错
-    let final_email = new_email.clone().ok_or("获取邮箱失败，请检查账号状态")?;
+    let final_email = require_login_email(new_email.clone())?;
 
-    let mut store = state.store.lock().expect("Failed to acquire lock");
+    let mut store = lock_state(&state.store, "store")?;
     let existing_idx = find_existing_account_idx(&store.accounts, new_email.as_ref(), &pending.provider, &token_response.refresh_token, user_id.as_ref());
     
     let account = if let Some(idx) = existing_idx {
@@ -276,11 +330,11 @@ pub async fn handle_kiro_social_callback(
         account
     };
     
-    store.save_to_file();
+    save_store(&store)?;
     drop(store);
     
     let display_id = account.get_display_id();
-    update_auth_state(&state, account.email.as_ref(), &pending.provider, &token_response.access_token, &token_response.refresh_token);
+    update_auth_state(&state, account.email.as_ref(), &pending.provider, &token_response.access_token, &token_response.refresh_token)?;
     let _ = app_handle.emit("login-success", account.id);
     println!("Social callback login completed: {display_id}");
     Ok(())
@@ -289,4 +343,47 @@ pub async fn handle_kiro_social_callback(
 #[tauri::command]
 pub fn get_supported_providers() -> Vec<&'static str> {
     crate::providers::get_supported_providers()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{require_login_email, resolve_idc_login_email};
+
+    #[test]
+    fn require_login_email_rejects_missing_email() {
+        assert_eq!(
+            require_login_email(Some("user@example.com".to_string())).unwrap(),
+            "user@example.com".to_string()
+        );
+        assert_eq!(
+            require_login_email(None).unwrap_err(),
+            "获取邮箱失败，请检查账号状态".to_string()
+        );
+    }
+
+    #[test]
+    fn resolve_idc_login_email_uses_enterprise_user_id_fallback() {
+        assert_eq!(
+            resolve_idc_login_email(
+                "Enterprise",
+                None,
+                Some("enterprise-user".to_string())
+            )
+            .unwrap(),
+            "enterprise-user".to_string()
+        );
+        assert_eq!(
+            resolve_idc_login_email(
+                "BuilderId",
+                None,
+                Some("builder-user".to_string())
+            )
+            .unwrap_err(),
+            "获取邮箱失败，请检查账号状态".to_string()
+        );
+        assert_eq!(
+            resolve_idc_login_email("Enterprise", None, None).unwrap_err(),
+            "Enterprise 账号缺少 email 和 userId".to_string()
+        );
+    }
 }

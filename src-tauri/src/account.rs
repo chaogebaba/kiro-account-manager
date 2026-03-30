@@ -276,10 +276,14 @@ impl AccountStore {
     }
 
     pub fn save_to_file(&self) -> bool {
+        self.try_save_to_file().is_ok()
+    }
+
+    pub fn try_save_to_file(&self) -> Result<(), String> {
         if let Some(parent) = self.file_path.parent() {
             if let Err(e) = std::fs::create_dir_all(parent) {
                 eprintln!("[AccountStore] 创建目录失败: {e}");
-                return false;
+                return Err(format!("创建账号目录失败: {e}"));
             }
         }
         
@@ -287,13 +291,13 @@ impl AccountStore {
             Ok(json) => {
                 if let Err(e) = std::fs::write(&self.file_path, json) {
                     eprintln!("[AccountStore] 写入文件失败: {e}");
-                    return false;
+                    return Err(format!("写入账号文件失败: {e}"));
                 }
-                true
+                Ok(())
             }
             Err(e) => {
                 eprintln!("[AccountStore] 序列化失败: {e}");
-                false
+                Err(format!("序列化账号数据失败: {e}"))
             }
         }
     }
@@ -306,20 +310,24 @@ impl AccountStore {
         self.accounts = Self::load_from_file(&self.file_path);
     }
 
-    pub fn delete(&mut self, id: &str) -> bool {
+    pub fn delete(&mut self, id: &str) -> Result<bool, String> {
         let len_before = self.accounts.len();
         self.accounts.retain(|a| a.id != id);
         let deleted = self.accounts.len() < len_before;
-        if deleted { let _ = self.save_to_file(); }
-        deleted
+        if deleted {
+            self.try_save_to_file()?;
+        }
+        Ok(deleted)
     }
 
-    pub fn delete_many(&mut self, ids: &[String]) -> usize {
+    pub fn delete_many(&mut self, ids: &[String]) -> Result<usize, String> {
         let len_before = self.accounts.len();
         self.accounts.retain(|a| !ids.contains(&a.id));
         let deleted = len_before - self.accounts.len();
-        if deleted > 0 { let _ = self.save_to_file(); }
-        deleted
+        if deleted > 0 {
+            self.try_save_to_file()?;
+        }
+        Ok(deleted)
     }
 
     pub fn import_from_json(&mut self, json: &str) -> Result<usize, String> {
@@ -364,9 +372,7 @@ impl AccountStore {
                         added += 1;
                     }
                 }
-                if !self.save_to_file() {
-                    return Err("保存文件失败".to_string());
-                }
+                self.try_save_to_file()?;
                 Ok(added)
             }
             Err(e) => Err(e.to_string()),
@@ -439,24 +445,24 @@ impl GroupTagStore {
         }
     }
 
-    pub fn save_to_file(&self) -> bool {
+    pub fn try_save_to_file(&self) -> Result<(), String> {
         if let Some(parent) = self.file_path.parent() {
             if let Err(e) = std::fs::create_dir_all(parent) {
                 eprintln!("[GroupTagStore] 创建目录失败: {e}");
-                return false;
+                return Err(format!("创建分组标签目录失败: {e}"));
             }
         }
         match serde_json::to_string_pretty(&self.data) {
             Ok(json) => {
                 if let Err(e) = std::fs::write(&self.file_path, json) {
                     eprintln!("[GroupTagStore] 写入文件失败: {e}");
-                    return false;
+                    return Err(format!("写入分组标签文件失败: {e}"));
                 }
-                true
+                Ok(())
             }
             Err(e) => {
                 eprintln!("[GroupTagStore] 序列化失败: {e}");
-                false
+                Err(format!("序列化分组标签数据失败: {e}"))
             }
         }
     }
@@ -472,9 +478,7 @@ impl GroupTagStore {
         let mut group = AccountGroup::new(name, color);
         group.order = order;
         self.data.groups.push(group.clone());
-        if !self.save_to_file() {
-            return Err("保存分组失败".to_string());
-        }
+        self.try_save_to_file().map_err(|_| "保存分组失败".to_string())?;
         Ok(group)
     }
 
@@ -484,21 +488,21 @@ impl GroupTagStore {
         if let Some(n) = name { group.name = n; }
         if let Some(c) = color { group.color = Some(c); }
         let result = group.clone();
-        if !self.save_to_file() {
-            return Err("保存分组失败".to_string());
-        }
+        self.try_save_to_file().map_err(|_| "保存分组失败".to_string())?;
         Ok(result)
     }
 
-    pub fn delete_group(&mut self, id: &str) -> bool {
+    pub fn delete_group(&mut self, id: &str) -> Result<bool, String> {
         let len_before = self.data.groups.len();
         self.data.groups.retain(|g| g.id != id);
         let deleted = self.data.groups.len() < len_before;
-        if deleted { let _ = self.save_to_file(); }
-        deleted
+        if deleted {
+            self.try_save_to_file().map_err(|_| "保存分组失败".to_string())?;
+        }
+        Ok(deleted)
     }
 
-    pub fn reorder_groups(&mut self, ids: &[String]) -> bool {
+    pub fn reorder_groups(&mut self, ids: &[String]) -> Result<bool, String> {
         for (order, id) in ids.iter().enumerate() {
             if let Some(group) = self.data.groups.iter_mut().find(|g| &g.id == id) {
                 #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)] // 分组数量不会超过 i32 范围
@@ -508,7 +512,8 @@ impl GroupTagStore {
             }
         }
         self.data.groups.sort_by_key(|g| g.order);
-        self.save_to_file()
+        self.try_save_to_file().map_err(|_| "保存分组失败".to_string())?;
+        Ok(true)
     }
 
     // 标签操作
@@ -519,9 +524,7 @@ impl GroupTagStore {
     pub fn add_tag(&mut self, name: String, color: String) -> Result<AccountTag, String> {
         let tag = AccountTag::new(name, color);
         self.data.tags.push(tag.clone());
-        if !self.save_to_file() {
-            return Err("保存标签失败".to_string());
-        }
+        self.try_save_to_file().map_err(|_| "保存标签失败".to_string())?;
         Ok(tag)
     }
 
@@ -531,17 +534,17 @@ impl GroupTagStore {
         if let Some(n) = name { tag.name = n; }
         if let Some(c) = color { tag.color = c; }
         let result = tag.clone();
-        if !self.save_to_file() {
-            return Err("保存标签失败".to_string());
-        }
+        self.try_save_to_file().map_err(|_| "保存标签失败".to_string())?;
         Ok(result)
     }
 
-    pub fn delete_tag(&mut self, id: &str) -> bool {
+    pub fn delete_tag(&mut self, id: &str) -> Result<bool, String> {
         let len_before = self.data.tags.len();
         self.data.tags.retain(|t| t.id != id);
         let deleted = self.data.tags.len() < len_before;
-        if deleted { let _ = self.save_to_file(); }
-        deleted
+        if deleted {
+            self.try_save_to_file().map_err(|_| "保存标签失败".to_string())?;
+        }
+        Ok(deleted)
     }
 }

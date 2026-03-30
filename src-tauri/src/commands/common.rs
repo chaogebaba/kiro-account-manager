@@ -3,6 +3,16 @@
 use crate::account::Account;
 use crate::providers::{AuthProvider, IdcProvider, RefreshMetadata, SocialProvider, KiroPortalClient};
 
+pub async fn run_blocking_task<T, F>(task: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    tokio::task::spawn_blocking(task)
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Token 刷新结果
 pub struct RefreshResult {
     pub access_token: String,
@@ -176,4 +186,63 @@ pub fn find_existing_account_idx(
     }
     
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{extract_user_info, find_existing_account_idx, parse_usage_result};
+    use crate::account::Account;
+
+    #[test]
+    fn parse_usage_result_maps_banned_and_auth_errors_without_failing() {
+        let banned = parse_usage_result(Err("BANNED: blocked".to_string())).unwrap();
+        assert!(banned.is_banned);
+        assert!(!banned.is_auth_error);
+        assert_eq!(banned.usage_data, serde_json::Value::Null);
+
+        let auth_error = parse_usage_result(Err("AUTH_ERROR: token expired".to_string())).unwrap();
+        assert!(!auth_error.is_banned);
+        assert!(auth_error.is_auth_error);
+        assert_eq!(auth_error.usage_data, serde_json::Value::Null);
+    }
+
+    #[test]
+    fn extract_user_info_ignores_empty_email_and_reads_user_id() {
+        let usage = serde_json::json!({
+            "userInfo": {
+                "email": "",
+                "userId": "user-123"
+            }
+        });
+
+        assert_eq!(
+            extract_user_info(&usage),
+            (None, Some("user-123".to_string()))
+        );
+    }
+
+    #[test]
+    fn find_existing_account_idx_prefers_user_id_then_email() {
+        let mut first = Account::new("first@example.com".to_string(), "first".to_string());
+        first.user_id = Some("user-1".to_string());
+
+        let second = Account::new("second@example.com".to_string(), "second".to_string());
+        let accounts = vec![first, second];
+
+        let user_id = "user-1".to_string();
+        let second_email = "second@example.com".to_string();
+
+        assert_eq!(
+            find_existing_account_idx(&accounts, Some(&second_email), "Google", "", Some(&user_id)),
+            Some(0)
+        );
+        assert_eq!(
+            find_existing_account_idx(&accounts, Some(&second_email), "Google", "", None),
+            Some(1)
+        );
+        assert_eq!(
+            find_existing_account_idx(&accounts, None, "Google", "", None),
+            None
+        );
+    }
 }
