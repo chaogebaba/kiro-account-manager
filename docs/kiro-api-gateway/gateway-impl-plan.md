@@ -36,7 +36,7 @@
 │             │                                                                         │
 │             ▼                                                                         │
 │  上游请求 (CodeWhisperer)                                                              │
-│    get_kiro_local_token() → Bearer <token>                                             │
+│    single/group 账号刷新链 → Bearer <token>                                            │
 │    generateAssistantResponse (chunked stream)                                         │
 │             │                                                                         │
 │             ├────────────────────────────────────────────────────────────────────────► │
@@ -72,13 +72,13 @@
 ## 技术选型
 
 - HTTP 框架：`axum 0.8`（与现有 tokio 无缝集成）
-- token 来源：复用 `get_kiro_local_token()` 读取 `~/.aws/sso/cache/kiro-auth-token.json`
-- 上游端点：`https://q.us-east-1.amazonaws.com/generateAssistantResponse`
+- token 来源：复用现有账号体系，通过 `refresh_token_by_provider()` 刷新 `single/group` 账号后获得上游 `access_token`
+- 上游端点：`https://q.{region}.amazonaws.com/generateAssistantResponse`
 - 流式传输：Anthropic SSE (`text/event-stream`) ← CodeWhisperer chunked stream
 - 参考实现：`kkddytd/claude-api`（用于 OpenAI/Anthropic 兼容端点与 SSE 事件映射对照）
 - 方向说明：入站是 Anthropic/OpenAI 请求归一化为 Kiro conversationState；出站是 Kiro / CodeWhisperer 响应事件再投影为 Anthropic/OpenAI 响应。像 `citationEvent` 这样的字段属于后者。
 
-## 当前落地快照（2026-03-20）
+## 当前落地快照（2026-04-01）
 
 ### 已完成
 - `src-tauri/src/gateway/mod.rs` 已存在，网关运行时、配置读写、自动启动、基础路由和本地 API Key 校验已接通。
@@ -86,9 +86,10 @@
 - `src-tauri/src/gateway/converter.rs` / `stream.rs` / `thinking_parser.rs` 已完成请求归一化、事件解析、thinking 与工具调用主链路；内部已收敛为统一请求模型，不再把 Responses 语义表述成 chat-first。
 - `GatewayConfig` 已扩展 `accountMode/accountId/groupId/strategy/threshold/localOnly`，并已接入账号存储与刷新链路。
 - `GatewayConfig` 已补齐 `allowedIps`、`logLevel`，后端已执行 IP/CIDR 白名单校验，前端已支持编辑、保存与查看状态。
-- 关闭 `localOnly` 时，后端配置校验已强制要求客户端 API Key，避免远程裸暴露。
+- 当前后端配置校验会始终要求客户端 API Key；`localOnly` 与 `allowedIps` 仅负责额外的网络访问限制。
 - 已支持 `POST /mcp` 透传，并可打开应用日志目录；日志级别配置会在下次应用启动时生效。
 - 已支持基础图片输入：Anthropic `image` base64 块，以及 `image_url`/Responses `input_image` 的 data URL / 远程 HTTP(S) 图片 URL，会被提取到 Kiro `images` 字段；远程抓取当前已限制私网/本机地址、有限重定向与单张图片大小。
+- `GET /v1/models` 当前仍返回网关内置静态模型列表，尚未接入真实上游 `ListAvailableModels`。
 - `src-tauri/src/commands/gateway_cmd.rs` 已提供 `start/stop/status/config` 命令并注册到 `main.rs`。
 - `src/components/features/GatewayPage.jsx` 已可配置 host/port/region/API Key、账号来源模式、策略、阈值、本机限制、白名单、日志级别，并支持启动、停止、重启、保存、复制客户端配置、打开日志目录；OpenAI 配置文案已明确 `/v1/responses` 为主。
 - `routes.jsx` 与侧边导航已添加网关入口。
@@ -99,14 +100,22 @@
 - **`tools/call` 的发包结构已被本地安装包源码坐实**：Kiro 安装包中的 `acp-remote-mcp-client-*.js` 明确显示远端 MCP 调用发送的是 `jsonrpc: "2.0" + method: "tools/call" + profileArn + params: { name, arguments }`；这与当前网关对 `/mcp tools/call` 的模拟方向一致。
 - **`web_search` 的运行时执行样本已补齐**：`2026-03-22 15:14:59` 这轮日志里，`q-client.log` 已抓到真实 `InvokeMCPCommand`，其 `id` 为 `web_search_tooluse_HBDsi00WRBobYdARUrKeqd_1774163698353_756aa2ec`、`method` 为 `tools/call`、HTTP 200 成功；同轮 `Kiro Logs.log` 还能看到 `[Remote tool web_search] Calling tool`、`Fetched URLs` 与后续 `WebFetch` 命中 `docs.anthropic.com/en/docs/about-claude/models/all-models`、`anthropic.com/news/claude-opus-4-5`、`anthropic.com/claude/opus` 的抓取完成记录。这说明“本机运行时确实执行过 `tools/call(web_search)`”已从缺口变成实证。
 - **`web_search` 的回包解析方式已被本地安装包源码坐实**：Kiro 安装包中的 `disclose-context-*.js` 明确把 `web_search` 结果解析为“从 `content[]` 中找 `type === "text"` 的项，再 `JSON.parse(text)`，然后读取 `results` 数组”；当前网关 `parse_web_search_mcp_result()` 采用的就是这一路径，不是臆造。
-- **citation 取证入口已收敛**：若要继续验证 Kiro 原始 `citationEvent`，优先看本地 Kiro 源码里的 `Q Chat API -> debug.log / execution-log.json` 调试导出链，而不是普通 `q-client.log`。另外 GitHub 上游当前能直接搜到 `codeReferenceEvent.references` 与 `supplementaryWebLinksEvent.supplementaryWebLinks` 的业务消费代码，但暂未在非生成代码里搜到对应的 `citationEvent` 消费；因此现阶段对 `citationEvent` 的把握是“协议层存在已坐实，业务层现成渲染链仍缺直接源码证据”。`codeReferenceEvent.references -> code-references` 属于代码引用/license trace，不等于 citation。
-- **本地安装包主循环的消费边界已进一步坐实**：`q-developer-converse` 的聊天主循环当前明确消费的是 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / meteringEvent / codeReferenceEvent / contextUsageEvent`；同级没有看到 `citationEvent / supplementaryWebLinksEvent / toolResultEvent` 的业务处理分支。聊天 webview 的 `session-view/main.js` 里这轮也未搜到 `citation` / `supplementaryWebLinks` 相关命中，因此现阶段不能把它们表述成“本地 IDE 已确认渲染”。
+- **citation 取证入口已收敛**：若要继续验证 Kiro 原始 `citationEvent`，优先看本地 Kiro 源码里的 `Q Chat API -> debug.log / execution-log.json` 调试导出链，而不是普通 `q-client.log`。另外 GitHub 上游当前能直接搜到 `codeReferenceEvent.references` 与 `supplementaryWebLinksEvent.supplementaryWebLinks` 的业务消费代码，但这只能作为上游参考线索，不代表当前安装版 Kiro 已坐实消费；对当前安装版的结论仍应以本地安装包静态链和本机日志样本为准。`codeReferenceEvent.references -> code-references` 属于代码引用/license trace，不等于 citation。
+- **本地安装包主循环的消费边界已进一步坐实**：`q-developer-converse` 的聊天主循环当前明确消费的是 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / meteringEvent / codeReferenceEvent / contextUsageEvent`；同级没有看到 `citationEvent / supplementaryWebLinksEvent / followupPromptEvent / toolResultEvent` 的业务处理分支。聊天 webview 的 `session-view/main.js` 里这轮也未搜到 `citation` / `supplementaryWebLinks` 相关命中，因此现阶段不能把它们表述成“本地 IDE 已确认渲染”。
 - **Execution Log 落盘链已打透**：`StorageManager` 会把 `workspaceId`、`folderKey`、`key` 都算成 `sha256(...).substring(0, 32)`；因此 `%APPDATA%\\Kiro\\User\\globalStorage\\kiro.kiroagent\\<workspaceHash>\\` 下的 32 位 hash 目录和文件名，都是源码规则生成的稳定路径。当前已坐实：
   - `KIRO::EXECUTION::SAVES` -> `414d1636299d2b9e4ce7e17fb11f63e9`
   - `KIRO::EXECUTION::METADATA` -> `f62de366d0006e17ea00a01f6624aabf`
 - **Execution save 里的 `actionType: search` 不是远端 `web_search`**：当前机器真实样本里，这类动作的输入形态是 `{ why, query }`，对应本地代理搜索上下文/代码的审计记录，不能把它误当成 `tools/call(web_search)` 已抓到。
 - **`web_search` 的取证结论需要更新**：截至 `2026-03-22 15:14:59` 这轮样本，本机已经抓到真实的 `tools/call(web_search)` 请求/响应与后续抓取链路；现在已可同时坐实“协议定义 + 客户端发包代码 + 客户端结果解析代码 + 本机运行时执行样本”。剩余缺口不再是 `web_search` 是否真实执行，而是 `citationEvent` 等搜索后续事件是否在当前样本中继续落盘。
 - **`citationEvent` 的下一步取证方法已经固定**：先查安装包 `extension.js` 的协议定义、反序列化和 `debug.log / execution-log.json` 写盘代码，再查 `*Q Chat API.log` 是否已有真实样本，最后回到工作区 `.kiro/debug/` 搜 `debug.log` / `execution-log.json`。如果 `Q Chat API.log` 仍无命中，只能说明“当前样本未覆盖”，不能反推协议不存在。
+- **文档表述需要按当前安装版 Kiro 收紧**：
+  - `codeReferenceEvent` 已有明确消费链，不能再和 protocol-only 家族混写。
+  - raw `toolResultEvent` 直接消费仍未坐实，但归一化后的 `tool_result / toolUseResponse` 消费链已坐实。
+  - `citationEvent / supplementaryWebLinksEvent / followupPromptEvent` 目前只能写成“协议存在，当前消费链未证实”，不要直接写成“IDE 已确认渲染”。
+- **聊天 webview 的当前边界也已坐实**：
+  - `onSessionUpdate` 是透传，不是隐藏改名桥。
+  - `inlineMessages` 来自 persisted unified messages 按 `executionId` 分组。
+  - GUI 主链当前消费的是归一化后的 `assistant / tool_call / tool_result / steering_inclusion / sub_agent_*`，不是 raw `citation/followup/supplementary` 事件名。
 
 ### 已新增逆向结论：模型列表、模型缓存与会话体
 - **`ListAvailableModels` 的消费字段已坐实**：Kiro 本地会把上游响应转换为 `models/defaultModel` 两层；每个模型至少依赖 `modelId`、`modelName`、`description`、`rateMultiplier`、`rateUnit`、`tokenLimits.maxInputTokens`。这意味着网关若自行维护模型列表，不能只保留 `id/name`。
@@ -119,10 +128,10 @@
 - **模型下拉是 `configOptions` select，不只是 models API**：Kiro 新建 session、加载 session、会话内改模型时，都会向 webview 推送 `configOptions`；其中 model 项会消费 `defaultModel.id`、`description`、`rateMultiplier`、`rateUnit`。协议 schema 虽然定义了独立的 `models.availableModels/currentModelId`，但当前本地实现更依赖本地 `availableModels` 缓存与 `configOptions`。
 - **请求头需要按端点分开模拟**：`generateAssistantResponse` 才有 `x-amzn-kiro-agent-mode`，且仅在内容采集关闭时才带 `x-amzn-codewhisperer-optout`；`ListAvailableModels` 与 `/mcp` 当前坐实的是 `authorization + x-amz-user-agent`，外加 `external_idp` 场景的 `TokenType: EXTERNAL_IDP`，不应把三类请求强行揉成一套 header 模板。
 - **`/mcp` 的 `profileArn` 承载位已补证**：Kiro 本地 `InvokeMCPCommand` / `InvokeMCPStreamCommand` 不是把 `profileArn` 放进 JSON body，而是通过请求头 `x-amzn-kiro-profile-arn` 发送；网关若要继续逼近本地行为，MCP 上游请求应补这个 header。
-- **流式事件协议层比当前业务消费层更宽**：`ChatResponseStream` 除了常见的 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / codeReferenceEvent / meteringEvent` 外，还定义了 `toolResultEvent / metadataEvent / supplementaryWebLinksEvent / contextUsageEvent / citationEvent / invalidStateEvent`；目前本地主对话链主循环 `extension.js:377716-377834` 已直接坐实的业务分支只有 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / meteringEvent / codeReferenceEvent / contextUsageEvent`，其余事件仍需区分“协议存在”与“业务已消费”。
+- **流式事件协议层比当前业务消费层更宽**：`ChatResponseStream` 除了常见的 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / codeReferenceEvent / meteringEvent` 外，还定义了 `toolResultEvent / metadataEvent / supplementaryWebLinksEvent / followupPromptEvent / contextUsageEvent / citationEvent / invalidStateEvent`；目前本地主对话链主循环 `extension.js:377716-377834` 已直接坐实的业务分支只有 `assistantResponseEvent / reasoningContentEvent / toolUseEvent / meteringEvent / codeReferenceEvent / contextUsageEvent`，其余事件仍需区分“协议存在”与“业务已消费”。
 - **`InvokeMCPStream` 已找到真实业务使用**：规格分析链 `requirements-analyzer` 会通过 `/mcp/stream -> tools/call(spec_disambiguation)` 获取增量结果，逐条消费 `response.stream.message`。
 - **`SendMessageStreaming` / `exportResultArchive` 目前仍主要停在协议层证据**：当前打包版 Kiro 源码已确认它们的 serializer / deserializer、事件流结构与路径，但尚未在业务层搜到明确的直接调用点；这一轮全文件搜索也没有发现新的 `new ...SendMessageCommand(...)` 或 `new ...ExportResultArchiveCommand(...)` 构造点，现阶段不应把它们表述成“当前主链真实在用”。
-- **region 选择链已收敛**：Kiro 本地 runtime 不是机械使用单一配置值，而是按“显式 region > `profileArn.region` > 默认 region”选区；本项目当前对托管账号场景已统一为“最终 `profileArn.region` > 账号 region > 网关默认 region”，并同时应用到对话链与 `ListAvailableModels`，避免跨区导致的 `Invalid model` / 模型列表错位。
+- **region 选择链已收敛**：Kiro 本地 runtime 不是机械使用单一配置值，而是按“显式 region > `profileArn.region` > 默认 region”选区；本项目当前对托管账号场景已统一为“最终 `profileArn.region` > 账号 region > 网关默认 region”，并已应用到对话链与 `/mcp` 代执行链。需要单独说明的是：当前网关对外的 `GET /v1/models` 仍返回静态模型列表，尚未把真实 `ListAvailableModels` 接进来，因此这里不能再写成“模型列表链也已完全收敛”。
 
 ### 当前优先级建议
 1. 若要继续对齐 Kiro IDE 能力，当前主链路缺口已从基础 `web_search` 接入收敛到更高精度的 citations 还原、模型失效回退策略，以及更多搜索结果字段透传。
@@ -161,6 +170,9 @@
 - 与 Kiro 本体安装包源码对照后，当前实现对 `tools/call` 请求结构和 `web_search` 回包解析路径都已对齐。
 - `web_search` 本身已补齐运行时执行实证；剩余缺口主要收敛为 `citationEvent` 等搜索后续事件是否在当前样本中继续落盘，而不是功能可用性或 `web_search` 是否真实执行。
 - `execution save` 里的 `actionType: search` 仍不能当成远端 MCP `web_search` 调用证据；它只是本地搜索动作审计记录，这条边界继续成立。
+- 当前文档也需要同步版本边界：
+  - `docs/kiro-api-gateway` 早期部分分析基于上一个 IDE 版本。
+  - 继续维护时，应优先按当前安装版 Kiro 的静态链结论回填，而不是沿用旧版“协议存在 = 已消费”的写法。
 
 ## 阶段验收清单（按当前代码回填）
 
@@ -175,7 +187,7 @@
 - [x] 已实现 `tool_use` / `tool_result` / `reasoning` 的主链路转换
 - [x] 已实现细粒度错误码映射与统一脱敏
 - [x] 已实现账号池选择、刷新失败回退与阈值优先策略
-- [x] 已实现 `localOnly` + IP/CIDR 白名单双层访问控制
+- [x] 已实现客户端 API Key + `localOnly` + IP/CIDR 白名单访问控制
 - [x] 已实现 `POST /mcp` JSON-RPC 透传
 - [x] 已实现基础图片输入提取并写入 Kiro `images`
 - [x] 已实现 `web_search_*` 特殊工具语义映射与网关代执行
@@ -241,7 +253,7 @@
 #### 2. 计划新增 `src-tauri/src/gateway/mod.rs`
 
 核心模块，包含：
-- `GatewayConfig`：`{ enabled, host, port, access_token: Option<String>, region }`
+- `GatewayConfig`：首版草案只写了 `{ enabled, host, port, access_token, region }`；当前实现已扩展为 `accountMode/accountId/groupId/strategy/threshold/localOnly/allowedIps/logLevel` 等字段
 - `GatewayHandle`：持有 axum server 的 abort handle
 - `start_gateway(config, app_state)` → 启动 axum server，绑定端口，返回 handle
 - `stop_gateway(handle)`
@@ -254,7 +266,7 @@ axum 路由：
 - `GET /v1/models` → 返回固定模型列表
 - `GET /health` → 健康检查
 
-请求鉴权：若配置了 `access_token`，校验 `Authorization: Bearer <token>`。
+请求鉴权：当前实现固定要求 `access_token` / 客户端 API Key，支持 `Authorization: Bearer <token>` 与 `x-api-key`。
 
 #### 4. 计划新增 `src-tauri/src/gateway/converter.rs`
 
@@ -298,12 +310,12 @@ CodeWhisperer 事件流 → Anthropic SSE 转换：
 
 ```
 客户端请求 -> 网关
-  Authorization: Bearer <api_key>（可选，本地网关校验）
+  Authorization: Bearer <api_key>（当前必填，也可改用 x-api-key）
 
 网关 -> Kiro API
-  get_kiro_local_token()
+  single/group 账号池 + refresh_token_by_provider()
     → access_token -> Authorization: Bearer <token>
-    → profile_arn（social）或从 ProfileStorage 获取
+    → profile_arn（若刷新结果或账号资料中存在）
     → region 优先取最终 profile_arn 中的 ARN region
     → 无 ARN region 时退回账号 region
     → 再退回默认 us-east-1
@@ -321,7 +333,7 @@ CodeWhisperer 事件流 → Anthropic SSE 转换：
 
 **左栏（配置区）**
 - 端口输入框（默认 8765）
-- API Key 输入框（可选，用于校验客户端请求，建议 `sk-` 格式；留空则不鉴权）
+- API Key 输入框（当前实现已改为必填，用于校验客户端请求，建议 `sk-` 格式）
 - region 下拉（默认 us-east-1）
 - 启动/停止按钮（运行中时红色停止，停止时绿色启动，异步操作期间 disabled + spinner）
 
