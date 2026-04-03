@@ -12,6 +12,7 @@ import { showSuccess, showError } from '../../../utils/toast.jsx'
 import { getAccountDisplayName } from '../../../utils/accountStats'
 import { normalizeAccountStatus } from '../../../utils/accountStatus'
 import { getThemeAccent } from '../KiroConfig/themeAccent'
+import { normalizeAccountForUi } from './utils/accountRuntime'
 import AccountHeader from './AccountHeader'
 import AccountTable from './AccountTable'
 import AccountListView from './AccountListView'
@@ -149,7 +150,8 @@ function AccountManager({ onNavigate }) {
 
   const patchAccountLocally = useCallback((updatedAccount) => {
     if (!updatedAccount?.id) return
-    setAccounts(prev => prev.map(account => account.id === updatedAccount.id ? updatedAccount : account))
+    const normalizedAccount = normalizeAccountForUi(updatedAccount)
+    setAccounts(prev => prev.map(account => account.id === normalizedAccount.id ? normalizedAccount : account))
   }, [setAccounts])
 
   const handleLoadAvailableModels = useCallback(async (id, options = {}) => {
@@ -599,7 +601,7 @@ function AccountManager({ onNavigate }) {
             setAccounts(prev => {
               const next = [...prev]
               const upsert = (entry) => {
-                const account = entry?.account
+                const account = normalizeAccountForUi(entry?.account)
                 if (!account?.id) return
                 const index = next.findIndex(item => item.id === account.id)
                 if (index >= 0) next[index] = account
