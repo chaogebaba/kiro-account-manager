@@ -168,6 +168,18 @@ function AccountManager({ onNavigate }) {
       const response = await invoke('list_available_models', { id, forceRefresh })
       const models = Array.isArray(response?.models) ? response.models : []
       setAvailableModelsById(prev => ({ ...prev, [id]: models }))
+      setAccounts(prev => prev.map(account => (
+        account.id === id
+          ? {
+              ...account,
+              availableModelsCache: {
+                response,
+                cachedAt: Math.floor(Date.now() / 1000),
+                modelProvider: null,
+              },
+            }
+          : account
+      )))
       return response
     } catch (e) {
       const message = String(e)
