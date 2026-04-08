@@ -48,8 +48,6 @@ if (import.meta.env.PROD) {
   })
 }
 
-console.log('[main.jsx] 开始加载')
-
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <I18nProvider>
@@ -64,32 +62,21 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </React.StrictMode>,
 )
 
-console.log('[main.jsx] ReactDOM.render 完成')
-
 
 // 页面加载完成后显示窗口
 const hasCurrentTauriWindow = () => Boolean(window.__TAURI_INTERNALS__?.metadata?.currentWindow)
 
 const showWindow = () => {
-  console.log('[main.jsx] showWindow 被调用')
   if (!hasCurrentTauriWindow()) {
-    console.log('[main.jsx] 不是 Tauri 窗口，跳过显示')
     return
   }
 
-  console.log('[main.jsx] 调用 getCurrentWindow().show()')
-  getCurrentWindow().show().then(() => {
-    console.log('[main.jsx] 窗口显示成功')
-  }).catch((err) => {
-    console.error('[main.jsx] 窗口显示失败:', err)
-  })
+  getCurrentWindow().show().catch(() => {})
 }
 
 // 立即尝试显示窗口
 if (document.readyState === 'loading') {
-  console.log('[main.jsx] 等待 DOMContentLoaded')
   document.addEventListener('DOMContentLoaded', showWindow)
 } else {
-  console.log('[main.jsx] DOM 已加载，立即显示窗口')
   showWindow()
 }

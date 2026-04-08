@@ -15,6 +15,23 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    // 优化开发服务器性能
+    hmr: {
+      overlay: false, // 禁用错误覆盖层，减少渲染开销
+    },
+  },
+  // 优化依赖预构建
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      '@mantine/core',
+      '@mantine/hooks',
+      'lucide-react',
+      '@tauri-apps/api',
+      'i18next',
+      'react-i18next',
+    ],
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
