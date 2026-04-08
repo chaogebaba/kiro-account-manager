@@ -387,12 +387,24 @@ cd kiro-account-manager
 # 2. 安装依赖
 npm install
 
-# 3. 开发模式运行
+# 3. 开发模式运行（推荐：分开启动，更快）
+# 终端 1：启动 Vite 开发服务器（保持运行）
+npm run dev
+
+# 终端 2：启动 Tauri 应用（可以快速重启）
+npm run dev:tauri
+
+# 或者：一键启动（较慢，每次都重启 Vite）
 npm run tauri dev
 
 # 4. 构建发行版
 npm run tauri build
 ```
+
+**开发提示**：
+- 分开启动可以避免每次重启 Tauri 时都重启 Vite（节省 15-20 秒）
+- Vite 服务器保持运行，只需重启 Rust 应用（2-3 秒）
+- 开发模式下点击关闭按钮会直接退出，生产模式会隐藏到托盘
 
 构建产物位置：
 - Windows: `src-tauri/target/release/bundle/msi/`

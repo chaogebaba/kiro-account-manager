@@ -12,6 +12,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tauri": "tauri dev --no-dev-server",
     "build": "vite build",
     "build:release": "pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-release.ps1",
     "preview": "vite preview",
