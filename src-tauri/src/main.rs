@@ -262,16 +262,8 @@ use crate::tray_behavior::TRAY_ICON_ID;
         }
     }
 
-    // 显示主窗口
-    if let Some(window) = app.get_webview_window("main") {
-        if let Err(err) = window.show() {
-            log::error!("显示主窗口失败: {err}");
-        } else {
-            log::info!("主窗口已显示");
-        }
-    } else {
-        log::warn!("未找到主窗口");
-    }
+    // 不在这里显示窗口，让前端 JavaScript 在准备好后显示
+    // 这样可以避免白屏问题
 
     Ok(())
 }
