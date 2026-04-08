@@ -487,8 +487,17 @@ pub async fn add_account_by_social(
 
     let (new_email, user_id) = extract_user_info(&usage_result.usage_data);
 
-    // 获取不到邮箱直接报错
-    let final_email = new_email.ok_or("获取邮箱失败，请检查账号状态")?;
+    // BuilderId 账号允许使用 userId 或 email
+    let user_id_or_email = new_email
+        .or(user_id.clone())
+        .ok_or_else(|| {
+            format!(
+                "BuilderId 账号缺少 userId 或 email。API 返回的数据：{}",
+                serde_json::to_string_pretty(&usage_result.usage_data).unwrap_or_else(|_| "无法序列化".to_string())
+            )
+        })?;
+    
+    let final_email = user_id_or_email;
 
     // 根据邮箱推断最终 provider
     let idp = provider.unwrap_or_else(|| {
@@ -865,7 +874,12 @@ async fn add_account_by_idc_internal(
 
     if is_enterprise {
         // Enterprise 账号：必须有 user_id，email 可选
-        let user_id = user_id.ok_or("Enterprise 账号缺少 userId")?;
+        let user_id = user_id.ok_or_else(|| {
+            format!(
+                "Enterprise 账号缺少 userId。API 返回的数据：\n{}",
+                serde_json::to_string_pretty(&usage_result.usage_data).unwrap_or_default()
+            )
+        })?;
 
         // 计算 client_id_hash（可选）
         let client_id_hash = if let Some(hash) = params.client_id_hash.clone() {
@@ -944,8 +958,13 @@ async fn add_account_by_idc_internal(
         save_store(&store)?;
         Ok(AddAccountResult { account, is_new })
     } else {
-        // BuilderId 账号：必须有 email
-        let email = new_email.ok_or("BuilderId 账号缺少 email")?;
+        // BuilderId 账号：优先使用 user_id 去重，如果都没有则报错
+        if user_id.is_none() && new_email.is_none() {
+            return Err(format!(
+                "BuilderId 账号缺少 userId 或 email。API 返回的数据：\n{}",
+                serde_json::to_string_pretty(&usage_result.usage_data).unwrap_or_default()
+            ));
+        }
 
         // 计算 client_id_hash（可选）
         let client_id_hash = Some(resolve_builder_client_id_hash(
@@ -956,7 +975,7 @@ async fn add_account_by_idc_internal(
         let mut store = lock_store(&state.store, "store")?;
         let existing_idx = find_existing_account_idx(
             &store.accounts,
-            Some(&email),
+            new_email.as_ref(),
             &params.provider_id,
             &final_refresh_token,
             user_id.as_ref(),
@@ -990,12 +1009,19 @@ async fn add_account_by_idc_internal(
             existing.clone()
         } else {
             // 创建新的 BuilderId 账号
-            let mut account = Account::new(email, "Kiro BuilderId 账号".to_string());
+            // 使用 user_id 或 email 作为标识
+            let display_id = new_email
+                .clone()
+                .or_else(|| user_id.clone())
+                .unwrap_or_else(|| "BuilderId 账号".to_string());
+            
+            let mut account = Account::new(display_id.clone(), "Kiro BuilderId 账号".to_string());
             account.access_token = Some(final_access_token);
             account.refresh_token = Some(final_refresh_token);
             account.provider = Some(params.provider_id.clone());
             account.auth_method = Some("IdC".to_string());
-            account.user_id = user_id;
+            account.email = new_email; // 可能是 None
+            account.user_id = user_id; // 可能是 None
             if !expires_at.is_empty() {
                 account.expires_at = Some(expires_at);
             }

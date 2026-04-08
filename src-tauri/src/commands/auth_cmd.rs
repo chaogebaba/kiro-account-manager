@@ -40,10 +40,10 @@ fn resolve_idc_login_email(
     email: Option<String>,
     user_id: Option<String>,
 ) -> Result<String, String> {
-    if provider_id == "Enterprise" {
+    if provider_id == "Enterprise" || provider_id == "BuilderId" {
         email
             .or(user_id)
-            .ok_or("Enterprise 账号缺少 email 和 userId".to_string())
+            .ok_or_else(|| format!("{} 账号缺少 userId 或 email", provider_id))
     } else {
         require_login_email(email)
     }

@@ -143,6 +143,15 @@ function App() {
       setLoading(false)
     }
   }
+  
+  // App 加载完成后移除启动画面（独立的 useEffect，避免 Hooks 顺序问题）
+  useEffect(() => {
+    if (!loading) {
+      import('./utils/bootSplash.js').then(({ dismissBootSplash }) => {
+        dismissBootSplash()
+      })
+    }
+  }, [loading])
 
   const handleLogin = () => {
     checkAuth()
