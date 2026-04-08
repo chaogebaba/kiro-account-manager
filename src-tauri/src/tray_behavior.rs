@@ -1,4 +1,6 @@
+#[cfg(not(debug_assertions))]
 use crate::state::AppState;
+#[cfg(not(debug_assertions))]
 use std::sync::atomic::Ordering;
 use tauri::{
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -25,10 +27,12 @@ pub fn tray_menu_action(id: &str) -> Option<TrayMenuAction> {
     }
 }
 
+#[cfg(not(debug_assertions))]
 pub fn should_hide_window_on_close(label: &str, tray_ready: bool) -> bool {
     tray_ready && label == MAIN_WINDOW_LABEL
 }
 
+#[cfg(not(debug_assertions))]
 fn tray_is_ready<R: Runtime>(window: &Window<R>) -> bool {
     window
         .state::<AppState>()
