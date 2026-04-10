@@ -39,12 +39,13 @@ use super::{
         build_kiro_payload, get_available_models, normalize_anthropic_request,
         normalize_responses_request,
     },
+    eventstream::try_decode_message,
     models::{
         AnthropicContentBlock, AnthropicMessagesRequest, AnthropicMessagesResponse, AnthropicUsage,
         ModelsResponse, NormalizedMessage, NormalizedRequest, ToolCall, ToolCallFunction,
         WebSearchToolOptions,
     },
-    stream::{self, aggregate_kiro_response, extract_json, parse_kiro_event_full, KiroEvent},
+    stream::{self, aggregate_kiro_response, parse_kiro_event_full, KiroEvent},
     thinking_parser::{SegmentType, ThinkingParser},
     GatewayConfig, GatewayRequestLogEntry, ResponseFormat, RouterState, DEFAULT_AGENT_MODE,
 };
@@ -483,7 +484,7 @@ pub async fn proxy_handler(
         ..request_log_context.clone()
     };
 
-    if has_server_web_search_tool(&request) {
+    if !request.stream && has_server_web_search_tool(&request) {
         let outcome = match execute_request_with_server_tools(&state, &upstream, &request).await {
             Ok(outcome) => outcome,
             Err((status, error_type, message)) => {
@@ -501,17 +502,6 @@ pub async fn proxy_handler(
                 .await;
             }
         };
-
-        if request.stream {
-            write_request_log(
-                &upstream_log_context,
-                StatusCode::OK,
-                "stream",
-                None,
-                Some(STREAMING_RESPONSE_PLACEHOLDER),
-            );
-            return stream_completed_response(format, request.model, outcome);
-        }
 
         let response = match format {
             ResponseFormat::Anthropic => build_anthropic_response(
@@ -942,34 +932,60 @@ async fn send_generate_request<T: serde::Serialize + ?Sized>(
         upstream.region
     );
 
-    let upstream_resp = with_kiro_upstream_headers(
-        http.post(upstream_url),
-        upstream,
-        "application/vnd.amazon.eventstream",
-        true,
-        true,
-        false,
-    )
-    .json(upstream_payload)
-    .send()
-    .await
-    .map_err(|error| {
-        (
-            StatusCode::BAD_GATEWAY,
-            "api_error",
-            sanitize_error(&format!("上游请求失败: {error}")),
-            None,
-        )
-    })?;
+    const MAX_RETRIES: u32 = 3;
+    let mut attempt = 0;
 
-    if !upstream_resp.status().is_success() {
+    loop {
+        attempt += 1;
+
+        let upstream_resp = with_kiro_upstream_headers(
+            http.post(&upstream_url),
+            upstream,
+            "application/vnd.amazon.eventstream",
+            true,
+            true,
+            false,
+        )
+        .json(upstream_payload)
+        .send()
+        .await
+        .map_err(|error| {
+            (
+                StatusCode::BAD_GATEWAY,
+                "api_error",
+                sanitize_error(&format!("上游请求失败: {error}")),
+                None,
+            )
+        })?;
+
         let status = upstream_resp.status();
+
+        if status.is_success() {
+            return Ok(upstream_resp);
+        }
+
         let body = upstream_resp.text().await.unwrap_or_default();
+        let should_retry = attempt < MAX_RETRIES
+            && (status == StatusCode::TOO_MANY_REQUESTS
+                || status == StatusCode::FORBIDDEN
+                || status.is_server_error());
+
+        if should_retry {
+            let backoff_ms = 1000 * 2u64.pow(attempt - 1);
+            log::warn!(
+                "上游请求失败 (状态: {}, 尝试: {}/{}), {}ms 后重试",
+                status,
+                attempt,
+                MAX_RETRIES,
+                backoff_ms
+            );
+            tokio::time::sleep(tokio::time::Duration::from_millis(backoff_ms)).await;
+            continue;
+        }
+
         let (mapped_status, error_type, message) = map_upstream_error(status, &body);
         return Err((mapped_status, error_type, message, Some(body)));
     }
-
-    Ok(upstream_resp)
 }
 
 fn with_kiro_upstream_headers(
@@ -2002,128 +2018,6 @@ fn build_stream_responses_completed_event(
     })
 }
 
-fn stream_completed_response(
-    format: ResponseFormat,
-    model: String,
-    outcome: ProxyExecutionOutcome,
-) -> Response {
-    let (tx, rx) = mpsc::channel::<Result<Bytes, Infallible>>(32);
-    tokio::spawn(async move {
-        let created_at = chrono::Utc::now().timestamp();
-        match format {
-            ResponseFormat::Anthropic => {
-                let message_id = format!("msg_{}", short_uuid());
-                let blocks =
-                    build_anthropic_content_blocks(&outcome.aggregated, &outcome.server_tool_calls);
-                let start = json!({
-                    "type": "message_start",
-                    "message": {
-                        "id": message_id,
-                        "type": "message",
-                        "role": "assistant",
-                        "content": [],
-                        "model": model,
-                        "stop_reason": Value::Null,
-                        "stop_sequence": Value::Null,
-                        "usage": {
-                            "input_tokens": outcome.aggregated.input_tokens,
-                            "output_tokens": outcome.aggregated.output_tokens
-                        }
-                    }
-                });
-                send_event(&tx, Some("message_start"), &start.to_string()).await;
-                for (index, block) in blocks.iter().enumerate() {
-                    let start_block = match block.block_type.as_str() {
-                        "text" => json!({
-                            "type": "content_block_start",
-                            "index": index,
-                            "content_block": { "type": "text", "text": "" }
-                        }),
-                        "thinking" => json!({
-                            "type": "content_block_start",
-                            "index": index,
-                            "content_block": { "type": "thinking", "thinking": "" }
-                        }),
-                        _ => json!({
-                            "type": "content_block_start",
-                            "index": index,
-                            "content_block": block
-                        }),
-                    };
-                    send_event(&tx, Some("content_block_start"), &start_block.to_string()).await;
-                    if let Some(text) = &block.text {
-                        let delta = json!({
-                            "type": "content_block_delta",
-                            "index": index,
-                            "delta": { "type": "text_delta", "text": text }
-                        });
-                        send_event(&tx, Some("content_block_delta"), &delta.to_string()).await;
-                    } else if let Some(thinking) = &block.thinking {
-                        let delta = json!({
-                            "type": "content_block_delta",
-                            "index": index,
-                            "delta": { "type": "thinking_delta", "thinking": thinking }
-                        });
-                        send_event(&tx, Some("content_block_delta"), &delta.to_string()).await;
-                    }
-                    let stop = json!({ "type": "content_block_stop", "index": index });
-                    send_event(&tx, Some("content_block_stop"), &stop.to_string()).await;
-                }
-                let finish = json!({
-                    "type": "message_delta",
-                    "delta": {
-                        "stop_reason": if outcome.aggregated.tool_calls.is_empty() { "end_turn" } else { "tool_use" },
-                        "stop_sequence": Value::Null
-                    },
-                    "usage": { "output_tokens": outcome.aggregated.output_tokens }
-                });
-                send_event(&tx, Some("message_delta"), &finish.to_string()).await;
-                send_event(&tx, Some("message_stop"), "{\"type\":\"message_stop\"}").await;
-            }
-            ResponseFormat::Responses => {
-                let response_id = format!("resp_{}", short_uuid());
-                let message_id = format!("msg_{}", short_uuid());
-                let response = build_responses_response_with_ids(
-                    &model,
-                    &outcome.aggregated,
-                    &outcome.server_tool_calls,
-                    &response_id,
-                    &message_id,
-                    created_at,
-                );
-                if let Some(output_text) = response
-                    .get("output_text")
-                    .and_then(Value::as_str)
-                    .filter(|text| !text.is_empty())
-                {
-                    let delta = json!({
-                        "type": "response.output_text.delta",
-                        "response_id": response_id,
-                        "delta": output_text
-                    });
-                    send_data(&tx, &delta.to_string()).await;
-                }
-                let completed = json!({
-                    "type": "response.completed",
-                    "response": response
-                });
-                send_data(&tx, &completed.to_string()).await;
-                send_data(&tx, "[DONE]").await;
-            }
-        }
-    });
-
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("text/event-stream"),
-        )
-        .header(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"))
-        .header(header::CONNECTION, HeaderValue::from_static("keep-alive"))
-        .body(Body::from_stream(ReceiverStream::new(rx)))
-        .unwrap_or_else(|_| Response::new(Body::empty()))
-}
 
 fn gateway_error_response(
     format: ResponseFormat,
@@ -2266,10 +2160,10 @@ fn stream_proxy_response(
     format: ResponseFormat,
     model: String,
 ) -> Response {
-    let (tx, rx) = mpsc::channel::<Result<Bytes, Infallible>>(64);
+    let (tx, rx) = mpsc::channel::<Result<Bytes, Infallible>>(2048);
     tokio::spawn(async move {
         let mut upstream_stream = upstream_resp.bytes_stream();
-        let mut buffer = String::new();
+        let mut raw_buffer = Vec::new();
         let mut parser = ThinkingParser::new();
         let mut aggregated = stream::AggregatedKiroResponse::default();
         let mut tool_accumulators: HashMap<String, (String, String)> = HashMap::new();
@@ -2286,285 +2180,431 @@ fn stream_proxy_response(
         let message_id = format!("msg_{}", short_uuid());
         let created_at = chrono::Utc::now().timestamp();
         let mut responses_sequence_number = 0usize;
+        let mut responses_next_output_index = 1usize;
+        let mut responses_tool_output_indexes: HashMap<String, usize> = HashMap::new();
 
-        while let Some(chunk_result) = upstream_stream.next().await {
+        if matches!(format, ResponseFormat::Responses) {
+            let created = json!({
+                "type": "response.created",
+                "response": {
+                    "id": response_id,
+                    "object": "response",
+                    "created_at": created_at,
+                    "status": "in_progress",
+                    "model": model,
+                    "output": []
+                }
+            });
+            if !send_data(&tx, &created.to_string()).await {
+                return;
+            }
+
+            let output_item_added = json!({
+                "type": "response.output_item.added",
+                "response_id": response_id,
+                "output_index": 0,
+                "item": {
+                    "id": message_id,
+                    "type": "message",
+                    "status": "in_progress",
+                    "role": "assistant",
+                    "content": []
+                }
+            });
+            if !send_data(&tx, &output_item_added.to_string()).await {
+                return;
+            }
+        }
+
+        const STALLED_STREAM_TIMEOUT: tokio::time::Duration =
+            tokio::time::Duration::from_secs(300);
+
+        loop {
+            let chunk_result = match tokio::time::timeout(
+                STALLED_STREAM_TIMEOUT,
+                upstream_stream.next(),
+            )
+            .await
+            {
+                Ok(Some(result)) => result,
+                Ok(None) => break,
+                Err(_) => {
+                    log::error!("流式响应超时: 5分钟内未收到数据");
+                    let data = json!({
+                        "type": "error",
+                        "message": "流式响应超时: 5分钟内未收到数据"
+                    });
+                    send_data(&tx, &data.to_string()).await;
+                    break;
+                }
+            };
+
             match chunk_result {
                 Ok(bytes) => {
-                    buffer.push_str(&String::from_utf8_lossy(&bytes));
-                    while let Some(start) = buffer.find('{') {
-                        let remaining = &buffer[start..];
-                        let Some(json_str) = extract_json(remaining) else {
-                            break;
-                        };
-                        let json_len = json_str.len();
-                        if let Some(event) = parse_kiro_event_full(&json_str) {
-                            match event {
-                                KiroEvent::Usage {
-                                    input_tokens: input,
-                                    output_tokens: output,
-                                } => {
-                                    input_tokens = input;
-                                    output_tokens = output;
-                                    aggregated.input_tokens = input;
-                                    aggregated.output_tokens = output;
-                                }
-                                KiroEvent::ContextUsage { percentage } => {
-                                    aggregated.context_usage_percentage = Some(percentage);
-                                    if matches!(format, ResponseFormat::Anthropic) {
-                                        let data =
-                                            json!({"type":"context_usage","percentage":percentage});
-                                        send_event(&tx, Some("context_usage"), &data.to_string())
-                                            .await;
-                                    }
-                                }
-                                KiroEvent::Thinking(text) => {
-                                    aggregated.thinking.push_str(&text);
-                                    handle_stream_text(
-                                        &tx,
-                                        format,
-                                        &model,
-                                        &anthropic_id,
-                                        &response_id,
-                                        &text,
-                                        true,
-                                        &mut message_started,
-                                        &mut next_block_index,
-                                        &mut text_block_index,
-                                        &mut thinking_block_index,
-                                        input_tokens,
-                                        output_tokens,
-                                    )
-                                    .await;
-                                }
-                                KiroEvent::Text(text) => {
-                                    aggregated.text.push_str(&text);
-                                    for segment in parser.push_and_parse(&text) {
-                                        handle_stream_text(
-                                            &tx,
-                                            format,
-                                            &model,
-                                            &anthropic_id,
-                                            &response_id,
-                                            &segment.content,
-                                            segment.segment_type == SegmentType::Thinking,
-                                            &mut message_started,
-                                            &mut next_block_index,
-                                            &mut text_block_index,
-                                            &mut thinking_block_index,
-                                            input_tokens,
-                                            output_tokens,
-                                        )
-                                        .await;
-                                    }
-                                }
-                                KiroEvent::ToolUseStart { id, name } => {
-                                    saw_tool_calls = true;
-                                    tool_accumulators
-                                        .entry(id.clone())
-                                        .or_insert((name.clone(), String::new()));
-                                    match format {
-                                        ResponseFormat::Anthropic => {
-                                            ensure_anthropic_message_start(
-                                                &tx,
-                                                &mut message_started,
-                                                &anthropic_id,
-                                                &model,
-                                                input_tokens,
-                                                output_tokens,
-                                            )
-                                            .await;
-                                            close_content_block(&tx, &mut text_block_index).await;
-                                            close_content_block(&tx, &mut thinking_block_index)
-                                                .await;
-                                            let index = next_block_index;
-                                            next_block_index += 1;
-                                            tool_block_indexes.insert(id.clone(), index);
-                                            let data = json!({
-                                                "type": "content_block_start",
-                                                "index": index,
-                                                "content_block": {
-                                                    "type": "tool_use",
-                                                    "id": id,
-                                                    "name": name,
-                                                    "input": {}
-                                                }
-                                            });
-                                            send_event(
-                                                &tx,
-                                                Some("content_block_start"),
-                                                &data.to_string(),
-                                            )
-                                            .await;
-                                        }
-                                        ResponseFormat::Responses => {
-                                            let data = json!({
-                                                "type": "response.output_item.added",
-                                                "response_id": response_id,
-                                                "item": {
-                                                    "type": "function_call",
-                                                    "call_id": id,
-                                                    "name": name,
-                                                    "arguments": ""
-                                                }
-                                            });
-                                            send_data(&tx, &data.to_string()).await;
-                                        }
-                                    }
-                                }
-                                KiroEvent::ToolUseInputDelta { id, input_delta } => {
-                                    if let Some((_, current_input)) = tool_accumulators.get_mut(&id)
-                                    {
-                                        current_input.push_str(&input_delta);
-                                    } else {
-                                        tool_accumulators.insert(
-                                            id.clone(),
-                                            (String::new(), input_delta.clone()),
-                                        );
-                                    }
-                                    match format {
-                                        ResponseFormat::Anthropic => {
-                                            if let Some(index) =
-                                                tool_block_indexes.get(&id).copied()
-                                            {
-                                                let data = json!({
-                                                    "type": "content_block_delta",
-                                                    "index": index,
-                                                    "delta": {
-                                                        "type": "input_json_delta",
-                                                        "partial_json": input_delta
-                                                    }
-                                                });
-                                                send_event(
-                                                    &tx,
-                                                    Some("content_block_delta"),
-                                                    &data.to_string(),
-                                                )
-                                                .await;
-                                            }
-                                        }
-                                        ResponseFormat::Responses => {
-                                            let data = json!({
-                                                "type": "response.function_call_arguments.delta",
-                                                "response_id": response_id,
-                                                "call_id": id,
-                                                "delta": input_delta
-                                            });
-                                            send_data(&tx, &data.to_string()).await;
-                                        }
-                                    }
-                                }
-                                KiroEvent::ToolUseStop { id } => match format {
-                                    ResponseFormat::Anthropic => {
-                                        if let Some((name, input)) = tool_accumulators.remove(&id) {
-                                            aggregated.tool_calls.push((id.clone(), name, input));
-                                        }
-                                        if let Some(index) = tool_block_indexes.remove(&id) {
-                                            let data = json!({
-                                                "type": "content_block_stop",
-                                                "index": index
-                                            });
-                                            send_event(
-                                                &tx,
-                                                Some("content_block_stop"),
-                                                &data.to_string(),
-                                            )
-                                            .await;
-                                        }
-                                    }
-                                    ResponseFormat::Responses => {
-                                        if let Some((name, input)) = tool_accumulators.remove(&id) {
-                                            aggregated.tool_calls.push((id.clone(), name, input));
-                                        }
-                                        let data = json!({
-                                            "type": "response.output_item.done",
-                                            "response_id": response_id,
-                                            "call_id": id
-                                        });
-                                        send_data(&tx, &data.to_string()).await;
-                                    }
-                                },
-                                KiroEvent::Citation { text, link, target } => {
-                                    let citation =
-                                        stream::AggregatedCitation { text, link, target };
-                                    aggregated.citations.push(citation.clone());
+                    // 累积二进制数据
+                    raw_buffer.extend_from_slice(&bytes);
 
-                                    match format {
-                                        ResponseFormat::Anthropic => {
-                                            ensure_anthropic_message_start(
-                                                &tx,
-                                                &mut message_started,
-                                                &anthropic_id,
-                                                &model,
-                                                input_tokens,
-                                                output_tokens,
-                                            )
-                                            .await;
-                                            close_content_block(&tx, &mut thinking_block_index)
-                                                .await;
-                                            if text_block_index.is_none() {
-                                                let index = next_block_index;
-                                                next_block_index += 1;
-                                                text_block_index = Some(index);
-                                                let data = json!({
-                                                    "type": "content_block_start",
-                                                    "index": index,
-                                                    "content_block": {
-                                                        "type": "text",
-                                                        "text": ""
-                                                    }
-                                                });
+                    // 逐个解码 EventStream 消息
+                    loop {
+                        match try_decode_message(&raw_buffer) {
+                            Ok(Some((msg, consumed_bytes))) => {
+                                // 成功解码一个消息
+                                let message_type = msg.headers.get(":message-type").map(String::as_str);
+                                let event_type = msg.headers.get(":event-type").map(String::as_str);
+
+                                if matches!(message_type, Some("error") | Some("exception")) {
+                                    let error_text = String::from_utf8_lossy(&msg.payload);
+                                    log::error!(
+                                        "EventStream 上游错误: message_type={:?}, event_type={:?}, payload={}",
+                                        message_type,
+                                        event_type,
+                                        error_text
+                                    );
+                                    let data = json!({
+                                        "type": "error",
+                                        "message": sanitize_error(error_text.as_ref())
+                                    });
+                                    send_data(&tx, &data.to_string()).await;
+                                    raw_buffer.drain(..consumed_bytes);
+                                    break;
+                                }
+
+                                if !matches!(message_type, Some("event")) {
+                                    raw_buffer.drain(..consumed_bytes);
+                                    continue;
+                                }
+
+                                // 将 payload 转换为文本
+                                let json_text = String::from_utf8_lossy(&msg.payload);
+
+                                // 解析 JSON 事件
+                                if let Some(event) = parse_kiro_event_full(&json_text) {
+                                    match event {
+                                        KiroEvent::Usage {
+                                            input_tokens: input,
+                                            output_tokens: output,
+                                        } => {
+                                            input_tokens = input;
+                                            output_tokens = output;
+                                            aggregated.input_tokens = input;
+                                            aggregated.output_tokens = output;
+                                        }
+                                        KiroEvent::ContextUsage { percentage } => {
+                                            aggregated.context_usage_percentage = Some(percentage);
+                                            if matches!(format, ResponseFormat::Anthropic) {
+                                                let data =
+                                                    json!({"type":"context_usage","percentage":percentage});
                                                 send_event(
                                                     &tx,
-                                                    Some("content_block_start"),
+                                                    Some("context_usage"),
                                                     &data.to_string(),
                                                 )
                                                 .await;
                                             }
-                                            if let Some(index) = text_block_index {
-                                                if let Some(data) =
-                                                    build_anthropic_citation_delta_event(
-                                                        index,
-                                                        &citation,
-                                                        &aggregated.text,
+                                        }
+                                        KiroEvent::Thinking(text) => {
+                                            aggregated.thinking.push_str(&text);
+                                            handle_stream_text(
+                                                &tx,
+                                                format,
+                                                &model,
+                                                &anthropic_id,
+                                                &response_id,
+                                                &text,
+                                                true,
+                                                &mut message_started,
+                                                &mut next_block_index,
+                                                &mut text_block_index,
+                                                &mut thinking_block_index,
+                                                input_tokens,
+                                                output_tokens,
+                                            )
+                                            .await;
+                                        }
+                                        KiroEvent::Text(text) => {
+                                            aggregated.text.push_str(&text);
+                                            for segment in parser.push_and_parse(&text) {
+                                                handle_stream_text(
+                                                    &tx,
+                                                    format,
+                                                    &model,
+                                                    &anthropic_id,
+                                                    &response_id,
+                                                    &segment.content,
+                                                    segment.segment_type == SegmentType::Thinking,
+                                                    &mut message_started,
+                                                    &mut next_block_index,
+                                                    &mut text_block_index,
+                                                    &mut thinking_block_index,
+                                                    input_tokens,
+                                                    output_tokens,
+                                                )
+                                                .await;
+                                            }
+                                        }
+                                        KiroEvent::ToolUseStart { id, name } => {
+                                            saw_tool_calls = true;
+                                            tool_accumulators
+                                                .entry(id.clone())
+                                                .or_insert((name.clone(), String::new()));
+                                            match format {
+                                                ResponseFormat::Anthropic => {
+                                                    ensure_anthropic_message_start(
+                                                        &tx,
+                                                        &mut message_started,
+                                                        &anthropic_id,
+                                                        &model,
+                                                        input_tokens,
+                                                        output_tokens,
                                                     )
-                                                {
+                                                    .await;
+                                                    close_content_block(&tx, &mut text_block_index)
+                                                        .await;
+                                                    close_content_block(
+                                                        &tx,
+                                                        &mut thinking_block_index,
+                                                    )
+                                                    .await;
+                                                    let index = next_block_index;
+                                                    next_block_index += 1;
+                                                    tool_block_indexes.insert(id.clone(), index);
+                                                    let data = json!({
+                                                        "type": "content_block_start",
+                                                        "index": index,
+                                                        "content_block": {
+                                                            "type": "tool_use",
+                                                            "id": id,
+                                                            "name": name,
+                                                            "input": {}
+                                                        }
+                                                    });
                                                     send_event(
                                                         &tx,
-                                                        Some("content_block_delta"),
+                                                        Some("content_block_start"),
+                                                        &data.to_string(),
+                                                    )
+                                                    .await;
+                                                }
+                                                ResponseFormat::Responses => {
+                                                    let output_index = responses_next_output_index;
+                                                    responses_next_output_index += 1;
+                                                    responses_tool_output_indexes
+                                                        .insert(id.clone(), output_index);
+                                                    let data = json!({
+                                                        "type": "response.output_item.added",
+                                                        "response_id": response_id,
+                                                        "output_index": output_index,
+                                                        "item": {
+                                                            "id": id,
+                                                            "type": "function_call",
+                                                            "status": "in_progress",
+                                                            "call_id": id,
+                                                            "name": name,
+                                                            "arguments": ""
+                                                        }
+                                                    });
+                                                    send_data(&tx, &data.to_string()).await;
+                                                }
+                                            }
+                                        }
+                                        KiroEvent::ToolUseInputDelta { id, input_delta } => {
+                                            if let Some((_, current_input)) =
+                                                tool_accumulators.get_mut(&id)
+                                            {
+                                                current_input.push_str(&input_delta);
+                                            } else {
+                                                tool_accumulators.insert(
+                                                    id.clone(),
+                                                    (String::new(), input_delta.clone()),
+                                                );
+                                            }
+                                            match format {
+                                                ResponseFormat::Anthropic => {
+                                                    if let Some(index) =
+                                                        tool_block_indexes.get(&id).copied()
+                                                    {
+                                                        let data = json!({
+                                                            "type": "content_block_delta",
+                                                            "index": index,
+                                                            "delta": {
+                                                                "type": "input_json_delta",
+                                                                "partial_json": input_delta
+                                                            }
+                                                        });
+                                                        send_event(
+                                                            &tx,
+                                                            Some("content_block_delta"),
+                                                            &data.to_string(),
+                                                        )
+                                                        .await;
+                                                    }
+                                                }
+                                                ResponseFormat::Responses => {
+                                                    let data = json!({
+                                                        "type": "response.function_call_arguments.delta",
+                                                        "response_id": response_id,
+                                                        "call_id": id,
+                                                        "delta": input_delta
+                                                    });
+                                                    send_data(&tx, &data.to_string()).await;
+                                                }
+                                            }
+                                        }
+                                        KiroEvent::ToolUseStop { id } => match format {
+                                            ResponseFormat::Anthropic => {
+                                                if let Some((name, input)) =
+                                                    tool_accumulators.remove(&id)
+                                                {
+                                                    aggregated.tool_calls.push((id.clone(), name, input));
+                                                }
+                                                if let Some(index) = tool_block_indexes.remove(&id) {
+                                                    let data = json!({
+                                                        "type": "content_block_stop",
+                                                        "index": index
+                                                    });
+                                                    send_event(
+                                                        &tx,
+                                                        Some("content_block_stop"),
                                                         &data.to_string(),
                                                     )
                                                     .await;
                                                 }
                                             }
-                                        }
-                                        ResponseFormat::Responses => {
-                                            if let Some(annotation) =
-                                                build_responses_citation_annotations(
-                                                    std::slice::from_ref(&citation),
-                                                )
-                                                .into_iter()
-                                                .next()
-                                            {
-                                                let data = build_responses_annotation_added_event(
-                                                    &response_id,
-                                                    &message_id,
-                                                    annotation,
-                                                    aggregated.citations.len() - 1,
-                                                    responses_sequence_number,
-                                                );
-                                                responses_sequence_number += 1;
-                                                send_data(&tx, &data.to_string()).await;
+                                            ResponseFormat::Responses => {
+                                                if let Some((name, input)) =
+                                                    tool_accumulators.remove(&id)
+                                                {
+                                                    aggregated.tool_calls.push((
+                                                        id.clone(),
+                                                        name.clone(),
+                                                        input.clone(),
+                                                    ));
+                                                    let output_index = responses_tool_output_indexes
+                                                        .remove(&id)
+                                                        .unwrap_or_else(|| {
+                                                            let idx = responses_next_output_index;
+                                                            responses_next_output_index += 1;
+                                                            idx
+                                                        });
+                                                    let data = json!({
+                                                        "type": "response.output_item.done",
+                                                        "response_id": response_id,
+                                                        "output_index": output_index,
+                                                        "item": {
+                                                            "id": id,
+                                                            "type": "function_call",
+                                                            "status": "completed",
+                                                            "call_id": id,
+                                                            "name": name,
+                                                            "arguments": input
+                                                        }
+                                                    });
+                                                    send_data(&tx, &data.to_string()).await;
+                                                }
+                                            }
+                                        },
+                                        KiroEvent::Citation { text, link, target } => {
+                                            let citation =
+                                                stream::AggregatedCitation { text, link, target };
+                                            aggregated.citations.push(citation.clone());
+
+                                            match format {
+                                                ResponseFormat::Anthropic => {
+                                                    ensure_anthropic_message_start(
+                                                        &tx,
+                                                        &mut message_started,
+                                                        &anthropic_id,
+                                                        &model,
+                                                        input_tokens,
+                                                        output_tokens,
+                                                    )
+                                                    .await;
+                                                    close_content_block(
+                                                        &tx,
+                                                        &mut thinking_block_index,
+                                                    )
+                                                    .await;
+                                                    if text_block_index.is_none() {
+                                                        let index = next_block_index;
+                                                        next_block_index += 1;
+                                                        text_block_index = Some(index);
+                                                        let data = json!({
+                                                            "type": "content_block_start",
+                                                            "index": index,
+                                                            "content_block": {
+                                                                "type": "text",
+                                                                "text": ""
+                                                            }
+                                                        });
+                                                        send_event(
+                                                            &tx,
+                                                            Some("content_block_start"),
+                                                            &data.to_string(),
+                                                        )
+                                                        .await;
+                                                    }
+                                                    if let Some(index) = text_block_index {
+                                                        if let Some(data) =
+                                                            build_anthropic_citation_delta_event(
+                                                                index,
+                                                                &citation,
+                                                                &aggregated.text,
+                                                            )
+                                                        {
+                                                            send_event(
+                                                                &tx,
+                                                                Some("content_block_delta"),
+                                                                &data.to_string(),
+                                                            )
+                                                            .await;
+                                                        }
+                                                    }
+                                                }
+                                                ResponseFormat::Responses => {
+                                                    if let Some(annotation) =
+                                                        build_responses_citation_annotations(
+                                                            std::slice::from_ref(&citation),
+                                                        )
+                                                        .into_iter()
+                                                        .next()
+                                                    {
+                                                        let data = build_responses_annotation_added_event(
+                                                            &response_id,
+                                                            &message_id,
+                                                            annotation,
+                                                            aggregated.citations.len() - 1,
+                                                            responses_sequence_number,
+                                                        );
+                                                        responses_sequence_number += 1;
+                                                        send_data(&tx, &data.to_string()).await;
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
+
+                                // 清理已处理的字节
+                                raw_buffer.drain(..consumed_bytes);
+                            }
+                            Ok(None) => {
+                                // 缓冲区数据不足，等待更多数据
+                                break;
+                            }
+                            Err(error) => {
+                                // 解码失败，记录错误并清空缓冲区
+                                log::error!("EventStream 解码失败: {}", error);
+                                raw_buffer.clear();
+                                break;
                             }
                         }
-                        buffer = buffer[start + json_len..].to_string();
                     }
                 }
                 Err(error) => {
-                    let data = json!({"type":"error","message":sanitize_error(&format!("流式读取失败: {error}"))});
+                    log::error!("流式读取错误: {:?}", error);
+                    let error_msg = format!("流式读取失败: {error}");
+                    log::error!("错误详情: {}", error_msg);
+                    let data = json!({"type":"error","message":sanitize_error(&error_msg)});
                     send_data(&tx, &data.to_string()).await;
                     break;
                 }
@@ -2609,6 +2649,35 @@ fn stream_proxy_response(
                 send_event(&tx, Some("message_stop"), "{\"type\":\"message_stop\"}").await;
             }
             ResponseFormat::Responses => {
+                let output_text = build_responses_output_text(&aggregated, &[]);
+                let mut content = Vec::new();
+                if !output_text.text.is_empty() {
+                    content.push(json!({
+                        "type": "output_text",
+                        "text": output_text.text,
+                        "annotations": output_text.annotations
+                    }));
+                }
+                if !aggregated.thinking.is_empty() {
+                    content.push(json!({
+                        "type": "reasoning",
+                        "summary": aggregated.thinking
+                    }));
+                }
+                let output_item_done = json!({
+                    "type": "response.output_item.done",
+                    "response_id": response_id,
+                    "output_index": 0,
+                    "item": {
+                        "id": message_id,
+                        "type": "message",
+                        "status": "completed",
+                        "role": "assistant",
+                        "content": content
+                    }
+                });
+                send_data(&tx, &output_item_done.to_string()).await;
+
                 let completed = build_stream_responses_completed_event(
                     &model,
                     &aggregated,
@@ -2777,17 +2846,17 @@ async fn send_event(
     tx: &mpsc::Sender<Result<Bytes, Infallible>>,
     event: Option<&str>,
     payload: &str,
-) {
+) -> bool {
     let chunk = if let Some(event) = event {
         format!("event: {event}\ndata: {payload}\n\n")
     } else {
         format!("data: {payload}\n\n")
     };
-    let _ = tx.send(Ok(Bytes::from(chunk))).await;
+    tx.send(Ok(Bytes::from(chunk))).await.is_ok()
 }
 
-async fn send_data(tx: &mpsc::Sender<Result<Bytes, Infallible>>, payload: &str) {
-    send_event(tx, None, payload).await;
+async fn send_data(tx: &mpsc::Sender<Result<Bytes, Infallible>>, payload: &str) -> bool {
+    send_event(tx, None, payload).await
 }
 
 #[cfg(test)]

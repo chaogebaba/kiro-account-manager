@@ -1,4 +1,5 @@
 mod converter;
+mod eventstream;
 mod models;
 mod proxy;
 mod stream;
@@ -31,7 +32,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::http_client::{build_http_client_with_timeout, is_supported_kiro_region};
+use crate::http_client::{build_streaming_http_client, is_supported_kiro_region};
 
 #[cfg(test)]
 thread_local! {
@@ -534,7 +535,7 @@ async fn spawn_runtime(config: GatewayConfig) -> Result<GatewayRuntime, String> 
     let request_count = Arc::new(AtomicU64::new(0));
     let last_error = Arc::new(AsyncMutex::new(None));
 
-    let http = build_http_client_with_timeout(120, 10)
+    let http = build_streaming_http_client()
         .map_err(|e| format!("初始化 HTTP 客户端失败: {e}"))?;
 
     let state = RouterState {

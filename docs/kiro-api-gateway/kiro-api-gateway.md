@@ -84,6 +84,7 @@
 - 已支持本地配置持久化到 app data 下的 `gateway-config.json`，并在应用启动时按 `enabled` 自动拉起。
 - 已提供基础端点：`GET /health`、`GET /v1/models`、`POST /v1/messages`、`POST /v1/responses`、`POST /v1/messages/count_tokens`、`POST /mcp`；OpenAI 仅保留 `/v1/responses`。
 - 已支持真实上游 `application/vnd.amazon.eventstream` 请求，并将 Kiro chunked stream 增量转换为 Anthropic / OpenAI / Responses SSE。
+- **已实现 AWS EventStream 二进制协议解码**：`src-tauri/src/gateway/eventstream.rs` 采用逐消息解码（与 Kiro IDE 官方实现一致），支持 CRC32 校验、完整头部解析、自动重试机制（3次指数退避）、Stalled Stream 保护（5分钟超时），彻底解决了流式响应截断问题。详见 `docs/kiro-api-gateway/STREAMING_FIX.md`。
 - 已完成 `system`、`tools`、`tool_use`、`tool_result`、`reasoningContent` 的主链路转换，并补充了 Responses `input` -> 统一请求模型归一化。
 - 已支持客户端 API Key 形式的入口鉴权，以及 `localOnly` + `allowedIps` 的访问限制。
 - 已接入现有账号体系：`single/group`、`accountId/groupId`、`strategy`、`threshold`。
@@ -132,6 +133,7 @@
 - 命令层：`src-tauri/src/commands/gateway_cmd.rs`
 - 运行时与路由：`src-tauri/src/gateway/mod.rs`
 - 协议代理：`src-tauri/src/gateway/proxy.rs`
+- EventStream 解码：`src-tauri/src/gateway/eventstream.rs`
 - 请求转换：`src-tauri/src/gateway/converter.rs`
 - 事件解析：`src-tauri/src/gateway/stream.rs`
 - 自动启动注册：`src-tauri/src/main.rs`
@@ -404,6 +406,15 @@
   - 最终触发 `Invalid model`、401/403，或让对话链与 `/mcp` 代执行链落区不一致
 
 ### 流式事件处理（Kiro IDE 行为，按当前安装版 Kiro 复核）
+
+**AWS EventStream 二进制协议解码**（网关实现）：
+- 网关已实现完整的 AWS EventStream 解码器（`src-tauri/src/gateway/eventstream.rs`）
+- 采用逐消息解码，与 Kiro IDE 官方实现完全一致
+- 支持 CRC32 校验、完整头部解析、自动重试（3次指数退避）、Stalled Stream 保护（5分钟超时）
+- 解决了之前直接把二进制当文本处理导致的响应截断问题
+- 详见 `docs/kiro-api-gateway/STREAMING_FIX.md`
+
+**事件类型处理**：
 - `assistantResponseEvent`：
   - 内容按块拼接（`stream: false` 时拼成完整文本）。
   - 每块内容会进行 HTML 实体反转义。

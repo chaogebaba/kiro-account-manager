@@ -83,6 +83,7 @@
 ### 已完成
 - `src-tauri/src/gateway/mod.rs` 已存在，网关运行时、配置读写、自动启动、基础路由和本地 API Key 校验已接通。
 - `src-tauri/src/gateway/proxy.rs` 已接入真实上游 `application/vnd.amazon.eventstream`，并向 Anthropic / OpenAI Responses 输出增量流。
+- **`src-tauri/src/gateway/eventstream.rs` 已实现 AWS EventStream 二进制协议解码**：采用逐消息解码（与 Kiro IDE 官方实现一致），支持 CRC32 校验、完整头部解析、流式处理，解决了之前直接把二进制当文本处理导致的响应截断问题。详见 `docs/kiro-api-gateway/STREAMING_FIX.md`。
 - `src-tauri/src/gateway/converter.rs` / `stream.rs` / `thinking_parser.rs` 已完成请求归一化、事件解析、thinking 与工具调用主链路；内部已收敛为统一请求模型，不再把 Responses 语义表述成 chat-first。
 - `GatewayConfig` 已扩展 `accountMode/accountId/groupId/strategy/threshold/localOnly`，并已接入账号存储与刷新链路。
 - `GatewayConfig` 已补齐 `allowedIps`、`logLevel`，后端已执行 IP/CIDR 白名单校验，前端已支持编辑、保存与查看状态。
@@ -283,7 +284,65 @@ axum 路由：
 - `system` → 拼入 `userInputMessage.content` 开头
 - `max_tokens` / `temperature` → 忽略（CodeWhisperer 不支持）
 
-#### 5. 计划新增 `src-tauri/src/gateway/stream.rs`
+#### 5. 已实现 `src-tauri/src/gateway/eventstream.rs`
+
+**AWS EventStream 二进制协议解码器**（与 Kiro IDE 官方实现一致）：
+
+```rust
+/// 逐消息解码（与官方一致）
+pub fn try_decode_message(buffer: &[u8]) 
+    -> Result<Option<(EventStreamMessage, usize)>, String>
+{
+    // 1. 检查最小长度 (16 字节)
+    // 2. 读取 totalLen(4) + headersLen(4)
+    // 3. 验证前导 CRC32 (preludeCrc)
+    // 4. 验证消息 CRC32 (messageCrc)
+    // 5. 完整解析头部（type=7 string headers）
+    // 6. 提取 payload (JSON 数据)
+    // 7. 返回 (message, consumed_bytes)
+}
+```
+
+**关键特性：**
+- ✅ 逐消息解码（每次解码一个完整消息）
+- ✅ 完整头部解析（支持所有 header 类型）
+- ✅ CRC32 校验（IEEE 标准）
+- ✅ 流式处理（返回已处理字节数）
+- ✅ 错误处理（返回 Result，不中断流）
+
+**流式处理循环：**
+```rust
+loop {
+    raw_buffer.extend(bytes);
+    loop {
+        match try_decode_message(&raw_buffer) {
+            Ok(Some((msg, size))) => {
+                // 处理消息
+                raw_buffer.drain(..size);
+            }
+            Ok(None) => break,  // 等待更多数据
+            Err(e) => {
+                log::error!("解码失败: {}", e);
+                raw_buffer.clear();
+                break;
+            }
+        }
+    }
+}
+```
+
+**重试机制：**
+- 最多重试 3 次
+- 指数退避：1s → 2s → 4s
+- 对 429/403/5xx 错误自动重试
+
+**Stalled Stream 保护：**
+- 5分钟无数据自动超时
+- 防止连接卡死
+
+详见 `docs/kiro-api-gateway/STREAMING_FIX.md`
+
+#### 6. 已实现 `src-tauri/src/gateway/stream.rs`
 
 CodeWhisperer 事件流 → Anthropic SSE 转换：
 - `assistantResponseEvent.content` → `content_block_delta` (text_delta)

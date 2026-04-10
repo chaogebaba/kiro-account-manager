@@ -266,6 +266,29 @@ pub fn build_http_client() -> Result<Client, String> {
     build_http_client_with_timeout(30, 10)
 }
 
+/// 构建用于流式请求的 HTTP 客户端（无总超时限制）
+pub fn build_streaming_http_client() -> Result<Client, String> {
+    let mut builder = Client::builder()
+        .connect_timeout(Duration::from_secs(30))
+        .pool_idle_timeout(Duration::from_secs(120))
+        .pool_max_idle_per_host(20)
+        .tcp_keepalive(Duration::from_secs(60))
+        .http2_keep_alive_interval(Duration::from_secs(30))
+        .http2_keep_alive_timeout(Duration::from_secs(20))
+        .http2_keep_alive_while_idle(true);
+
+    // 尝试从 Kiro 设置获取代理
+    if let Some(proxy_url) = get_proxy_from_kiro_settings() {
+        if let Ok(proxy) = Proxy::all(&proxy_url) {
+            builder = builder.proxy(proxy);
+        }
+    }
+
+    builder
+        .build()
+        .map_err(|e| format!("Failed to create streaming HTTP client: {e}"))
+}
+
 /// 构建 HTTP 客户端（自定义超时）
 pub fn build_http_client_with_timeout(
     timeout_secs: u64,
@@ -273,7 +296,13 @@ pub fn build_http_client_with_timeout(
 ) -> Result<Client, String> {
     let mut builder = Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
-        .connect_timeout(Duration::from_secs(connect_timeout_secs));
+        .connect_timeout(Duration::from_secs(connect_timeout_secs))
+        .pool_idle_timeout(Duration::from_secs(120))
+        .pool_max_idle_per_host(20)
+        .tcp_keepalive(Duration::from_secs(60))
+        .http2_keep_alive_interval(Duration::from_secs(30))
+        .http2_keep_alive_timeout(Duration::from_secs(20))
+        .http2_keep_alive_while_idle(true);
 
     // 尝试从 Kiro 设置获取代理
     if let Some(proxy_url) = get_proxy_from_kiro_settings() {
