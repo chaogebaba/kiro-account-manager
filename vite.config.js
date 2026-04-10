@@ -19,6 +19,10 @@ export default defineConfig({
     hmr: {
       overlay: false, // 禁用错误覆盖层，减少渲染开销
     },
+    // 预热常用文件，加快首次加载
+    warmup: {
+      clientFiles: ['./src/main.jsx', './src/App.jsx'],
+    },
   },
   // 优化依赖预构建
   optimizeDeps: {
@@ -32,6 +36,8 @@ export default defineConfig({
       'i18next',
       'react-i18next',
     ],
+    // 强制预构建，避免首次启动慢
+    force: false,
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {

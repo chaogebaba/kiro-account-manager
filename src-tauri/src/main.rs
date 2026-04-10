@@ -262,10 +262,14 @@ use crate::tray_behavior::TRAY_ICON_ID;
         }
     }
 
-    // 不在这里显示窗口，让前端 JavaScript 在准备好后显示
-    // 这样可以避免白屏问题
+    // 主窗口由前端首屏 ready 后通过命令触发显示，避免 setup 阶段过早白屏
 
     Ok(())
+}
+
+#[tauri::command]
+fn reveal_main_window(app: tauri::AppHandle) {
+    tray_behavior::show_main_window(&app);
 }
 
 #[allow(clippy::too_many_lines)] // Tauri 框架要求在 main 中注册所有命令，无法拆分
@@ -339,7 +343,8 @@ fn main() {
             kiro_login,
             get_supported_providers,
             handle_kiro_social_callback,
-            // Kiro IDE 命令
+            reveal_main_window,
+
             get_kiro_local_token,
             switch_kiro_account,
             read_kiro_accounts,

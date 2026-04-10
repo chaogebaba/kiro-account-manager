@@ -34,7 +34,6 @@ function PageLoading() {
 
 function App() {
   const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [activeMenu, setActiveMenu] = useState(() => {
     // 从 localStorage 恢复上次的页面
     return localStorage.getItem('activeMenu') || 'home'
@@ -61,10 +60,21 @@ function App() {
   const { checkAndRestoreLockedModel } = useModelLock(appSettings, settingsLoading)
 
   useEffect(() => {
+    requestAnimationFrame(() => {
+      dismissBootSplash()
+
+      requestAnimationFrame(() => {
+        invoke('reveal_main_window').catch(() => {})
+      })
+    })
+  }, [])
+
+  useEffect(() => {
     checkAuth()
 
     // 检查是否是回调页面
     const url = new URL(window.location.href)
+
     if (url.pathname === '/callback' && (url.searchParams.has('code') || url.searchParams.has('state'))) {
       setActiveMenu('callback')
       return
@@ -140,9 +150,6 @@ function App() {
       setUser(currentUser)
     } catch (e) {
       console.error('Auth check failed:', e)
-    } finally {
-      setLoading(false)
-      dismissBootSplash()
     }
   }
 
@@ -184,13 +191,6 @@ function App() {
     })
   }
 
-  if (loading) {
-    return (
-      <div className={`h-screen flex items-center justify-center ${colors.main}`}>
-        <div className={colors.text}>加载中...</div>
-      </div>
-    )
-  }
 
   return (
     <PrivacyProvider>
@@ -199,7 +199,6 @@ function App() {
           <Sidebar 
             activeMenu={activeMenu} 
             onMenuChange={setActiveMenu}
-            user={user}
             onLogout={handleLogout}
           />
           <main className="flex-1 overflow-hidden">

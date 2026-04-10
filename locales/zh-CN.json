@@ -727,6 +727,7 @@
   "skills.saving": "保存中...",
   "skills.save": "保存",
   "skills.createFailed": "创建失败",
+  "skills.loadFailed": "加载 Skills 失败",
   "skills.confirmDelete": "确认删除",
   "skills.confirmDeleteSkill": "确定删除 Skill \"{{name}}\"？这将删除整个目录。",
   "skills.files": "个文件",
@@ -792,6 +793,7 @@
   "agents.saving": "保存中...",
   "agents.save": "保存",
   "agents.createFailed": "创建失败",
+  "agents.loadFailed": "加载 Custom Agents 失败",
   "agents.confirmDelete": "确认删除",
   "agents.confirmDeleteAgent": "确定删除 Agent \"{{fileName}}\"？",
   "agents.tools": "个工具",
@@ -903,6 +905,8 @@
   "powers.installFailed": "安装失败",
   "powers.browseRecommended": "浏览推荐 Powers",
   "powers.noRecommended": "无法加载推荐列表",
+  "powers.loadFailed": "加载 Powers 失败",
+  "powers.loadRecommendedFailed": "加载推荐 Powers 失败",
   "powers.name": "名称",
   "powers.thirdPartyDisclaimer": "第三方 Powers 独立于 Kiro 核心服务运行，可能受其自身许可条款约束。Kiro 未在所有场景下测试这些工具，请仅从受信任来源安装并查阅相关文档和许可。"
 }

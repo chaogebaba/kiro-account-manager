@@ -1,6 +1,5 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import App from './App.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
 import { DialogProvider } from './contexts/DialogContext.jsx'
@@ -60,21 +59,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </I18nProvider>,
 )
 
-
-// 页面加载完成后显示窗口
-const hasCurrentTauriWindow = () => Boolean(window.__TAURI_INTERNALS__?.metadata?.currentWindow)
-
-const showWindow = () => {
-  if (!hasCurrentTauriWindow()) {
-    return
-  }
-
-  getCurrentWindow().show().catch(() => {})
-}
-
-// 立即尝试显示窗口
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', showWindow)
-} else {
-  showWindow()
-}

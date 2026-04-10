@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
-const source = await readFile(new URL('./main.jsx', import.meta.url), 'utf8')
+const mainSource = await readFile(new URL('./main.jsx', import.meta.url), 'utf8')
+const appSource = await readFile(new URL('./App.jsx', import.meta.url), 'utf8')
 
-assert.match(source, /const hasCurrentTauriWindow = \(\) => Boolean\(window\.__TAURI_INTERNALS__\?\.metadata\?\.currentWindow\)/)
-assert.match(source, /if \(!hasCurrentTauriWindow\(\)\) return/)
-assert.match(source, /getCurrentWindow\(\)\.show\(\)\.catch\?\.\(\(\) => \{\}\)/)
+assert.doesNotMatch(mainSource, /getCurrentWindow\(\)\.show\(\)/)
+assert.doesNotMatch(mainSource, /window\.__TAURI_INTERNALS__\?\.metadata\?\.currentWindow/)
+assert.doesNotMatch(mainSource, /invoke\('reveal_main_window'\)/)
+assert.match(appSource, /dismissBootSplash\(\)/)
+assert.match(appSource, /invoke\('reveal_main_window'\)/)
 
-console.log('main window bootstrap is guarded')
+console.log('main window reveal is deferred to App first paint stage')

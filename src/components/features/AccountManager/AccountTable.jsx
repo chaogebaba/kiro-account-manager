@@ -181,9 +181,8 @@ function AccountTable({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 290,
+    estimateSize: () => 320,
     overscan: 1,
-    measureElement: (el) => el?.getBoundingClientRect().height ?? 290,
   })
 
   // 将 selectedIds 转为 Set 提高查找性能
@@ -244,7 +243,6 @@ function AccountTable({
                 <div 
                   key={virtualRow.key} 
                   data-index={virtualRow.index}
-                  ref={rowVirtualizer.measureElement}
                 >
                   <VirtualRow
                     row={rows[virtualRow.index]}
