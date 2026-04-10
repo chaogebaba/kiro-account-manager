@@ -320,6 +320,7 @@ pub async fn build_kiro_payload(
                             images: images_option(images),
                             user_input_message_context: build_user_context(
                                 None,
+                                None,
                                 extract_tool_results(message.content.as_ref()),
                             ),
                             inference_config: inference_config.clone(),
@@ -339,6 +340,7 @@ pub async fn build_kiro_payload(
                             origin: "AI_EDITOR".to_string(),
                             images: None,
                             user_input_message_context: build_user_context(
+                                None,
                                 None,
                                 extract_tool_results_from_tool_message(message),
                             ),
@@ -397,6 +399,7 @@ pub async fn build_kiro_payload(
                     images: images_option(current_images),
                     user_input_message_context: build_user_context(
                         convert_tools(&processed_tools),
+                        normalize_tool_choice(&request.tool_choice, &processed_tools)?,
                         current_tool_results,
                     ),
                     inference_config,
@@ -828,14 +831,16 @@ fn merge_adjacent_messages(messages: &[&NormalizedMessage]) -> Vec<NormalizedMes
 
 fn build_user_context(
     tools: Option<Vec<KiroTool>>,
+    tool_choice: Option<Value>,
     tool_results: Vec<KiroToolResult>,
 ) -> Option<UserInputMessageContext> {
-    if tools.is_none() && tool_results.is_empty() {
+    if tools.is_none() && tool_choice.is_none() && tool_results.is_empty() {
         return None;
     }
 
     Some(UserInputMessageContext {
         tools,
+        tool_choice,
         tool_results: if tool_results.is_empty() {
             None
         } else {
@@ -1310,6 +1315,60 @@ fn extract_tool_uses(message: &NormalizedMessage) -> Option<Vec<KiroToolUse>> {
         Some(tool_uses)
     }
 }
+
+fn normalize_tool_choice(
+    tool_choice: &Option<Value>,
+    tools: &Option<Vec<Tool>>,
+) -> Result<Option<Value>, String> {
+    let Some(choice) = tool_choice.as_ref() else {
+        return Ok(None);
+    };
+
+    let choice_type = match choice {
+        Value::String(raw) => raw.trim(),
+        Value::Object(_) => choice
+            .get("type")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .ok_or_else(|| "tool_choice.type 无效".to_string())?,
+        _ => return Err("tool_choice 格式无效".to_string()),
+    };
+
+    match choice_type {
+        "auto" => Ok(Some(json!({ "type": "auto" }))),
+        "none" => Ok(Some(json!({ "type": "none" }))),
+        "required" => {
+            if tools.as_ref().is_none_or(|items| items.is_empty()) {
+                return Err("tool_choice=required 时必须同时提供 tools".to_string());
+            }
+            Ok(Some(json!({ "type": "required" })))
+        }
+        "function" => {
+            let name = choice
+                .get("name")
+                .or_else(|| choice.pointer("/function/name"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| "tool_choice.function.name 不能为空".to_string())?;
+
+            let tool_exists = tools
+                .as_ref()
+                .map(|items| items.iter().any(|tool| tool.function.name == name))
+                .unwrap_or(false);
+            if !tool_exists {
+                return Err(format!("tool_choice 指定的工具不存在: {name}"));
+            }
+
+            Ok(Some(json!({
+                "type": "function",
+                "name": name
+            })))
+        }
+        other => Err(format!("暂不支持的 tool_choice.type: {other}")),
+    }
+}
+
 
 fn convert_tools(tools: &Option<Vec<Tool>>) -> Option<Vec<KiroTool>> {
     tools.as_ref().map(|items| {
@@ -1994,6 +2053,93 @@ mod tests {
                 }
             }))
         );
+    }
+
+
+    #[tokio::test]
+    async fn build_kiro_payload_preserves_responses_tool_choice() {
+        let request = NormalizedRequest {
+            model: "claude-sonnet-4-5-20250929".to_string(),
+            messages: vec![NormalizedMessage {
+                role: "user".to_string(),
+                content: Some(json!("hello")),
+                tool_calls: None,
+                tool_call_id: None,
+                metadata: None,
+            }],
+            stream: false,
+            max_tokens: Some(1024),
+            temperature: None,
+            top_p: None,
+            stop: None,
+            tools: Some(vec![Tool {
+                tool_type: "function".to_string(),
+                function: crate::gateway::models::ToolFunction {
+                    name: "search_docs".to_string(),
+                    description: Some("搜索文档".to_string()),
+                    parameters: Some(json!({
+                        "type": "object",
+                        "properties": { "q": { "type": "string" } }
+                    })),
+                },
+                web_search: None,
+            }]),
+            tool_choice: Some(json!({ "type": "function", "name": "search_docs" })),
+        };
+
+        let payload = build_kiro_payload(&Client::new(), &request, None)
+            .await
+            .expect("payload should build");
+
+        assert_eq!(
+            payload
+                .conversation_state
+                .current_message
+                .user_input_message
+                .user_input_message_context
+                .as_ref()
+                .and_then(|context| context.tool_choice.as_ref())
+                .cloned(),
+            Some(json!({ "type": "function", "name": "search_docs" }))
+        );
+    }
+
+    #[tokio::test]
+    async fn build_kiro_payload_rejects_unknown_tool_choice_function() {
+        let request = NormalizedRequest {
+            model: "claude-sonnet-4-5-20250929".to_string(),
+            messages: vec![NormalizedMessage {
+                role: "user".to_string(),
+                content: Some(json!("hello")),
+                tool_calls: None,
+                tool_call_id: None,
+                metadata: None,
+            }],
+            stream: false,
+            max_tokens: Some(1024),
+            temperature: None,
+            top_p: None,
+            stop: None,
+            tools: Some(vec![Tool {
+                tool_type: "function".to_string(),
+                function: crate::gateway::models::ToolFunction {
+                    name: "search_docs".to_string(),
+                    description: Some("搜索文档".to_string()),
+                    parameters: Some(json!({
+                        "type": "object",
+                        "properties": { "q": { "type": "string" } }
+                    })),
+                },
+                web_search: None,
+            }]),
+            tool_choice: Some(json!({ "type": "function", "name": "missing_tool" })),
+        };
+
+        let error = build_kiro_payload(&Client::new(), &request, None)
+            .await
+            .expect_err("unknown tool choice should fail");
+
+        assert!(error.contains("tool_choice 指定的工具不存在"));
     }
 
     #[tokio::test]

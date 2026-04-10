@@ -1,8 +1,12 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { Copy, Play, Square, Activity, Shield, Server, RefreshCw, Radio, Check, RotateCcw, FolderOpen, Search, AlertTriangle } from 'lucide-react'
-import { Alert, Button, Card, Group, Stack, Text, TextInput, Textarea, NumberInput, Select, Badge, Code, Tooltip, Switch, Tabs } from '@mantine/core'
+import { Activity, Play, RotateCcw, Square } from 'lucide-react'
+import { Alert, Badge, Button, Card, Group, Stack, Tabs, Text } from '@mantine/core'
 import { useApp } from '../../hooks/useApp'
-import { applyGatewayLocalOnlyChange, buildClientSamples, buildGatewayActionSummary, buildGatewayBaseUrl, buildGatewayConnectHost, buildGatewayIntegrationSummary, buildGatewayMetricsSummary, buildGatewayRequestLogSummary, buildGatewayRoutingSummary, buildGatewaySecuritySummary, buildGatewayStatusSummary, createGatewayFieldErrors, filterGatewayRequestLogs, formatGatewayAccountOptionLabel, formatGatewayRequestDuration, formatGatewayTimestamp, getGatewayRequestOutcomeColor, mergeErrorHistory } from './gatewayPageUtils'
+import GatewayAdvancedTab from './gateway/GatewayAdvancedTab'
+import GatewayIntegrationTab from './gateway/GatewayIntegrationTab'
+import GatewayObservabilityTab from './gateway/GatewayObservabilityTab'
+import GatewayOverviewTab from './gateway/GatewayOverviewTab'
+import { applyGatewayLocalOnlyChange, buildClientSamples, buildGatewayActionSummary, buildGatewayBaseUrl, buildGatewayConnectHost, buildGatewayIntegrationSummary, buildGatewayMetricsSummary, buildGatewayRequestLogSummary, buildGatewayRoutingSummary, buildGatewaySecuritySummary, buildGatewayStatusSummary, createGatewayFieldErrors, filterGatewayRequestLogs, formatGatewayAccountOptionLabel, formatGatewayTimestamp, mergeErrorHistory } from './gatewayPageUtils'
 import {
   buildGatewayConfigSnapshot,
   buildGatewayRuntimeSnapshot,
@@ -1141,7 +1145,7 @@ function GatewayPage() {
                         <Card withBorder radius="md">
                           <Text size="xs" className={colors.textMuted}>OpenAI</Text>
                           <Text fw={700} className={colors.text}>Responses / function call</Text>
-                          <Text size="sm" className={colors.textMuted} mt={6}>支持 /v1/responses、tool call 生命周期、流式 delta 和最终 completed 事件。</Text>
+                          <Text size="sm" className={colors.textMuted} mt={6}>支持 /v1/responses、function call、流式 delta、done 与 completed 事件，并透传 tool_choice。</Text>
                         </Card>
                         <Card withBorder radius="md">
                           <Text size="xs" className={colors.textMuted}>网关边界</Text>

@@ -11,7 +11,6 @@ pub struct NormalizedRequest {
     pub top_p: Option<f32>,
     pub stop: Option<Vec<String>>,
     pub tools: Option<Vec<Tool>>,
-    #[allow(dead_code)] // 当前归一化层保留该字段用于协议对齐与测试校验，后续 Kiro payload 尚未消费
     pub tool_choice: Option<serde_json::Value>,
 }
 
@@ -152,6 +151,8 @@ pub struct InferenceConfig {
 pub struct UserInputMessageContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<KiroTool>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_results: Option<Vec<KiroToolResult>>,
 }

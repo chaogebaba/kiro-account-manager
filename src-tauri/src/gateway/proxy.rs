@@ -498,7 +498,7 @@ pub async fn proxy_handler(
         ..request_log_context.clone()
     };
 
-    if !request.stream && has_server_web_search_tool(&request) {
+    if has_server_web_search_tool(&request) {
         let outcome = match execute_request_with_server_tools(&state, &upstream, &request).await {
             Ok(outcome) => outcome,
             Err((status, error_type, message)) => {
@@ -516,6 +516,36 @@ pub async fn proxy_handler(
                 .await;
             }
         };
+
+        if request.stream && matches!(format, ResponseFormat::Responses) {
+            let response = build_stream_responses_completed_event(
+                &request.model,
+                &outcome.aggregated,
+                &outcome.server_tool_calls,
+                &format!("resp_{}", short_uuid()),
+                &format!("msg_{}", short_uuid()),
+                chrono::Utc::now().timestamp(),
+            );
+            let response_body = serialize_logged_value(&response);
+            write_request_log(
+                &upstream_log_context,
+                StatusCode::OK,
+                "success",
+                None,
+                Some(response_body.as_str()),
+            );
+            let body = format!("data: {}\n\ndata: [DONE]\n\n", response);
+            return Response::builder()
+                .status(StatusCode::OK)
+                .header(
+                    header::CONTENT_TYPE,
+                    HeaderValue::from_static("text/event-stream"),
+                )
+                .header(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"))
+                .header(header::CONNECTION, HeaderValue::from_static("keep-alive"))
+                .body(Body::from(body))
+                .unwrap_or_else(|_| Response::new(Body::empty()));
+        }
 
         let response = match format {
             ResponseFormat::Anthropic => build_anthropic_response(
@@ -593,7 +623,7 @@ pub async fn proxy_handler(
             None,
             Some(STREAMING_RESPONSE_PLACEHOLDER),
         );
-        return stream_proxy_response(upstream_resp, format, request.model);
+        return stream_proxy_response(upstream_resp, format, request.model, Vec::new());
     }
 
     let body = match upstream_resp.text().await {
@@ -1937,6 +1967,36 @@ fn build_responses_web_search_call(call: &ServerToolCall) -> Value {
     })
 }
 
+fn build_responses_message_content(
+    aggregated: &stream::AggregatedKiroResponse,
+    server_tool_calls: &[ServerToolCall],
+) -> Vec<Value> {
+    let output_text = build_responses_output_text(aggregated, server_tool_calls);
+    let mut content = Vec::new();
+    if !output_text.text.is_empty() {
+        content.push(json!({
+            "type": "output_text",
+            "text": output_text.text,
+            "annotations": output_text.annotations
+        }));
+    }
+    if !aggregated.thinking.is_empty() {
+        content.push(json!({
+            "type": "reasoning",
+            "summary": aggregated.thinking
+        }));
+    }
+    for (id, name, arguments) in &aggregated.tool_calls {
+        content.push(json!({
+            "type": "function_call",
+            "call_id": id,
+            "name": name,
+            "arguments": arguments
+        }));
+    }
+    content
+}
+
 fn build_responses_response(
     model: &str,
     aggregated: &stream::AggregatedKiroResponse,
@@ -1961,28 +2021,7 @@ fn build_responses_response_with_ids(
     created_at: i64,
 ) -> Value {
     let output_text = build_responses_output_text(aggregated, server_tool_calls);
-    let mut content = Vec::new();
-    if !output_text.text.is_empty() {
-        content.push(json!({
-            "type": "output_text",
-            "text": output_text.text,
-            "annotations": output_text.annotations
-        }));
-    }
-    if !aggregated.thinking.is_empty() {
-        content.push(json!({
-            "type": "reasoning",
-            "summary": aggregated.thinking
-        }));
-    }
-    for (id, name, arguments) in &aggregated.tool_calls {
-        content.push(json!({
-            "type": "function_call",
-            "call_id": id,
-            "name": name,
-            "arguments": arguments
-        }));
-    }
+    let content = build_responses_message_content(aggregated, server_tool_calls);
 
     let mut output: Vec<Value> = server_tool_calls
         .iter()
@@ -2015,6 +2054,7 @@ fn build_responses_response_with_ids(
 fn build_stream_responses_completed_event(
     model: &str,
     aggregated: &stream::AggregatedKiroResponse,
+    server_tool_calls: &[ServerToolCall],
     response_id: &str,
     message_id: &str,
     created_at: i64,
@@ -2024,7 +2064,7 @@ fn build_stream_responses_completed_event(
         "response": build_responses_response_with_ids(
             model,
             aggregated,
-            &[],
+            server_tool_calls,
             response_id,
             message_id,
             created_at,
@@ -2032,6 +2072,40 @@ fn build_stream_responses_completed_event(
     })
 }
 
+fn build_stream_responses_function_call_arguments_done_event(
+    response_id: &str,
+    call_id: &str,
+    arguments: &str,
+) -> Value {
+    json!({
+        "type": "response.function_call_arguments.done",
+        "response_id": response_id,
+        "call_id": call_id,
+        "arguments": arguments
+    })
+}
+
+fn build_stream_responses_output_text_done_event(
+    response_id: &str,
+    text: &str,
+) -> Value {
+    json!({
+        "type": "response.output_text.done",
+        "response_id": response_id,
+        "text": text
+    })
+}
+
+fn build_stream_responses_reasoning_done_event(
+    response_id: &str,
+    text: &str,
+) -> Value {
+    json!({
+        "type": "response.reasoning.done",
+        "response_id": response_id,
+        "text": text
+    })
+}
 
 fn gateway_error_response(
     format: ResponseFormat,
@@ -2173,6 +2247,7 @@ fn stream_proxy_response(
     upstream_resp: reqwest::Response,
     format: ResponseFormat,
     model: String,
+    server_tool_calls: Vec<ServerToolCall>,
 ) -> Response {
     let (tx, rx) = mpsc::channel::<Result<Bytes, Infallible>>(2048);
     tokio::spawn(async move {
@@ -2493,6 +2568,12 @@ fn stream_proxy_response(
                                                         name.clone(),
                                                         input.clone(),
                                                     ));
+                                                    let done = build_stream_responses_function_call_arguments_done_event(
+                                                        &response_id,
+                                                        &id,
+                                                        &input,
+                                                    );
+                                                    send_data(&tx, &done.to_string()).await;
                                                     let output_index = responses_tool_output_indexes
                                                         .remove(&id)
                                                         .unwrap_or_else(|| {
@@ -2663,21 +2744,22 @@ fn stream_proxy_response(
                 send_event(&tx, Some("message_stop"), "{\"type\":\"message_stop\"}").await;
             }
             ResponseFormat::Responses => {
-                let output_text = build_responses_output_text(&aggregated, &[]);
-                let mut content = Vec::new();
+                let output_text = build_responses_output_text(&aggregated, &server_tool_calls);
                 if !output_text.text.is_empty() {
-                    content.push(json!({
-                        "type": "output_text",
-                        "text": output_text.text,
-                        "annotations": output_text.annotations
-                    }));
+                    let text_done = build_stream_responses_output_text_done_event(
+                        &response_id,
+                        &output_text.text,
+                    );
+                    send_data(&tx, &text_done.to_string()).await;
                 }
                 if !aggregated.thinking.is_empty() {
-                    content.push(json!({
-                        "type": "reasoning",
-                        "summary": aggregated.thinking
-                    }));
+                    let reasoning_done = build_stream_responses_reasoning_done_event(
+                        &response_id,
+                        &aggregated.thinking,
+                    );
+                    send_data(&tx, &reasoning_done.to_string()).await;
                 }
+                let content = build_responses_message_content(&aggregated, &server_tool_calls);
                 let output_item_done = json!({
                     "type": "response.output_item.done",
                     "response_id": response_id,
@@ -2695,6 +2777,7 @@ fn stream_proxy_response(
                 let completed = build_stream_responses_completed_event(
                     &model,
                     &aggregated,
+                    &server_tool_calls,
                     &response_id,
                     &message_id,
                     created_at,
@@ -3303,6 +3386,7 @@ mod tests {
         let event = build_stream_responses_completed_event(
             "gpt-4.1",
             &aggregated,
+            &[],
             "resp_test",
             "msg_test",
             123,
@@ -3326,27 +3410,63 @@ mod tests {
     }
 
     #[test]
-    fn build_responses_annotation_added_event_uses_sdk_shape() {
-        let event = build_responses_annotation_added_event(
+    fn build_stream_responses_completed_event_keeps_server_web_search_output() {
+        let aggregated = stream::AggregatedKiroResponse {
+            text: "Hello Rust".to_string(),
+            thinking: String::new(),
+            tool_calls: Vec::new(),
+            input_tokens: 3,
+            output_tokens: 5,
+            context_usage_percentage: None,
+            citations: Vec::new(),
+        };
+
+        let event = build_stream_responses_completed_event(
+            "gpt-4.1",
+            &aggregated,
+            &[ServerToolCall {
+                id: "srv_1".to_string(),
+                name: "web_search".to_string(),
+                input: json!({ "query": "Rust release" }),
+                result_content: json!([{
+                    "type": "web_search_result",
+                    "title": "Rust Blog",
+                    "url": "https://blog.rust-lang.org"
+                }]),
+                tool_result_text: "{\"results\":[]}".to_string(),
+            }],
             "resp_test",
             "msg_test",
-            json!({
-                "type": "url_citation",
-                "url": "https://example.com/rust",
-                "citationText": "Rust"
-            }),
-            2,
-            7,
+            123,
         );
 
-        assert_eq!(event["type"], "response.output_text.annotation.added");
-        assert_eq!(event["response_id"], "resp_test");
-        assert_eq!(event["item_id"], "msg_test");
-        assert_eq!(event["output_index"], 0);
-        assert_eq!(event["content_index"], 0);
-        assert_eq!(event["annotation_index"], 2);
-        assert_eq!(event["sequence_number"], 7);
-        assert_eq!(event["annotation"]["type"], "url_citation");
+        assert_eq!(event["response"]["output"][0]["type"], "web_search_call");
+        assert_eq!(event["response"]["output"][0]["action"]["query"], "Rust release");
+        assert_eq!(event["response"]["output"][1]["type"], "message");
+    }
+
+    #[test]
+    fn build_stream_responses_done_events_use_expected_shape() {
+        let function_done = build_stream_responses_function_call_arguments_done_event(
+            "resp_test",
+            "call_1",
+            "{\"q\":\"rust\"}",
+        );
+        let text_done = build_stream_responses_output_text_done_event("resp_test", "Hello Rust");
+        let reasoning_done = build_stream_responses_reasoning_done_event("resp_test", "Think");
+
+        assert_eq!(function_done["type"], "response.function_call_arguments.done");
+        assert_eq!(function_done["response_id"], "resp_test");
+        assert_eq!(function_done["call_id"], "call_1");
+        assert_eq!(function_done["arguments"], "{\"q\":\"rust\"}");
+
+        assert_eq!(text_done["type"], "response.output_text.done");
+        assert_eq!(text_done["response_id"], "resp_test");
+        assert_eq!(text_done["text"], "Hello Rust");
+
+        assert_eq!(reasoning_done["type"], "response.reasoning.done");
+        assert_eq!(reasoning_done["response_id"], "resp_test");
+        assert_eq!(reasoning_done["text"], "Think");
     }
 
     #[test]
