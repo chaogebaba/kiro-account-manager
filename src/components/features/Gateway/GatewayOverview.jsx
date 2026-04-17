@@ -1,7 +1,7 @@
 import { Check, Copy, FolderOpen, Radio, RefreshCw, Shield } from 'lucide-react'
 import { Badge, Button, Card, Code, Group, Stack, Text } from '@mantine/core'
 
-function GatewayOverviewTab({
+function GatewayOverview({
   colors,
   loading,
   handleRefresh,
@@ -187,4 +187,4 @@ function GatewayOverviewTab({
   )
 }
 
-export default GatewayOverviewTab
+export default GatewayOverview

@@ -1,7 +1,7 @@
 import { Server } from 'lucide-react'
 import { Badge, Button, Card, Group, NumberInput, Select, Stack, Switch, Text, TextInput, Textarea, Tooltip } from '@mantine/core'
 
-function GatewayAdvancedTab({
+function GatewayAdvanced({
   colors,
   config,
   hasFieldErrors,
@@ -292,4 +292,4 @@ function GatewayAdvancedTab({
   )
 }
 
-export default GatewayAdvancedTab
+export default GatewayAdvanced

@@ -2,7 +2,7 @@ import { Activity, AlertTriangle, FolderOpen, Radio, RefreshCw, Search, Shield }
 import { Alert, Badge, Button, Card, Code, Group, Select, Stack, Text, TextInput } from '@mantine/core'
 import { formatGatewayRequestDuration, getGatewayRequestOutcomeColor } from '../gatewayPageUtils'
 
-function GatewayObservabilityTab({
+function GatewayObservability({
   colors,
   observabilityHighlights,
   effectiveConfig,
@@ -439,4 +439,4 @@ function GatewayObservabilityTab({
   )
 }
 
-export default GatewayObservabilityTab
+export default GatewayObservability

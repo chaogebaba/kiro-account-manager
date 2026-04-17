@@ -1,7 +1,7 @@
 import { Check, Copy } from 'lucide-react'
 import { Badge, Button, Card, Code, Group, Stack, Text } from '@mantine/core'
 
-function GatewayIntegrationTab({
+function GatewayIntegration({
   colors,
   integrationGuidance,
   integrationSummary,
@@ -130,4 +130,4 @@ function GatewayIntegrationTab({
   )
 }
 
-export default GatewayIntegrationTab
+export default GatewayIntegration
