@@ -6,7 +6,7 @@ import { Home, Key, Settings2, LogIn, Settings, Info, Network } from 'lucide-rea
 export const routes = [
   { id: 'home', icon: Home, nameKey: 'nav.home', component: lazy(() => import('./components/features/Home')) },
   { id: 'accounts', icon: Key, nameKey: 'nav.accounts', component: lazy(() => import('./components/features/AccountManager/index')) },
-  { id: 'kiroConfig', icon: Settings2, nameKey: 'nav.kiroConfig', component: lazy(() => import('./components/features/KiroConfig/index')) },
+  { id: 'kiroConfig', icon: Settings2, nameKey: 'nav.kiroConfig', component: lazy(() => import('./components/features/KiroConfig/KiroConfig')) },
   { id: 'desktopOAuth', icon: LogIn, nameKey: 'nav.desktopOAuth', descKey: 'nav.socialIdC', component: lazy(() => import('./components/features/Login')) },
   { id: 'gateway', icon: Network, nameKey: 'nav.gateway', component: lazy(() => import('./components/features/GatewayPage')) },
   { id: 'settings', icon: Settings, nameKey: 'nav.settings', component: lazy(() => import('./components/features/Settings')) },
