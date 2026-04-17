@@ -2,10 +2,10 @@ import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, use
 import { Activity, Play, RotateCcw, Square } from 'lucide-react'
 import { Alert, Badge, Button, Card, Group, Stack, Tabs, Text } from '@mantine/core'
 import { useApp } from '../../hooks/useApp'
-import GatewayAdvancedTab from './gateway/GatewayAdvancedTab'
-import GatewayIntegrationTab from './gateway/GatewayIntegrationTab'
-import GatewayObservabilityTab from './gateway/GatewayObservabilityTab'
-import GatewayOverviewTab from './gateway/GatewayOverviewTab'
+import GatewayAdvancedTab from './Gateway/GatewayAdvancedTab'
+import GatewayIntegrationTab from './Gateway/GatewayIntegrationTab'
+import GatewayObservabilityTab from './Gateway/GatewayObservabilityTab'
+import GatewayOverviewTab from './Gateway/GatewayOverviewTab'
 import { applyGatewayLocalOnlyChange, buildClientSamples, buildGatewayActionSummary, buildGatewayBaseUrl, buildGatewayConnectHost, buildGatewayIntegrationSummary, buildGatewayMetricsSummary, buildGatewayRequestLogSummary, buildGatewayRoutingSummary, buildGatewaySecuritySummary, buildGatewayStatusSummary, createGatewayFieldErrors, filterGatewayRequestLogs, formatGatewayAccountOptionLabel, formatGatewayTimestamp, mergeErrorHistory } from './gatewayPageUtils'
 import {
   buildGatewayConfigSnapshot,
