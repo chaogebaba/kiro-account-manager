@@ -9,8 +9,8 @@ import {
   DialogTitle,
   DialogBody,
   DialogFooter,
-} from '../../ui/dialog'
-import { Button } from '../../ui/button'
+} from '../../shared/dialog'
+import { Button } from '../../shared/button'
 
 /**
  * 通用确认/提示模态框
