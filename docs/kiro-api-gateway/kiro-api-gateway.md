@@ -86,7 +86,7 @@
 - 已支持真实上游 `application/vnd.amazon.eventstream` 请求，并将 Kiro chunked stream 增量转换为 Anthropic / OpenAI / Responses SSE。
 - **已实现 AWS EventStream 二进制协议解码**：`src-tauri/src/gateway/eventstream.rs` 采用逐消息解码（与 Kiro IDE 官方实现一致），支持 CRC32 校验、完整头部解析、自动重试机制（3次指数退避）、Stalled Stream 保护（5分钟超时），彻底解决了流式响应截断问题。详见 `docs/kiro-api-gateway/STREAMING_FIX.md`。
 - 已完成 `system`、`tools`、`tool_use`、`tool_result`、`reasoningContent` 的主链路转换，并补充了 Responses `input` -> 统一请求模型归一化。
-- 已支持客户端 API Key 形式的入口鉴权，以及 `localOnly` + `allowedIps` 的访问限制。
+- 已支持客户端 API Key 形式的入口鉴权，以及 `localOnly` + `allowedIps` 的访问限制；当前可同时配置多个客户端 Key，任意一个命中即可通过入口鉴权。
 - 已接入现有账号体系：`single/group`、`accountId/groupId`、`strategy`、`threshold`。
 - 已支持基础图片输入：Anthropic `image` base64 块，以及 `image_url`/Responses `input_image` 的 data URL 与远程 HTTP(S) 图片 URL，会被提取到 Kiro `images` 字段。
 - 已加入错误映射与脱敏，`401/403/429/5xx` 会按兼容格式返回，错误文本会裁剪敏感字段。
@@ -96,7 +96,8 @@
 - **`web_search` 特殊工具已接入**：当前已支持 Anthropic 版本化 `web_search_*` 归一化为 Kiro `web_search` 工具，并由网关代执行 `/mcp tools/call` 后回灌为服务端搜索结果。公开文档已能确认 `web_search_20250305` / `web_search_20260209` 这类版本化命名真实存在；但截至目前，我们掌握的是“网关按 `web_search_*` 模式兼容”，不是“Kiro 上游已被实证会发出上述每个版本号”。
 - **Responses / Anthropic citations 已按 SDK 结构输出**：OpenAI Responses 输出已补 `web_search_call`，非流式 `output_text.annotations` 与流式 `response.output_text.annotation.added` 都支持 Kiro 原始 `citationEvent` 的映射；其中仍保留 `target` / `citationText` / `citationLink`，且仅当上游 `target.range` 明确存在时才补 `start_index/end_index`，不会再把 `citationText` 硬塞到 `url_citation.title`。Anthropic 侧则按官方 `TextCitation` / `citations_delta` 结构输出：非流式 `content[].citations` 和流式 `content_block_delta.delta.citation` 现在都会把 Kiro 原始 citation 映射成 `char_location`。若上游只给 `target.location`，Anthropic 侧会用 `citationText` 长度补 `end_char_index`；Responses 侧仍不额外猜 `start_index/end_index`。运行时若要继续取证 citation 原始事件，优先看 Kiro 源码中的 `Q Chat API -> debug.log / execution-log.json` 导出链路，不要把普通 `q-client.log` 当成 citation 主样本。
 - **图片输入已支持远程 HTTP(S) URL**：当前会按响应 `Content-Type` 或 URL 扩展名识别 `png/jpeg/gif/webp`；更复杂的鉴权下载、重定向策略与尺寸限制仍未增强。
-- **客户端 API Key 当前是必填项**：当前配置校验会无条件要求 `accessToken` / 客户端 API Key 非空；`localOnly` 与 `allowedIps` 只是额外的网络访问限制，不再承担“留空即可关闭入口鉴权”的语义。
+- **客户端 API Key 当前是必填项**：当前配置校验会无条件要求至少一个客户端 API Key；老配置里的 `accessToken` 会自动收敛为首个客户端 Key。`localOnly` 与 `allowedIps` 只是额外的网络访问限制，不再承担“留空即可关闭入口鉴权”的语义。
+- **请求日志默认只保留元数据**：当前请求日志默认记录端点、状态码、耗时、模型、Region、上游来源与错误信息，不再默认持久化原始请求/响应 body；旧日志里若已有 body，前端仍兼容展示。
 - **远程图片输入已加基础安全边界**：仅允许 `http/https`，会拒绝 `localhost`、loopback、私网/链路本地/文档保留地址，并限制有限次重定向与单张图片大小；更复杂的鉴权下载策略仍未增强。
 - **`GET /v1/models` 当前仍是静态列表**：对外模型列表目前来自网关内置 `get_available_models()`，尚未对接真实上游 `ListAvailableModels`；因此 region/profileArn 选区收敛目前只覆盖对话链与 `/mcp` 代执行链。
 
@@ -236,7 +237,7 @@
 - Claude/Anthropic 客户端：
 - `base_url` 指向本地代理。
 - `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` 应填写网关自己的客户端 API Key，不是 Kiro 上游 `access_token`。
-- 当前入口鉴权支持 `Authorization: Bearer <gateway-api-key>` 与 `x-api-key`。
+- 当前入口鉴权支持 `Authorization: Bearer <gateway-api-key>` 与 `x-api-key`；若配置了多个客户端 Key，任意一个命中即可。
 - OpenAI 侧当前主入口是 `POST /v1/responses`，不要再按 `chat/completions` 兼容层理解。
 - 代理将 `model`、`messages`、`stream` 等字段转换到 Kiro API。
 - 处理错误码与异常格式的映射。
@@ -1333,6 +1334,7 @@
 
 ## 2api 实现原理（核心链路）
 - 代理层：本地 HTTP 服务对外提供 Anthropic `POST /v1/messages`，以及 OpenAI `POST /v1/responses`。
+- 入口鉴权层：网关配置可保存一个或多个客户端 API Key；它们只控制“谁能进入本地网关”，不改变上游账号池路由。
 - 鉴权层：使用 Kiro 账号获取 `access_token`，请求上游时携带 `Authorization` + Cookie。
 - 上游调用层：请求发送到 `https://q.{region}.amazonaws.com/` 的对话接口（常见路径 `generateAssistantResponse`）。
 - 协议适配层：将上游响应按客户端协议转换为 Anthropic / OpenAI Responses 结构；若 `stream: true` 则输出对应 SSE。
@@ -1349,6 +1351,7 @@
 ### 2) 账号与 Token 准备
 - 当前网关从已有账号体系里挑选 `single/group` 账号，并通过 `refresh_token_by_provider()` 刷新出可用的 `access_token`。
 - 若 access token 过期，先刷新再继续（失败则返回 Anthropic 标准错误）。
+- 多客户端 API Key 只作用于入口鉴权，不会把不同客户端 Key 绑定到不同 `single/group` 账号策略；上游账号仍按现有账号池逻辑选择。
 - 构建上游鉴权头：
 - `Authorization: Bearer <access_token>`
 - `User-Agent` / `x-amz-user-agent: KiroIDE <version> <machineId>`
@@ -1558,7 +1561,7 @@ data: {"type":"message_stop"}
 - `groupId`（group 模式）。
 - `strategy`（round_robin/most_quota/random）。
 - `threshold`（可选，控制切换阈值）。
-- `accessToken` / 客户端 API Key（当前必填，支持 `Authorization` 或 `x-api-key`）。
+- `accessToken` / `clientApiKeys` / 客户端 API Key（当前至少一个必填，支持 `Authorization` 或 `x-api-key`；`accessToken` 仅作为老配置兼容字段保留）。
 - `localOnly` / `allowedIps`（入口访问限制）。
 - `logLevel`（应用日志级别）。
 
