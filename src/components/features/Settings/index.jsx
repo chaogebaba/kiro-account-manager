@@ -411,8 +411,27 @@ function Settings() {
             }
             
             if (proxyInfo.enabled && proxyInfo.httpProxy) {
-                setHttpProxy(proxyInfo.httpProxy)
-                await showSuccess(t('settings.detectSuccess'), `${t('settings.systemProxyDetected')}: ${proxyInfo.httpProxy}`)
+                // 规范化检测到的代理地址：如果没有协议前缀，添加 http://
+                const detectedProxy = proxyInfo.httpProxy.startsWith('http://') 
+                    || proxyInfo.httpProxy.startsWith('https://') 
+                    || proxyInfo.httpProxy.startsWith('socks5://')
+                    ? proxyInfo.httpProxy
+                    : `http://${proxyInfo.httpProxy}`
+                
+                // 如果输入框已有值，询问是否替换
+                if (httpProxy.trim()) {
+                    const replace = await showConfirm(
+                        t('settings.detectSuccess'),
+                        `${t('settings.systemProxyDetected')}: ${detectedProxy}\n\n当前已有代理配置，是否替换？`
+                    )
+                    if (replace) {
+                        setHttpProxy(detectedProxy)
+                    }
+                } else {
+                    // 输入框为空，直接填充
+                    setHttpProxy(detectedProxy)
+                    await showSuccess(t('settings.detectSuccess'), `${t('settings.systemProxyDetected')}: ${detectedProxy}`)
+                }
             } else if (proxyInfo.proxyServer) {
                 // 代理已配置但未启用
                 const useIt = await showConfirm(t('settings.proxyConfigured'), `${t('settings.proxyNotEnabled')}: ${proxyInfo.proxyServer}\n\n${t('settings.useThisProxy')}`)
@@ -708,6 +727,7 @@ function Settings() {
                                 <label className={`block text-sm ${colors.textMuted} mb-1.5`}>{t('settings.httpProxy')}</label>
                                 <div className="flex gap-2">
                                     <TextInput
+                                        type="text"
                                         value={httpProxy}
                                         onChange={(e) => setHttpProxy(e.currentTarget.value)}
                                         placeholder="http://127.0.0.1:7897"

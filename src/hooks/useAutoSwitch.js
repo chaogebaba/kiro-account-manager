@@ -63,8 +63,16 @@ export function useAutoSwitch(appSettings, settingsLoading) {
           // 更新账号状态为封禁
           try {
             await invoke('update_account', {
-              id: currentAccount.id,
-              status: 'banned'
+              params: {
+                id: currentAccount.id,
+                label: null,
+                status: 'banned',
+                accessToken: null,
+                refreshToken: null,
+                clientId: null,
+                clientSecret: null,
+                machineId: null,
+              }
             })
             emit('accounts-updated')
           } catch (updateErr) {
@@ -74,8 +82,16 @@ export function useAutoSwitch(appSettings, settingsLoading) {
         } else if (errorMsg.includes('AUTH_ERROR') || errorMsg.includes('401') || errorMsg.includes('invalid')) {
           try {
             await invoke('update_account', {
-              id: currentAccount.id,
-              status: 'invalid'
+              params: {
+                id: currentAccount.id,
+                label: null,
+                status: 'invalid',
+                accessToken: null,
+                refreshToken: null,
+                clientId: null,
+                clientSecret: null,
+                machineId: null,
+              }
             })
             emit('accounts-updated')
           } catch (updateErr) {

@@ -126,18 +126,19 @@ function EditAccountModal({ account, onClose, onSuccess }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const params = {
-        id: account.id,
-        label: form.label || null,
-        accessToken: form.accessToken || null,
-        refreshToken: form.refreshToken || null,
-        machineId: form.machineId || null,
-      }
-      if (isIdCAccount) {
-        params.clientId = form.clientId || null
-        params.clientSecret = form.clientSecret || null
-      }
-      const updatedAccount = await invoke('update_account', params)
+      // Tauri 命令参数名是 params，必须嵌套传递
+      const updatedAccount = await invoke('update_account', {
+        params: {
+          id: account.id,
+          label: form.label || null,
+          status: null,
+          accessToken: form.accessToken || null,
+          refreshToken: form.refreshToken || null,
+          clientId: isIdCAccount ? (form.clientId || null) : null,
+          clientSecret: isIdCAccount ? (form.clientSecret || null) : null,
+          machineId: form.machineId || null,
+        }
+      })
       await setAccountGroup(account.id, selectedGroupId || null)
       await setAccountTags(account.id, selectedTagIds)
       onSuccess?.(updatedAccount)

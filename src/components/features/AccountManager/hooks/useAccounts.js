@@ -135,14 +135,36 @@ export function useAccounts() {
       // 失效或封禁时更新状态，避免后续继续参与自动链路
       if (errorMsg.includes('BANNED')) {
         try {
-          await invoke('update_account', { id, status: 'banned' })
+          await invoke('update_account', {
+            params: {
+              id,
+              label: null,
+              status: 'banned',
+              accessToken: null,
+              refreshToken: null,
+              clientId: null,
+              clientSecret: null,
+              machineId: null,
+            }
+          })
           setAccounts(prev => prev.map(a => a.id === id ? { ...a, status: 'banned' } : a))
         } catch (updateErr) {
           // 静默处理
         }
       } else if (errorMsg.includes('AUTH_ERROR') || errorMsg.includes('401') || errorMsg.includes('invalid')) {
         try {
-          await invoke('update_account', { id, status: 'invalid' })
+          await invoke('update_account', {
+            params: {
+              id,
+              label: null,
+              status: 'invalid',
+              accessToken: null,
+              refreshToken: null,
+              clientId: null,
+              clientSecret: null,
+              machineId: null,
+            }
+          })
           setAccounts(prev => prev.map(a => a.id === id ? { ...a, status: 'invalid' } : a))
         } catch (updateErr) {
           // 静默处理

@@ -354,6 +354,7 @@ fn request_endpoint(format: ResponseFormat) -> &'static str {
     match format {
         ResponseFormat::Anthropic => "messages",
         ResponseFormat::Responses => "responses",
+        ResponseFormat::OpenAI => "chat/completions",
     }
 }
 
@@ -407,6 +408,13 @@ fn build_gateway_error_body(
             }
         }),
         ResponseFormat::Responses => json!({
+            "error": {
+                "message": message,
+                "type": error_type,
+                "code": status.as_u16()
+            }
+        }),
+        ResponseFormat::OpenAI => json!({
             "error": {
                 "message": message,
                 "type": error_type,
@@ -637,6 +645,13 @@ pub async fn proxy_handler(
                 created_at,
                 request.previous_response_id.as_deref(),
             ),
+            ResponseFormat::OpenAI => {
+                serde_json::to_value(stream::build_openai_response(
+                    &request.model,
+                    &outcome.aggregated,
+                ))
+                .unwrap_or_else(|_| json!({}))
+            }
         };
         let response_body = serialize_logged_value(&response);
         if matches!(format, ResponseFormat::Responses) {
@@ -769,6 +784,10 @@ pub async fn proxy_handler(
             created_at,
             request.previous_response_id.as_deref(),
         ),
+        ResponseFormat::OpenAI => {
+            serde_json::to_value(stream::build_openai_response(&request.model, &aggregated))
+                .unwrap_or_else(|_| json!({}))
+        }
     };
     if matches!(format, ResponseFormat::Responses) {
         persist_responses_session_entry(
@@ -1444,6 +1463,12 @@ fn normalize_request(format: ResponseFormat, payload: &Value) -> Result<Normaliz
             Ok(normalize_anthropic_request(&request))
         }
         ResponseFormat::Responses => normalize_responses_request(payload),
+        ResponseFormat::OpenAI => {
+            let request: crate::gateway::models::OpenAIChatRequest =
+                serde_json::from_value(payload.clone())
+                    .map_err(|error| format!("OpenAI 请求解析失败: {error}"))?;
+            Ok(crate::gateway::converter::normalize_openai_chat_request(&request))
+        }
     }
 }
 
@@ -2400,6 +2425,8 @@ fn stream_proxy_response(
         let response_id = format!("resp_{}", short_uuid());
         let message_id = format!("msg_{}", short_uuid());
         let created_at = chrono::Utc::now().timestamp();
+        let completion_id = format!("chatcmpl-{}", short_uuid());
+        let created = created_at;
         let mut responses_sequence_number = 0usize;
         let mut responses_next_output_index = 1usize;
         let mut responses_tool_output_indexes: HashMap<String, usize> = HashMap::new();
@@ -2531,6 +2558,8 @@ fn stream_proxy_response(
                                                 &model,
                                                 &anthropic_id,
                                                 &response_id,
+                                                &completion_id,
+                                                created,
                                                 &text,
                                                 true,
                                                 &mut message_started,
@@ -2551,6 +2580,8 @@ fn stream_proxy_response(
                                                     &model,
                                                     &anthropic_id,
                                                     &response_id,
+                                                    &completion_id,
+                                                    created,
                                                     &segment.content,
                                                     segment.segment_type == SegmentType::Thinking,
                                                     &mut message_started,
@@ -2626,6 +2657,9 @@ fn stream_proxy_response(
                                                     });
                                                     send_data(&tx, &data.to_string()).await;
                                                 }
+                                                ResponseFormat::OpenAI => {
+                                                    // OpenAI 格式在最后统一发送 tool_calls
+                                                }
                                             }
                                         }
                                         KiroEvent::ToolUseInputDelta { id, input_delta } => {
@@ -2668,6 +2702,9 @@ fn stream_proxy_response(
                                                         "delta": input_delta
                                                     });
                                                     send_data(&tx, &data.to_string()).await;
+                                                }
+                                                ResponseFormat::OpenAI => {
+                                                    // OpenAI 格式在最后统一发送 tool_calls
                                                 }
                                             }
                                         }
@@ -2727,6 +2764,11 @@ fn stream_proxy_response(
                                                         }
                                                     });
                                                     send_data(&tx, &data.to_string()).await;
+                                                }
+                                            }
+                                            ResponseFormat::OpenAI => {
+                                                if let Some((name, input)) = tool_accumulators.remove(&id) {
+                                                    aggregated.tool_calls.push((id.clone(), name, input));
                                                 }
                                             }
                                         },
@@ -2806,6 +2848,9 @@ fn stream_proxy_response(
                                                         send_data(&tx, &data.to_string()).await;
                                                     }
                                                 }
+                                                ResponseFormat::OpenAI => {
+                                                    // OpenAI 格式暂不支持 citations
+                                                }
                                             }
                                         }
                                     }
@@ -2845,6 +2890,8 @@ fn stream_proxy_response(
                 &model,
                 &anthropic_id,
                 &response_id,
+                &completion_id,
+                created,
                 &segment.content,
                 segment.segment_type == SegmentType::Thinking,
                 &mut message_started,
@@ -2926,6 +2973,74 @@ fn stream_proxy_response(
                 .await;
                 send_data(&tx, "[DONE]").await;
             }
+            ResponseFormat::OpenAI => {
+                // 发送 tool_calls（如果有）
+                if !aggregated.tool_calls.is_empty() {
+                    let tool_calls_delta: Vec<_> = aggregated
+                        .tool_calls
+                        .iter()
+                        .enumerate()
+                        .map(|(index, (id, name, arguments))| {
+                            json!({
+                                "index": index,
+                                "id": id,
+                                "type": "function",
+                                "function": {
+                                    "name": name,
+                                    "arguments": arguments
+                                }
+                            })
+                        })
+                        .collect();
+
+                    let chunk = stream::build_openai_chunk(
+                        &format!("chatcmpl-{}", uuid::Uuid::new_v4().simple()),
+                        created_at,
+                        &model,
+                        crate::gateway::models::OpenAIChatDelta {
+                            role: None,
+                            content: None,
+                            tool_calls: Some(tool_calls_delta.iter().map(|tc| {
+                                crate::gateway::models::OpenAIDeltaToolCall {
+                                    index: tc["index"].as_i64().unwrap() as i32,
+                                    id: tc["id"].as_str().unwrap().to_string(),
+                                    call_type: "function".to_string(),
+                                    function: crate::gateway::models::OpenAIToolCallFunction {
+                                        name: tc["function"]["name"].as_str().unwrap().to_string(),
+                                        arguments: tc["function"]["arguments"].as_str().unwrap().to_string(),
+                                    },
+                                }
+                            }).collect()),
+                        },
+                        None,
+                        None,
+                    );
+                    let chunk_json = serde_json::to_string(&chunk).unwrap_or_default();
+                    send_data(&tx, &chunk_json).await;
+                }
+
+                // 发送最终 chunk（带 finish_reason 和 usage）
+                let finish_reason = if saw_tool_calls { "tool_calls" } else { "stop" };
+                let final_chunk = stream::build_openai_chunk(
+                    &format!("chatcmpl-{}", uuid::Uuid::new_v4().simple()),
+                    created_at,
+                    &model,
+                    crate::gateway::models::OpenAIChatDelta {
+                        role: None,
+                        content: None,
+                        tool_calls: None,
+                    },
+                    Some(finish_reason.to_string()),
+                    Some(crate::gateway::models::OpenAIUsage {
+                        prompt_tokens: input_tokens,
+                        completion_tokens: output_tokens,
+                        total_tokens: input_tokens + output_tokens,
+                    }),
+                );
+                let final_json = serde_json::to_string(&final_chunk).unwrap_or_default();
+                send_data(&tx, &final_json).await;
+                send_data(&tx, "[DONE]").await;
+            }
         }
     });
 
@@ -2948,6 +3063,8 @@ async fn handle_stream_text(
     model: &str,
     anthropic_id: &str,
     response_id: &str,
+    completion_id: &str,
+    created: i64,
     text: &str,
     is_thinking: bool,
     message_started: &mut bool,
@@ -3032,6 +3149,31 @@ async fn handle_stream_text(
                 "delta": text
             });
             send_data(tx, &data.to_string()).await;
+        }
+        ResponseFormat::OpenAI => {
+            let delta = crate::gateway::models::OpenAIChatDelta {
+                role: if !*message_started {
+                    *message_started = true;
+                    Some("assistant".to_string())
+                } else {
+                    None
+                },
+                content: Some(text.to_string()),
+                tool_calls: None,
+            };
+
+            let chunk = crate::gateway::stream::build_openai_chunk(
+                completion_id,
+                created,
+                model,
+                delta,
+                None,
+                None,
+            );
+
+            if let Ok(chunk_json) = serde_json::to_string(&chunk) {
+                send_data(tx, &chunk_json).await;
+            }
         }
     }
 }

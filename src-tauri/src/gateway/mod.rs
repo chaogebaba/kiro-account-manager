@@ -152,6 +152,7 @@ struct RouterState {
 enum ResponseFormat {
     Anthropic,
     Responses,
+    OpenAI,
 }
 
 const CONFIG_DIR: &str = ".kiro-account-manager";
@@ -597,6 +598,7 @@ fn router(state: RouterState) -> Router {
         .route("/messages", post(messages_handler))
         .route("/v1/messages", post(messages_handler))
         .route("/v1/messages/count_tokens", post(count_tokens_handler))
+        .route("/v1/chat/completions", post(openai_chat_handler))
         .route("/v1/responses", post(responses_handler))
         .route("/mcp", post(mcp_handler))
         .with_state(state)
@@ -727,6 +729,15 @@ async fn responses_handler(
     Json(payload): Json<Value>,
 ) -> Response {
     proxy::proxy_handler(state, addr, headers, payload, ResponseFormat::Responses).await
+}
+
+async fn openai_chat_handler(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    State(state): State<RouterState>,
+    headers: HeaderMap,
+    Json(payload): Json<Value>,
+) -> Response {
+    proxy::proxy_handler(state, addr, headers, payload, ResponseFormat::OpenAI).await
 }
 
 async fn mcp_handler(

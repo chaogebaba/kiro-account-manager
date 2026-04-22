@@ -2,8 +2,9 @@ use crate::gateway::models::{
     AnthropicMessagesRequest, ConversationState, CurrentMessage, HistoryAssistantMessage,
     HistoryItem, HistoryUserMessage, ImageBlock, ImageSource, InferenceConfig, KiroInputSchema,
     KiroPayload, KiroTool, KiroToolResult, KiroToolResultContent, KiroToolSpec, KiroToolUse,
-    ModelInfo, NormalizedMessage, NormalizedRequest, Tool, ToolCall, ToolCallFunction,
-    ToolFunction, UserInputMessage, UserInputMessageContext, WebSearchToolOptions,
+    ModelInfo, NormalizedMessage, NormalizedRequest, OpenAIChatRequest,
+    Tool, ToolCall, ToolCallFunction, ToolFunction, UserInputMessage,
+    UserInputMessageContext, WebSearchToolOptions,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use reqwest::Client;
@@ -139,6 +140,112 @@ pub fn normalize_responses_request(payload: &Value) -> Result<NormalizedRequest,
             .filter(|value| !value.is_empty())
             .map(str::to_string),
     })
+}
+
+pub fn normalize_openai_chat_request(request: &OpenAIChatRequest) -> NormalizedRequest {
+    let mut messages = Vec::new();
+    let mut pending_tool_results = Vec::new();
+
+    for msg in &request.messages {
+        match msg.role.as_str() {
+            "system" => {
+                let text = extract_text_content(msg.content.as_ref());
+                if !text.is_empty() {
+                    messages.push(NormalizedMessage {
+                        role: "system".to_string(),
+                        content: Some(Value::String(text)),
+                        tool_calls: None,
+                        tool_call_id: None,
+                        metadata: None,
+                    });
+                }
+            }
+            "tool" => {
+                let content = extract_text_content(msg.content.as_ref());
+                let tool_call_id = msg.tool_call_id.clone().unwrap_or_default();
+                pending_tool_results.push((tool_call_id, content));
+            }
+            "user" | "assistant" => {
+                if !pending_tool_results.is_empty() {
+                    messages.push(create_tool_results_message(&pending_tool_results));
+                    pending_tool_results.clear();
+                }
+
+                let tool_calls = if msg.role == "assistant" {
+                    msg.tool_calls.as_ref().map(|tcs| {
+                        tcs.iter()
+                            .map(|tc| ToolCall {
+                                id: tc.id.clone(),
+                                call_type: tc.call_type.clone(),
+                                function: ToolCallFunction {
+                                    name: tc.function.name.clone(),
+                                    arguments: tc.function.arguments.clone(),
+                                },
+                            })
+                            .collect()
+                    })
+                } else {
+                    None
+                };
+
+                messages.push(NormalizedMessage {
+                    role: msg.role.clone(),
+                    content: msg.content.clone(),
+                    tool_calls,
+                    tool_call_id: None,
+                    metadata: None,
+                });
+            }
+            _ => {}
+        }
+    }
+
+    if !pending_tool_results.is_empty() {
+        messages.push(create_tool_results_message(&pending_tool_results));
+    }
+
+    let tools = request.tools.as_ref().map(|tools| {
+        tools
+            .iter()
+            .map(|t| Tool {
+                tool_type: t.tool_type.clone(),
+                function: t.function.clone(),
+                web_search: None,
+            })
+            .collect()
+    });
+
+    NormalizedRequest {
+        model: request.model.clone(),
+        messages,
+        stream: request.stream,
+        max_tokens: request.max_tokens,
+        temperature: request.temperature,
+        top_p: request.top_p,
+        stop: request.stop.clone(),
+        tools,
+        tool_choice: request.tool_choice.clone(),
+        previous_response_id: None,
+    }
+}
+
+fn create_tool_results_message(tool_results: &[(String, String)]) -> NormalizedMessage {
+    let mut content_array = Vec::new();
+    for (tool_call_id, content) in tool_results {
+        content_array.push(json!({
+            "type": "tool_result",
+            "tool_use_id": tool_call_id,
+            "content": content
+        }));
+    }
+
+    NormalizedMessage {
+        role: "user".to_string(),
+        content: Some(Value::Array(content_array)),
+        tool_calls: None,
+        tool_call_id: None,
+        metadata: None,
+    }
 }
 
 fn convert_anthropic_tool(tool: &crate::gateway::models::AnthropicTool) -> Tool {
