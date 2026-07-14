@@ -5,6 +5,10 @@ export interface IdeSession {
   workspaceDirectory: string
   history: HistoryItem[]
   conversationSummary?: string
+  // V1SessionFileSchema additional fields
+  modelId?: string
+  selectedModel?: string
+  autonomyMode?: string
 }
 
 export interface SessionSummary {
@@ -24,10 +28,12 @@ export interface HistoryItem {
   contextItems: any[]
   editorState: any
   promptLogs: PromptLog[]
+  // V1HistoryItemSchema additional field
+  executionId?: string
 }
 
 export interface Message {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: ContentItem[]
   id: string
 }

@@ -7,11 +7,18 @@ pub struct IdeSession {
     pub session_id: String,
     pub title: String,
     pub session_type: String,
+    #[serde(default, deserialize_with = "deserialize_nullable_string")]
     pub workspace_directory: String,
     pub history: Vec<HistoryItem>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversation_summary: Option<String>,
-    // 忽略其他未知字段
+    // V1SessionFileSchema additional fields (with junk data tolerance)
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_optional_string")]
+    pub model_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_optional_string")]
+    pub selected_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub autonomy_mode: Option<String>,
 }
 
 /// Session 摘要（用于列表显示）
@@ -47,6 +54,9 @@ pub struct HistoryItem {
     pub editor_state: serde_json::Value,
     #[serde(default)]
     pub prompt_logs: Vec<PromptLog>,
+    // V1HistoryItemSchema additional field
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_id: Option<String>,
 }
 
 /// 消息
@@ -131,4 +141,28 @@ pub struct PromptLog {
     pub completion: String,
     #[serde(default)]
     pub completion_options: serde_json::Value,
+}
+
+// V1 Session 兼容：处理垃圾数据 (selectedModel: {}, workspaceDirectory: null)
+fn deserialize_nullable_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::String(s) => Ok(s),
+        serde_json::Value::Null => Ok(String::new()),
+        _ => Ok(String::new()), // 忽略 {} 等垃圾值
+    }
+}
+
+fn deserialize_optional_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::String(s) if !s.is_empty() => Ok(Some(s)),
+        _ => Ok(None), // null / {} / "" 全部映射为 None
+    }
 }
