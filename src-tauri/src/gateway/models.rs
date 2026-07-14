@@ -501,18 +501,6 @@ pub struct AnthropicMessagesRequest {
     pub thinking: Option<Thinking>,
     #[allow(dead_code)]
     pub metadata: Option<serde_json::Value>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    pub context_editing: Option<serde_json::Value>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    pub mcp_servers: Option<serde_json::Value>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    pub betas: Option<Vec<String>>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    pub cache_control: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -521,20 +509,66 @@ pub struct OpenAIChatRequest {
     pub messages: Vec<OpenAIMessage>,
     #[serde(default)]
     pub stream: bool,
+    #[serde(default)]
     pub max_tokens: Option<i32>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub max_completion_tokens: Option<i32>,
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
     pub stop: Option<Vec<String>>,
     pub tools: Option<Vec<OpenAITool>>,
     pub tool_choice: Option<serde_json::Value>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub modalities: Option<Vec<String>>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub audio: Option<AudioParams>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub prediction: Option<PredictionConfig>,
     #[serde(default)]
     pub stream_options: Option<StreamOptions>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub response_format: Option<serde_json::Value>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub store: Option<bool>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub metadata: Option<serde_json::Value>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub user: Option<String>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub n: Option<i32>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub seed: Option<i64>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub frequency_penalty: Option<f32>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub presence_penalty: Option<f32>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub logit_bias: Option<serde_json::Value>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub logprobs: Option<bool>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub top_logprobs: Option<i32>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub parallel_tool_calls: Option<bool>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub service_tier: Option<String>,
 }
 
 
@@ -752,14 +786,6 @@ pub struct AnthropicTool {
     pub description: Option<String>,
     #[serde(default)]
     pub input_schema: serde_json::Value,
-    #[serde(default)]
-    pub max_uses: Option<i32>,
-    #[serde(default)]
-    pub allowed_domains: Option<Vec<String>>,
-    #[serde(default)]
-    pub blocked_domains: Option<Vec<String>>,
-    #[serde(default)]
-    pub user_location: Option<serde_json::Value>,
     #[serde(default)]
     pub cache_control: Option<serde_json::Value>,
 }

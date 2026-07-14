@@ -674,8 +674,8 @@ fn estimate_generic_tokens(text: &str) -> usize {
 ///
 /// 数据来源：
 /// - Kiro 官方文档：https://kiro.dev/docs/models/
-/// - Claude Opus 4.6/4.7：1M tokens
-/// - Claude Sonnet 4.6：1M tokens
+/// - Claude Opus 4.8/4.7/4.6、Sonnet 4.6/5：1M tokens
+/// - GPT-5.6 系列：272K tokens
 /// - 其他 Claude 4.x：200k tokens
 #[allow(dead_code)]
 async fn get_model_max_input_tokens(model_id: &str) -> usize {
@@ -685,13 +685,17 @@ async fn get_model_max_input_tokens(model_id: &str) -> usize {
     if model_lower == "auto" {
         1_000_000 // auto 模型支持 1M tokens
     } else if model_lower.contains("opus-4.8") || model_lower.contains("opus-4-8") {
-        1_000_000 // Claude Opus 4.7: 1M tokens
+        1_000_000 // Claude Opus 4.8: 1M tokens
     } else if model_lower.contains("opus-4.7") || model_lower.contains("opus-4-7") {
         1_000_000 // Claude Opus 4.7: 1M tokens
     } else if model_lower.contains("opus-4.6") || model_lower.contains("opus-4-6") {
         1_000_000 // Claude Opus 4.6: 1M tokens
     } else if model_lower.contains("sonnet-4.6") || model_lower.contains("sonnet-4-6") {
         1_000_000 // Claude Sonnet 4.6: 1M tokens
+    } else if model_lower.contains("sonnet-5") {
+        1_000_000 // Claude Sonnet 5: 1M tokens
+    } else if model_lower.contains("gpt-5.6") || model_lower.contains("gpt-5-6") {
+        272_000 // GPT-5.6 Sol/Terra/Luna: 272K tokens
     } else if model_lower.contains("qwen") {
         256_000 // Qwen3 Coder Next: 256k tokens
     } else if model_lower.contains("llama") || model_lower.contains("deepseek") {
@@ -1476,6 +1480,12 @@ pub async fn proxy_handler(
         .await;
     }
 
+    // 可选：通过 x-account-id 指定本次请求使用的账号（须在当前路由可用集合内）
+    let preferred_account_id = extract_preferred_account_id(&headers);
+    if let Some(ref account_id) = preferred_account_id {
+        log::info!("[网关] 请求指定账号: {}", account_id);
+    }
+
     let mut request = match normalize_request(format, &payload) {
         Ok(request) => request,
         Err(message) => {
@@ -1641,13 +1651,24 @@ pub async fn proxy_handler(
         ..base_log_context.clone()
     };
 
-    let upstream = match resolve_upstream_credentials(&state.config, &state).await {
+    let preferred_account_id_ref = preferred_account_id.as_deref();
+    let upstream = match resolve_upstream_credentials(
+        &state.config,
+        &state,
+        preferred_account_id_ref,
+    )
+    .await
+    {
         Ok(creds) => creds,
         Err(message) => {
             // 如果是 token refresh 429，尝试换一个账号而不是直接返回错误
-            if message.contains("429") || message.to_lowercase().contains("too many requests") {
+            // 指定了 x-account-id 时不换号，直接返回限流错误
+            if preferred_account_id_ref.is_none()
+                && (message.contains("429")
+                    || message.to_lowercase().contains("too many requests"))
+            {
                 log::warn!("[Gateway] Token 刷新被限流，尝试换账号: {}", sanitize_error(&message));
-                match resolve_upstream_credentials(&state.config, &state).await {
+                match resolve_upstream_credentials(&state.config, &state, None).await {
                     Ok(creds) => creds,
                     Err(retry_message) => {
                         let sanitized = sanitize_error(&retry_message);
@@ -1666,12 +1687,18 @@ pub async fn proxy_handler(
                     }
                 }
             } else {
-                // 检查是否是配额不足错误（以 __402__ 为前缀标记）
+                // 检查是否是配额不足 / 参数错误（以 __402__ / __400__ 为前缀标记）
                 let (status, error_type, display_message) = if message.starts_with("__402__") {
                     (
                         StatusCode::PAYMENT_REQUIRED,
                         "insufficient_quota",
                         message.strip_prefix("__402__").unwrap_or(&message),
+                    )
+                } else if message.starts_with("__400__") {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        "invalid_request_error",
+                        message.strip_prefix("__400__").unwrap_or(&message),
                     )
                 } else {
                     (
@@ -1857,7 +1884,10 @@ pub async fn proxy_handler(
     const MAX_AUTH_FAILURES: u32 = 5; // 连续认证失败次数上限
 
     // 获取可用账号数量，用于判断何时需要等待
-    let available_account_count = {
+    // 指定了 x-account-id 时固定为 1，避免失败后自动换到其他账号
+    let available_account_count = if preferred_account_id_ref.is_some() {
+        1
+    } else {
         let mut store = AccountStore::new();
         store.reload();
 
@@ -1891,11 +1921,15 @@ pub async fn proxy_handler(
                 .count(),
             _ => 0,
         }
-    }.max(1); // 至少假设有1个账号
+        .max(1) // 至少假设有1个账号
+    };
 
     log::info!(
-        "[Gateway] 开始请求，可用账号数: {}",
-        available_account_count
+        "[Gateway] 开始请求，可用账号数: {}{}",
+        available_account_count,
+        preferred_account_id_ref
+            .map(|id| format!(" (指定账号: {})", id))
+            .unwrap_or_default()
     );
 
     let (upstream_resp, successful_upstream) = loop {
@@ -1971,7 +2005,13 @@ pub async fn proxy_handler(
             tried_account_ids.insert(extract_account_id_from_upstream(&creds));
             creds
         } else if account_attempt > 1 {
-            match resolve_upstream_credentials(&state.config, &state).await {
+            match resolve_upstream_credentials(
+                &state.config,
+                &state,
+                preferred_account_id_ref,
+            )
+            .await
+            {
                 Ok(creds) => {
                     // 检查是否已经尝试过这个账号
                     let account_id = extract_account_id_from_upstream(&creds);
@@ -2811,12 +2851,25 @@ fn verify_client_auth(headers: &HeaderMap, config: &GatewayConfig) -> Result<(),
     }
 }
 
+/// 从请求头读取可选的指定账号 ID（在线测试 / 客户端调试用）
+fn extract_preferred_account_id(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-account-id")
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string())
+}
+
 async fn resolve_upstream_credentials(
     config: &GatewayConfig,
     state: &RouterState,
+    preferred_account_id: Option<&str>,
 ) -> Result<UpstreamCredentials, String> {
     match config.account_mode.as_str() {
-        "single" | "group" | "pool" => resolve_managed_account_credentials(config, state).await,
+        "single" | "group" | "pool" => {
+            resolve_managed_account_credentials(config, state, preferred_account_id).await
+        }
         "local" => Err("2API不再支持 local 模式，请改用 single/group/pool 账号池模式".to_string()),
         _ => Err("accountMode 必须是 single/group/pool".to_string()),
     }
@@ -2825,6 +2878,7 @@ async fn resolve_upstream_credentials(
 async fn resolve_managed_account_credentials(
     config: &GatewayConfig,
     state: &RouterState,
+    preferred_account_id: Option<&str>,
 ) -> Result<UpstreamCredentials, String> {
     let mut store = AccountStore::new();
     store.reload();
@@ -2874,7 +2928,7 @@ async fn resolve_managed_account_credentials(
         let _ = store.save_to_file();
     }
 
-    let accounts = match config.account_mode.as_str() {
+    let mut accounts = match config.account_mode.as_str() {
         "single" => store
             .accounts
             .iter()
@@ -2903,6 +2957,18 @@ async fn resolve_managed_account_credentials(
             .collect::<Vec<_>>(),
         _ => Vec::new(),
     };
+
+    // x-account-id：强制使用指定账号，且必须在当前路由可用集合内
+    if let Some(preferred) = preferred_account_id {
+        accounts.retain(|account| account.id == preferred);
+        if accounts.is_empty() {
+            return Err(format!(
+                "__400__指定账号 {} 不在当前2API路由可用账号中，请检查账号模式/分组/账号池配置",
+                preferred
+            ));
+        }
+        log::info!("[网关] 使用指定账号: {}", preferred);
+    }
 
     if accounts.is_empty() {
         return Err("__402__未找到符合2API配置的可用账号".to_string());

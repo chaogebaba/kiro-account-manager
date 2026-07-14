@@ -1,5 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Play, Square, ScrollText, Copy, Zap } from 'lucide-react'
+import { Play, Square, ScrollText, Copy, Zap, TestTube2 } from 'lucide-react'
 import { Alert as AlertPrimitive, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { configureProxyClients } from '../../../api/gatewayApi'
@@ -15,6 +15,7 @@ import {
 } from '@/components/shared/dialog'
 import GatewayConfigComponent from './GatewayConfig'
 import { RequestLogsDialog } from './RequestLogsDialog'
+import { ApiPlaygroundDialog } from './ApiPlaygroundDialog'
 import { GatewayConfig, GatewayStatus } from './gatewayPageState'
 import { ErrorHistoryEntry } from './gatewayPageUtils'
 
@@ -94,6 +95,7 @@ function GatewayPage() {
   const [copySuccess, setCopySuccess] = useState('')
   const [logDir, setLogDir] = useState('')
   const [showRequestLogs, setShowRequestLogs] = useState(false)
+  const [showApiPlayground, setShowApiPlayground] = useState(false)
   const [savedConfigSnapshot, setSavedConfigSnapshot] = useState(() => buildGatewayConfigSnapshot(DEFAULT_GATEWAY_CONFIG))
   const [appliedRuntimeSnapshot, setAppliedRuntimeSnapshot] = useState<any>(null)
   const [lastStatusSyncAt, setLastStatusSyncAt] = useState('-')
@@ -513,6 +515,10 @@ function GatewayPage() {
                         <ScrollText size={12} className="mr-1" />
                         请求日志
                       </Button>
+                      <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setShowApiPlayground(true)} disabled={!status.running}>
+                        <TestTube2 size={12} className="mr-1" />
+                        在线测试
+                      </Button>
                     </Group>
                   </Group>
 
@@ -648,6 +654,21 @@ function GatewayPage() {
                   </DialogBody>
                 </DialogContent>
               </DialogRoot>
+
+              {/* API Playground / 在线测试 */}
+              <ApiPlaygroundDialog
+                open={showApiPlayground}
+                onOpenChange={setShowApiPlayground}
+                accounts={accounts}
+                gatewayBaseUrl={effectiveBaseUrl}
+                gatewayApiKey={(effectiveConfig.clientApiKeysText || effectiveConfig.apiKey || '').split('\n')[0]?.trim() || ''}
+                routing={{
+                  accountMode: effectiveConfig.accountMode,
+                  accountId: effectiveConfig.accountId,
+                  groupId: effectiveConfig.groupId,
+                  poolAccountIds: effectiveConfig.poolAccountIds,
+                }}
+              />
             </Stack>
           </div>
         </GatewayDataProvider>

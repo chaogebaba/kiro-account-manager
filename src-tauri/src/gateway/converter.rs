@@ -3,8 +3,8 @@ use crate::gateway::models::{
     AnthropicMessagesRequest, ConversationState, CurrentMessage, HistoryAssistantMessage,
     HistoryItem, HistoryUserMessage, ImageBlock, ImageSource, KiroInputSchema, KiroPayload,
     KiroTool, KiroToolResult, KiroToolResultContent, KiroToolSpec, KiroToolUse, ModelInfo,
-    NormalizedMessage, NormalizedRequest, OpenAIChatRequest, Tool, ToolCall, ToolCallFunction,
-    ToolFunction, UserInputMessage, UserInputMessageContext,
+    NormalizedMessage, NormalizedRequest, OpenAIChatRequest, Thinking, Tool, ToolCall,
+    ToolCallFunction, ToolFunction, UserInputMessage, UserInputMessageContext,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use reqwest::Client;
@@ -142,8 +142,6 @@ pub fn normalize_openai_responses_request(payload: &Value) -> Result<NormalizedR
 }
 
 pub fn normalize_openai_chat_payload(payload: &Value) -> Result<NormalizedRequest, String> {
-    reject_unsupported_openai_chat_fields(payload)?;
-
     let model = payload
         .get("model")
         .and_then(Value::as_str)
@@ -166,8 +164,6 @@ pub fn normalize_openai_chat_payload(payload: &Value) -> Result<NormalizedReques
 }
 
 pub fn normalize_openai_chat_request(request: &OpenAIChatRequest) -> Result<NormalizedRequest, String> {
-    reject_unsupported_openai_chat_request(request)?;
-
     let mut messages = Vec::new();
     let mut pending_tool_results = Vec::new();
 
@@ -260,11 +256,90 @@ pub fn normalize_openai_chat_request(request: &OpenAIChatRequest) -> Result<Norm
         .map(|opts| opts.include_usage)
         .unwrap_or(false);
 
+    // 处理 response_format：注入 system prompt 让模型按格式返回
+    if let Some(response_format) = &request.response_format {
+        let format_type = response_format.get("type").and_then(Value::as_str);
+        match format_type {
+            Some("json_object") => {
+                let instr = "You must respond with a valid JSON object. Do not include any explanatory text outside the JSON.";
+                if let Some(first) = messages.first_mut() {
+                    if first.role == "system" {
+                        if let Some(Value::String(text)) = &mut first.content {
+                            text.push_str("\n\n");
+                            text.push_str(instr);
+                        }
+                    } else {
+                        messages.insert(0, NormalizedMessage {
+                            role: "system".to_string(),
+                            content: Some(Value::String(instr.to_string())),
+                            tool_calls: None,
+                            tool_call_id: None,
+                            metadata: None,
+                        });
+                    }
+                }
+            }
+            Some("json_schema") => {
+                let name = response_format
+                    .get("json_schema")
+                    .and_then(|s| s.get("name"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("output");
+                let instr = format!("You must respond with a valid JSON object conforming to the \"{}\" schema. Do not include any explanatory text outside the JSON.", name);
+                if let Some(first) = messages.first_mut() {
+                    if first.role == "system" {
+                        if let Some(Value::String(text)) = &mut first.content {
+                            text.push_str("\n\n");
+                            text.push_str(&instr);
+                        }
+                    } else {
+                        messages.insert(0, NormalizedMessage {
+                            role: "system".to_string(),
+                            content: Some(Value::String(instr)),
+                            tool_calls: None,
+                            tool_call_id: None,
+                            metadata: None,
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // 处理 parallel_tool_calls=false
+    if request.parallel_tool_calls == Some(false) {
+        let instr = "Call only one tool at a time. Wait for the result before calling the next tool.";
+        if let Some(first) = messages.first_mut() {
+            if first.role == "system" {
+                if let Some(Value::String(text)) = &mut first.content {
+                    text.push_str("\n\n");
+                    text.push_str(instr);
+                }
+            } else {
+                messages.insert(0, NormalizedMessage {
+                    role: "system".to_string(),
+                    content: Some(Value::String(instr.to_string())),
+                    tool_calls: None,
+                    tool_call_id: None,
+                    metadata: None,
+                });
+            }
+        }
+    }
+
+    // 处理 n > 1：Kiro 只支持返回 1 个，打日志提示
+    if let Some(n) = request.n {
+        if n > 1 {
+            log::warn!("[OpenAI Chat] 请求 n={}，但 Kiro 上游仅支持返回 1 个 choice", n);
+        }
+    }
+
     Ok(NormalizedRequest {
         model: request.model.clone(),
         messages,
         stream: request.stream,
-        max_tokens: request.max_tokens,
+        max_tokens: request.max_tokens.or(request.max_completion_tokens),
         temperature: request.temperature,
         top_p: request.top_p,
         stop: request.stop.clone(),
@@ -277,45 +352,6 @@ pub fn normalize_openai_chat_request(request: &OpenAIChatRequest) -> Result<Norm
     })
 }
 
-/// Kiro 网关仅支持文本输出；官方 modalities/audio/prediction 有契约但本网关无法兑现。
-fn reject_unsupported_openai_chat_request(request: &OpenAIChatRequest) -> Result<(), String> {
-    if let Some(modalities) = &request.modalities {
-        for modality in modalities {
-            if modality != "text" {
-                return Err(format!(
-                    "不支持的 modalities 值: {modality}（当前仅支持 text）"
-                ));
-            }
-        }
-    }
-    if request.audio.is_some() {
-        return Err("不支持 audio 参数（Kiro 上游无法生成音频输出）".to_string());
-    }
-    if request.prediction.is_some() {
-        return Err("不支持 prediction 参数（Predicted Outputs）".to_string());
-    }
-    Ok(())
-}
-
-fn reject_unsupported_openai_chat_fields(payload: &Value) -> Result<(), String> {
-    if let Some(modalities) = payload.get("modalities").and_then(Value::as_array) {
-        for modality in modalities {
-            let name = modality.as_str().unwrap_or_default();
-            if name != "text" {
-                return Err(format!(
-                    "不支持的 modalities 值: {name}（当前仅支持 text）"
-                ));
-            }
-        }
-    }
-    if payload.get("audio").is_some_and(|v| !v.is_null()) {
-        return Err("不支持 audio 参数（Kiro 上游无法生成音频输出）".to_string());
-    }
-    if payload.get("prediction").is_some_and(|v| !v.is_null()) {
-        return Err("不支持 prediction 参数（Predicted Outputs）".to_string());
-    }
-    Ok(())
-}
 
 fn create_tool_results_message(tool_results: &[(String, String)]) -> NormalizedMessage {
     let mut content_array = Vec::new();
@@ -339,10 +375,107 @@ fn create_tool_results_message(tool_results: &[(String, String)]) -> NormalizedM
 fn build_normalized_request_from_payload(
     payload: &Value,
     model: String,
-    messages: Vec<NormalizedMessage>,
+    mut messages: Vec<NormalizedMessage>,
     tools: Option<Vec<Tool>>,
     tool_name_map: std::collections::HashMap<String, String>,
 ) -> NormalizedRequest {
+    // 处理 response_format：注入 system prompt 让模型按格式返回
+    if let Some(response_format) = payload.get("response_format").and_then(|v| v.as_object()) {
+        let format_type = response_format.get("type").and_then(Value::as_str);
+        let instruction = match format_type {
+            Some("json_object") => {
+                Some("You must respond with a valid JSON object. Do not include any explanatory text outside the JSON.".to_string())
+            }
+            Some("json_schema") => {
+                let name = response_format
+                    .get("json_schema")
+                    .and_then(|s| s.get("name"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("output");
+                let description = response_format
+                    .get("json_schema")
+                    .and_then(|s| s.get("description"))
+                    .and_then(Value::as_str)
+                    .filter(|d| !d.is_empty());
+                match description {
+                    Some(desc) => Some(format!(
+                        "You must respond with a valid JSON object conforming to the \"{}\" schema. Description: {}. Do not include any explanatory text outside the JSON.",
+                        name, desc
+                    )),
+                    None => Some(format!(
+                        "You must respond with a valid JSON object conforming to the \"{}\" schema. Do not include any explanatory text outside the JSON.",
+                        name
+                    )),
+                }
+            }
+            _ => None,
+        };
+        if let Some(instr) = instruction {
+            if let Some(first) = messages.first_mut() {
+                if first.role == "system" {
+                    if let Some(Value::String(text)) = &mut first.content {
+                        text.push_str("\n\n");
+                        text.push_str(&instr);
+                    } else {
+                        first.content = Some(Value::String(instr));
+                    }
+                } else {
+                    messages.insert(0, NormalizedMessage {
+                        role: "system".to_string(),
+                        content: Some(Value::String(instr)),
+                        tool_calls: None,
+                        tool_call_id: None,
+                        metadata: None,
+                    });
+                }
+            } else {
+                messages.push(NormalizedMessage {
+                    role: "system".to_string(),
+                    content: Some(Value::String(instr)),
+                    tool_calls: None,
+                    tool_call_id: None,
+                    metadata: None,
+                });
+            }
+        }
+    }
+
+    // 处理 parallel_tool_calls=false：注入 system prompt 让模型一次只调用一个工具
+    if payload.get("parallel_tool_calls").and_then(Value::as_bool) == Some(false) {
+        let instr = "Call only one tool at a time. Wait for the result before calling the next tool.";
+        if let Some(first) = messages.first_mut() {
+            if first.role == "system" {
+                if let Some(Value::String(text)) = &mut first.content {
+                    text.push_str("\n\n");
+                    text.push_str(instr);
+                }
+            } else {
+                messages.insert(0, NormalizedMessage {
+                    role: "system".to_string(),
+                    content: Some(Value::String(instr.to_string())),
+                    tool_calls: None,
+                    tool_call_id: None,
+                    metadata: None,
+                });
+            }
+        }
+    }
+
+    // 处理 reasoning.effort → Kiro thinking 映射（OpenAI Responses API）
+    let thinking = payload.get("reasoning").and_then(|r| r.get("effort")).and_then(Value::as_str).map(|effort| {
+        let budget_tokens = match effort {
+            "low" => 1024,
+            "medium" => 4096,
+            "high" => 16384,
+            _ => 4096,
+        };
+        log::info!("[模型映射] reasoning.effort=\"{}\" → thinking enabled, budget_tokens={}", effort, budget_tokens);
+        Thinking {
+            thinking_type: "enabled".to_string(),
+            budget_tokens,
+        }
+    });
+
     NormalizedRequest {
         model,
         messages,
@@ -352,6 +485,7 @@ fn build_normalized_request_from_payload(
             .unwrap_or(true), // 默认使用流式响应
         max_tokens: payload
             .get("max_output_tokens")
+            .or_else(|| payload.get("max_completion_tokens"))
             .or_else(|| payload.get("max_tokens"))
             .and_then(Value::as_i64)
             .map(|value| value as i32),
@@ -382,7 +516,7 @@ fn build_normalized_request_from_payload(
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(str::to_string),
-        thinking: None,
+        thinking,
         include_usage: payload
             .get("stream_options")
             .and_then(|opts| opts.get("include_usage"))
@@ -596,7 +730,8 @@ pub fn get_internal_model_id(external_model: &str) -> Result<String, String> {
         "opus" | "opus-4-7" => return Ok("claude-opus-4.7".to_string()),
         "sonnet" | "sonnet-4-6" => return Ok("claude-sonnet-4.6".to_string()),
         "haiku" | "haiku-4-5" => return Ok("claude-haiku-4.5".to_string()),
-        "claude-sonnet-latest" => return Ok("claude-sonnet-4.5".to_string()),
+        "claude-sonnet-latest" => return Ok("claude-sonnet-5".to_string()),
+        "claude-sonnet-5" => return Ok("claude-sonnet-5".to_string()),
         // Claude 3.x 旧版兜底到 Claude 4.x
         "claude-3-5-sonnet"
         | "claude-3-5-sonnet-latest"
@@ -610,6 +745,11 @@ pub fn get_internal_model_id(external_model: &str) -> Result<String, String> {
         "gpt-4" | "gpt-4o" | "gpt-4-turbo" | "gpt-3.5-turbo" | "gpt-4o-mini" => {
             return Ok("claude-sonnet-4.5".to_string());
         }
+        // GPT-5.6 系列（Kiro 原生 GPT 模型，不做映射）
+        "gpt-5-6-sol" | "gpt-5.6-sol" => return Ok("gpt-5.6-sol".to_string()),
+        "gpt-5-6-terra" | "gpt-5.6-terra" => return Ok("gpt-5.6-terra".to_string()),
+        "gpt-5-6-luna" | "gpt-5.6-luna" => return Ok("gpt-5.6-luna".to_string()),
+        "gpt-5-6" | "gpt-5.6" | "gpt5.6" => return Ok("gpt-5.6-sol".to_string()),
         // 开源模型别名
         "deepseek-3-2" | "deepseek-3.2" | "deepseek" => return Ok("deepseek-3.2".to_string()),
         "minimax-m2-5" | "minimax-m2.5" | "minimax" => return Ok("minimax-m2.5".to_string()),
@@ -639,7 +779,8 @@ pub fn get_internal_model_id(external_model: &str) -> Result<String, String> {
 }
 
 /// 判断模型 ID 是否符合 Kiro API 接受的格式
-/// - claude-{sonnet|haiku|opus}-{version} （包括 4.5 / 4.6 / 4.7 + 未来新版本）
+/// - claude-{sonnet|haiku|opus}-{version} （包括 4.5 / 4.6 / 4.7 / 5 + 未来新版本）
+/// - gpt-5.6-{sol|terra|luna} （Kiro 原生 GPT 模型）
 /// - 开源模型：deepseek-3.2 / minimax-m2.5 / minimax-m2.1 / glm-5 / qwen3-coder-next
 /// - 特殊值：auto
 fn is_kiro_supported_model_format(model: &str) -> bool {
@@ -650,6 +791,9 @@ fn is_kiro_supported_model_format(model: &str) -> bool {
         || model.starts_with("claude-haiku-")
         || model.starts_with("claude-opus-")
     {
+        return true;
+    }
+    if model.starts_with("gpt-5.6-") || model.starts_with("gpt-5-6-") {
         return true;
     }
     matches!(
@@ -702,6 +846,29 @@ fn normalize_claude_model_format(model: &str) -> String {
         }
     }
 
+    // GPT-5.6 系列横杠转点号：gpt-5-6-sol → gpt-5.6-sol
+    // 匹配模式：gpt-{major}-{minor}-{variant}
+    if s.starts_with("gpt-") {
+        // 去掉 gpt- 前缀
+        let rest = &s[4..];
+        // 找第一个横杠（major 和 minor 之间）
+        if let Some(first_dash) = rest.find('-') {
+            let major = &rest[..first_dash];
+            if major.len() == 1 && major.chars().all(|c| c.is_ascii_digit()) {
+                let after_major = &rest[first_dash + 1..];
+                // 找第二个横杠（minor 和 variant 之间）
+                if let Some(second_dash) = after_major.find('-') {
+                    let minor = &after_major[..second_dash];
+                    if minor.len() == 1 && minor.chars().all(|c| c.is_ascii_digit()) {
+                        let variant = &after_major[second_dash + 1..];
+                        // gpt-5-6-sol → gpt-5.6-sol
+                        return format!("gpt-{}.{}-{}", major, minor, variant);
+                    }
+                }
+            }
+        }
+    }
+
     s
 }
 
@@ -713,6 +880,7 @@ fn normalize_claude_model_format(model: &str) -> String {
 ///
 /// Free 用户可用模型：sonnet-4.5, sonnet-4, haiku-4.5, 开源模型
 /// Free 用户不可用：所有 Opus 系列、Sonnet 4.6+
+/// GPT-5.6 不可用时降级到 gpt-5.6-luna（最便宜变体），避免跨协议降级
 ///
 /// 简单策略：所有不可用模型一律降级到 claude-sonnet-4.5（保留 -thinking 后缀）
 pub fn get_internal_model_id_with_fallback(
@@ -728,6 +896,18 @@ pub fn get_internal_model_id_with_fallback(
 
     // 检测原始模型名是否要求 thinking（用于降级后保留 -thinking 后缀）
     let requires_thinking = external_model.to_lowercase().contains("thinking");
+
+    // GPT-5.6 系列降级到最便宜的 luna 变体（避免跨协议降级到 Claude）
+    if mapped_model.starts_with("gpt-5.6-") {
+        if available_models.contains(&"gpt-5.6-luna".to_string()) {
+            log::warn!(
+                "[Gateway] 模型 {} 不在可用列表中，降级到 gpt-5.6-luna",
+                mapped_model
+            );
+            return Ok("gpt-5.6-luna".to_string());
+        }
+        // 如果连 luna 都没有，再降级到 Claude
+    }
 
     // 简单粗暴：一律降级到 claude-sonnet-4.5（Free 用户最高可用模型）
     let fallback = if requires_thinking {
@@ -1349,31 +1529,37 @@ pub async fn build_kiro_payload(
 pub fn get_available_models() -> Vec<ModelInfo> {
     // 数据来源：Kiro ListAvailableModels API 实际返回
     // 注意：Claude 模型只保留 -thinking 版本，不带后缀的已删除
+    //       GPT-5.6 系列是 Kiro 原生 GPT 模型，没有 thinking 变体
     [
         // 自动选择
-        "auto",
+        ("auto", "anthropic"),
         // Claude 系列（仅 thinking 版本）
-        "claude-opus-4.8-thinking",
-        "claude-opus-4.7-thinking",
-        "claude-opus-4.6-thinking",
-        "claude-sonnet-4.6-thinking",
-        "claude-opus-4.5-thinking",
-        "claude-sonnet-4.5-thinking",
-        "claude-haiku-4.5-thinking",
-        "claude-sonnet-4-thinking",
+        ("claude-sonnet-5-thinking", "anthropic"),
+        ("claude-opus-4.8-thinking", "anthropic"),
+        ("claude-opus-4.7-thinking", "anthropic"),
+        ("claude-opus-4.6-thinking", "anthropic"),
+        ("claude-sonnet-4.6-thinking", "anthropic"),
+        ("claude-opus-4.5-thinking", "anthropic"),
+        ("claude-sonnet-4.5-thinking", "anthropic"),
+        ("claude-haiku-4.5-thinking", "anthropic"),
+        ("claude-sonnet-4-thinking", "anthropic"),
+        // GPT-5.6 系列（Kiro 原生 GPT 模型）
+        ("gpt-5.6-sol", "openai"),
+        ("gpt-5.6-terra", "openai"),
+        ("gpt-5.6-luna", "openai"),
         // 开源模型
-        "deepseek-3.2",
-        "minimax-m2.5",
-        "minimax-m2.1",
-        "glm-5",
-        "qwen3-coder-next",
+        ("deepseek-3.2", "deepseek"),
+        ("minimax-m2.5", "minimax"),
+        ("minimax-m2.1", "minimax"),
+        ("glm-5", "zhipu"),
+        ("qwen3-coder-next", "alibaba"),
     ]
     .into_iter()
-    .map(|id| ModelInfo {
+    .map(|(id, owner)| ModelInfo {
         id: id.to_string(),
         object: "model".to_string(),
         created: 1_700_000_000,
-        owned_by: "anthropic".to_string(),
+        owned_by: owner.to_string(),
     })
     .collect()
 }
@@ -3023,10 +3209,6 @@ mod tests {
             name: "长描述工具".to_string(),
             description: Some(multibyte_desc),
             input_schema: json!({ "type": "object" }),
-            max_uses: None,
-            allowed_domains: None,
-            blocked_domains: None,
-            user_location: None,
             cache_control: None,
         };
 
@@ -3073,19 +3255,11 @@ mod tests {
                     "properties": { "expr": { "type": "string" } },
                     "required": ["expr"]
                 }),
-                max_uses: None,
-                allowed_domains: None,
-                blocked_domains: None,
-                user_location: None,
                 cache_control: None,
             }]),
             tool_choice: Some(json!({"type":"auto"})),
             thinking: None,
             metadata: None,
-            context_editing: None,
-            mcp_servers: None,
-            betas: None,
-            cache_control: None,
             top_k: None,
         };
 
@@ -4205,10 +4379,6 @@ mod tests {
             tool_choice: None,
             thinking: None,
             metadata: None,
-            context_editing: None,
-            mcp_servers: None,
-            betas: None,
-            cache_control: None,
         };
 
         let converted = normalize_anthropic_request(&request);

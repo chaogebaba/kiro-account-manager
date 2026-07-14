@@ -95,12 +95,26 @@ const AVAILABLE_TOOL_TAGS = [
   'semanticRename', 'smartRelocate', 'discloseContext',
 ]
 
-// Kiro v0.10.32 可用的模型
+// Kiro 可用的 Agent 模型
 const AVAILABLE_MODELS = [
   { value: 'default', label: '默认（跟随主对话）' },
+  { value: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
+  { value: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
   { value: 'claude-sonnet-4.5', label: 'Claude Sonnet 4.5' },
   { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
+  { value: 'claude-opus-4.8', label: 'Claude Opus 4.8' },
+  { value: 'claude-opus-4.7', label: 'Claude Opus 4.7' },
+  { value: 'claude-opus-4.6', label: 'Claude Opus 4.6' },
+  { value: 'claude-opus-4.5', label: 'Claude Opus 4.5' },
   { value: 'claude-haiku-4.5', label: 'Claude Haiku 4.5' },
+  { value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+  { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+  { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
+  { value: 'deepseek-3.2', label: 'DeepSeek 3.2' },
+  { value: 'minimax-m2.5', label: 'MiniMax M2.5' },
+  { value: 'minimax-m2.1', label: 'MiniMax M2.1' },
+  { value: 'glm-5', label: 'GLM-5' },
+  { value: 'qwen3-coder-next', label: 'Qwen3 Coder Next' },
 ]
 
 const normalizeToolTagsSelection = (nextValues: string[], prevValues: string[] = []) => {
