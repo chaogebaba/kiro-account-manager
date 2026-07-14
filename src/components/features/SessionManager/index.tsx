@@ -41,8 +41,11 @@ function IdeSessionManager() {
     const newExpanded = new Set(expandedWorkspaces)
 
     if (newExpanded.has(workspaceHash)) {
-      // 折叠
+      // 折叠 - 清空该工作区的选中状态
       newExpanded.delete(workspaceHash)
+      if (selectedWorkspace === workspaceHash) {
+        setSelectedWorkspace(null)
+      }
     } else {
       // 展开 - 加载该工作区的 sessions
       newExpanded.add(workspaceHash)
@@ -466,19 +469,22 @@ function IdeSessionManager() {
                 const sessions = getWorkspaceSessions(workspace)
 
                 return (
-                  <div key={workspace} className="space-y-1">
+                  <div key={workspace} className="space-y-1 min-w-0">
                     {/* Workspace Row */}
                     <div
-                      className={`group relative overflow-hidden rounded-xl border transition-all ${selectedWorkspace === workspace
-                          ? 'border-primary/50 bg-gradient-to-r from-primary/14 to-primary/5 shadow-sm ring-1 ring-primary/20'
-                          : 'border-transparent hover:border-border/70 hover:bg-muted/40'
+                      className={`group relative rounded-xl transition-all duration-200 cursor-pointer ${selectedWorkspace === workspace
+                          ? 'border-2 border-primary/70 bg-gradient-to-br from-primary/12 via-primary/8 to-primary/4 shadow-lg ring-1 ring-primary/30 scale-[1.02]'
+                          : isExpanded
+                          ? 'border border-border/60 bg-muted/40 hover:border-primary/50 hover:bg-muted/50 hover:shadow-sm'
+                          : 'border border-border/40 bg-card hover:border-border/70 hover:bg-muted/40'
                         }`}
+                      onClick={() => toggleWorkspace(workspace)}
                     >
                       <div className="flex items-center gap-2 px-2.5 py-2.5">
                         {/* Expand/Collapse Icon */}
                         <button
                           onClick={() => toggleWorkspace(workspace)}
-                          className="shrink-0 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                          className={`shrink-0 rounded-lg p-1 transition-all ${selectedWorkspace === workspace ? 'text-primary hover:bg-primary/15 hover:text-primary' : 'text-muted-foreground hover:bg-background hover:text-foreground'}`}
                           title={isExpanded ? '折叠' : '展开'}
                         >
                           {isExpanded ? (
@@ -499,29 +505,25 @@ function IdeSessionManager() {
                         />
 
                         {/* Workspace Name */}
-                        <button
-                          onClick={() => {
-                            setSelectedWorkspace(workspace)
-                            toggleWorkspace(workspace)
-                          }}
-                          className="flex-1 rounded-lg px-2 py-1 text-left text-sm transition-colors hover:bg-background/70"
+                        <div
+                          className="flex-1 min-w-0 rounded-lg px-2 py-1 text-left text-sm"
                           title={workspace}
                         >
-                          <div className="truncate font-medium text-foreground">
+                          <div className={`truncate font-medium transition-colors ${selectedWorkspace === workspace ? 'text-primary font-semibold' : 'text-foreground'}`}>
                             {decodeWorkspaceName(workspace)}
                           </div>
                           {isExpanded && sessions.length > 0 && (
-                            <div className="mt-0.5 text-xs text-muted-foreground">
+                            <div className="mt-0.5 text-xs text-muted-foreground truncate">
                               {sessions.length} 个会话
                             </div>
                           )}
-                        </button>
+                        </div>
 
                         {/* Delete Button */}
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 shrink-0 rounded-lg text-muted-foreground opacity-0 transition-opacity hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100"
+                          className="h-7 w-7 shrink-0 rounded-lg text-muted-foreground opacity-0 transition-all hover:opacity-100 hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100"
                           onClick={(e) => {
                             e.stopPropagation()
                             handleDeleteWorkspace(workspace)
@@ -535,13 +537,13 @@ function IdeSessionManager() {
 
                     {/* Sessions under this workspace (when expanded) */}
                     {isExpanded && (
-                      <div className="ml-7 space-y-1.5 border-l border-border/70 pl-3">
+                      <div className="ml-7 space-y-1.5 border-l-2 border-border/50 pl-3 py-1.5 min-w-0 overflow-hidden">
                         {loading && sessions.length === 0 ? (
                           <div className="flex items-center justify-center py-4">
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           </div>
                         ) : sessions.length === 0 ? (
-                          <div className="rounded-xl bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+                          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
                             暂无会话
                           </div>
                         ) : (
@@ -551,18 +553,16 @@ function IdeSessionManager() {
                             return (
                             <Card
                               key={session.sessionId}
-                              className={`group relative cursor-pointer overflow-hidden rounded-2xl p-2.5 transition-all hover:border-primary/40 hover:bg-primary/5 ${isSelected ? 'border-primary/60 bg-primary/10 shadow-sm ring-1 ring-primary/20' : 'border-border/60 bg-card'}
+                              className={`group relative cursor-pointer overflow-hidden rounded-xl p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/5 hover:shadow-md min-w-0 ${isSelected ? 'border-primary/60 bg-primary/10 ring-1 ring-primary/20' : 'border-border/60 bg-card hover:border-border'}
                               `}
                               onClick={() => handleSelectSession(workspace, session)}
                             >
                               {isSelected && (
-                                <>
-                                  <div className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-primary" />
-                                </>
+                                <div className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-primary" />
                               )}
-                              <div className="space-y-1.5 pl-1">
-                                <div className="flex items-start justify-between gap-2">
-                                  <h3 className={`line-clamp-2 flex-1 text-xs font-semibold leading-snug ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                              <div className="space-y-2 pl-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2 min-w-0">
+                                  <h3 className={`line-clamp-2 flex-1 min-w-0 text-xs font-semibold leading-snug break-all overflow-hidden ${isSelected ? 'text-primary' : 'text-foreground'}`}>
                                     {session.title}
                                   </h3>
                                   <Button
@@ -575,15 +575,15 @@ function IdeSessionManager() {
                                     }}
                                     title="删除会话"
                                   >
-                                    <Trash2 className="h-2.5 w-2.5" />
+                                    <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge variant="secondary" className="h-4 rounded-full px-1.5 text-[10px] font-normal">
+                                  <Badge variant="secondary" className="h-5 rounded-full px-2 text-[10px] font-normal">
                                     {session.sessionType}
                                   </Badge>
                                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <MessageSquare className="h-2.5 w-2.5" />
+                                    <MessageSquare className="h-3 w-3" />
                                     {session.messageCount}
                                   </span>
                                 </div>
@@ -618,6 +618,18 @@ function IdeSessionManager() {
                   <p className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">
                     {selectedSession.workspaceDirectory}
                   </p>
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    {(selectedSession.modelId || selectedSession.selectedModel) && (
+                      <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px] font-normal">
+                        🤖 {selectedSession.modelId || selectedSession.selectedModel}
+                      </Badge>
+                    )}
+                    {selectedSession.autonomyMode && (
+                      <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px] font-normal">
+                        {selectedSession.autonomyMode === 'Autopilot' ? '🚀' : '👁️'} {selectedSession.autonomyMode}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-1.5 ml-3">
                   <Button
@@ -698,6 +710,11 @@ function IdeSessionManager() {
                                 <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px] font-normal">
                                   #{index + 1}
                                 </Badge>
+                                {item.executionId && (
+                                  <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px] font-mono font-normal text-muted-foreground">
+                                    {item.executionId.slice(0, 8)}
+                                  </Badge>
+                                )}
                               </div>
                               {item.message.content.map((content, i) => (
                                 <div key={i} className="whitespace-pre-wrap break-words rounded-xl bg-background/70 p-3 text-sm leading-6 text-foreground/90 ring-1 ring-border/50">
