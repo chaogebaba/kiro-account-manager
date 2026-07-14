@@ -2396,6 +2396,7 @@ dependencies = [
  "tokio-stream",
  "toml_edit 0.25.11+spec-1.1.0",
  "tower",
+ "tower-http",
  "url",
  "urlencoding",
  "uuid",

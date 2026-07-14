@@ -15,12 +15,13 @@ mod token_estimator;
 
 use axum::{
     extract::{ConnectInfo, State},
-    http::HeaderMap,
+    http::{HeaderMap, Method},
     response::{Json, Response},
     routing::{get, post},
     Router,
 };
 use reqwest::Client;
+use tower_http::cors::{Any, CorsLayer};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -379,7 +380,7 @@ const CONFIG_DIR: &str = ".kiro-account-manager";
 const CONFIG_FILE: &str = "gateway-config.json";
 const LOGS_DIR: &str = "logs";
 const REQUEST_LOG_FILE: &str = "gateway-request-log.jsonl";
-const DEFAULT_AGENT_MODE: &str = "q-developer-converse";
+const DEFAULT_AGENT_MODE: &str = "vibe";
 
 fn default_host() -> String {
     "127.0.0.1".to_string()
@@ -1034,6 +1035,11 @@ pub async fn get_gateway_status(
 }
 
 fn router(state: RouterState) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers(Any);
+
     Router::new()
         .route("/health", get(health_handler))
         .route("/v1/models", get(models_handler))
@@ -1045,6 +1051,7 @@ fn router(state: RouterState) -> Router {
         .route("/v1/responses", post(openai_responses_handler))
         .route("/v1/responses/input_tokens", post(openai_tokens_handler))
         .route("/v1/chat/completions", post(openai_chat_handler))
+        .layer(cors)
         .with_state(state)
 }
 
