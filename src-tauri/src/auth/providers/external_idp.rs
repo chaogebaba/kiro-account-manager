@@ -43,7 +43,7 @@ impl Default for ExternalIdpProvider {
 /// - scheme 必须是 https；
 /// - host 必须是 `login.microsoftonline.com` / `.us` / 中国域（或其子域）；
 /// - 拒绝 userinfo(`@`) 混淆。
-pub(crate) fn validate_microsoft_token_endpoint(endpoint: &str) -> Result<(), String> {
+pub fn validate_microsoft_token_endpoint(endpoint: &str) -> Result<(), String> {
     // 关键(SSRF)：必须用 url::Url 解析取 host，而不是手工切分字符串。手工按 `/ ? #`
     // 切 authority 会漏掉反斜杠——https 是 WHATWG special scheme，url crate(及 reqwest
     // 底层)会把 `\` 规范化成 `/`。若手工校验：`https://evil.com\.login.microsoftonline.com`

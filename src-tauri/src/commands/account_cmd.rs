@@ -754,6 +754,30 @@ pub async fn add_account_by_external_idp(
     email: Option<String>,
     expires_at: Option<String>,
 ) -> Result<AddAccountResult, String> {
+    // 导入期就校验微软 token 端点，避免脏 endpoint 先入库、刷新时才爆。
+    // 优先校验显式 token_endpoint；没有则尝试从 issuer_url 派生后再校验。
+    if let Some(endpoint) = token_endpoint
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        crate::auth::providers::validate_microsoft_token_endpoint(endpoint)?;
+    } else if let Some(issuer) = issuer_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        let issuer = issuer.trim_end_matches('/');
+        let derived = if issuer.ends_with("/v2.0") {
+            format!("{issuer}/token")
+        } else {
+            format!("{issuer}/oauth2/v2.0/token")
+        };
+        crate::auth::providers::validate_microsoft_token_endpoint(&derived)?;
+    } else {
+        return Err("External IdP 导入需要 tokenEndpoint 或 issuerUrl".to_string());
+    }
+
     // machine_id：账号自带（非空）→ 否则生成账号独立 ID
     let account_machine_id = machine_id
         .filter(|id| !id.trim().is_empty())
@@ -1095,21 +1119,38 @@ async fn add_account_by_idc_internal(
     state: State<'_, AppState>,
     mut params: IdcAccountParams,
 ) -> Result<AddAccountResult, String> {
-    // 从 clientSecret JWT 中提取 startUrl（如果前端没显式传）。
-    // 关键：**不管前端判 BuilderId 还是 Enterprise 都尝试提取**。真实企业号的 startUrl
-    // 藏在 clientSecret 的 JWT payload（base64，明文搜不到 initiateLoginUri），前端无法
-    // 可靠区分，常把企业号误判成 BuilderId。这里用 extract_start_url_from_client_secret
-    // 正确解码 JWT，只要提取到 start_url，就说明它是真正的企业 IdC 号。
-    // 两条来源都过 normalize_start_url 去尾斜杠：params.start_url 可能由前端带斜杠传入，
-    // JWT 真相源虽已规范化，这里统一兜底，保证落进 account.start_url 的永远是无斜杠规范形。
-    let start_url = if let Some(ref url) = params.start_url {
-        Some(normalize_start_url(url))
-    } else {
-        extract_start_url_from_client_secret(&params.client_secret)
+    // 解析 startUrl：
+    // 1) 始终尝试从 clientSecret JWT 提取（企业号真相源常藏在 JWT 里）
+    // 2) 前端显式 startUrl 仅在“非空且不是 BuilderId 默认域”时优先
+    // 3) 若前端传了 view.awsapps.com 默认域，但 JWT 解出企业域，以 JWT 为准
+    // 两条来源都过 normalize_start_url 去尾斜杠，保证落库永远是无斜杠规范形。
+    let jwt_start_url = extract_start_url_from_client_secret(&params.client_secret);
+    let explicit_start_url = params
+        .start_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+        .map(normalize_start_url);
+    let start_url = match (explicit_start_url, jwt_start_url) {
+        (Some(explicit), Some(jwt)) => {
+            let explicit_is_builder =
+                crate::commands::common::is_builder_id_start_url(&explicit);
+            let jwt_is_enterprise = !crate::commands::common::is_builder_id_start_url(&jwt);
+            if explicit_is_builder && jwt_is_enterprise {
+                log::info!(
+                    "[IdC] 显式 startUrl 是 BuilderId 默认域，但 JWT 解出企业域，采用 JWT: {jwt}"
+                );
+                Some(jwt)
+            } else {
+                Some(explicit)
+            }
+        }
+        (Some(explicit), None) => Some(explicit),
+        (None, jwt) => jwt,
     };
 
-    // 依据「实际拿到的 start_url」纠正 provider：前端可能误判 BuilderId，但只要 clientSecret
-    // 里解出了非 BuilderId 默认域的 start_url，就是企业号。BuilderId 的公共 start_url 是
+    // 依据「实际拿到的 start_url」纠正 provider：前端可能误判 BuilderId，但只要最终
+    // start_url 不是 BuilderId 默认域，就是企业号。BuilderId 的公共 start_url 是
     // view.awsapps.com，企业号是自己的 d-xxx / xxx.awsapps.com 实例。空串先过滤掉再判。
     let is_enterprise = params.provider_id == "Enterprise"
         || start_url
@@ -1118,7 +1159,7 @@ async fn add_account_by_idc_internal(
             .filter(|u| !u.is_empty())
             .is_some_and(|u| !crate::commands::common::is_builder_id_start_url(u));
 
-    // 纠正 provider_id：前端可能把企业号误判成 BuilderId，这里按 JWT 解出的真相回正，
+    // 纠正 provider_id：前端可能把企业号误判成 BuilderId，这里按 JWT/最终 start_url 回正，
     // 使后续刷新（IdcProvider::new）和落库（account.provider）都用正确的 Enterprise。
     if is_enterprise {
         params.provider_id = "Enterprise".to_string();

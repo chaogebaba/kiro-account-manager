@@ -395,10 +395,12 @@ pub struct UsageResult {
 /// 判断账号是否为 external_idp（微软 / Azure AD）。
 ///
 /// 口径与导入分类、KiroStudio 对齐：auth_method（大小写不敏感）命中
-/// external_idp / external-idp / externalidp / azure / azuread / azure_ad 即判定；
-/// 导入时我们落的是 "external_idp"，所以主要看 auth_method。为兜底历史/异常数据，
-/// 若带微软 token_endpoint / issuer_url 也视为 external_idp（这类凭据只可能是微软号，
-/// 且它们的 clientId/secret 是微软的，绝不能走 AWS OIDC 刷新）。
+/// external_idp / external-idp / externalidp / azure / azuread / azure_ad 即判定。
+/// 导入时我们落的是 "external_idp"，所以主要看 auth_method。
+///
+/// 兜底历史/异常数据时，**不能**仅因存在 token_endpoint/issuer_url 就判 external：
+/// 以后别的 provider 也可能带这两个字段。只有 endpoint/issuer 通过微软登录域白名单
+/// 时才兜底判为 external_idp，避免误路由到微软刷新链路。
 fn is_external_idp_account(account: &Account) -> bool {
     if let Some(method) = account.auth_method.as_deref() {
         let m = method.trim();
@@ -412,14 +414,32 @@ fn is_external_idp_account(account: &Account) -> bool {
             return true;
         }
     }
-    account
+
+    if let Some(endpoint) = account
         .token_endpoint
         .as_deref()
-        .is_some_and(|s| !s.trim().is_empty())
-        || account
-            .issuer_url
-            .as_deref()
-            .is_some_and(|s| !s.trim().is_empty())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        return crate::auth::providers::validate_microsoft_token_endpoint(endpoint).is_ok();
+    }
+
+    if let Some(issuer) = account
+        .issuer_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        let issuer = issuer.trim_end_matches('/');
+        let derived = if issuer.ends_with("/v2.0") {
+            format!("{issuer}/token")
+        } else {
+            format!("{issuer}/oauth2/v2.0/token")
+        };
+        return crate::auth::providers::validate_microsoft_token_endpoint(&derived).is_ok();
+    }
+
+    false
 }
 
 async fn refresh_token_by_provider_inner(

@@ -135,10 +135,12 @@ pub async fn restart_as_admin(app: tauri::AppHandle) -> Result<(), String> {
                 Err("以管理员权限启动失败(可能是取消了授权),请重试或用 sudo 手动运行".to_string())
             }
             // 仍在运行(提权进程正常拉起,pkexec 作为父进程存活)= 成功,退出旧进程
-            _ => {
+            Ok(None) | Ok(Some(_)) => {
                 app.exit(0);
                 Ok(())
             }
+            // try_wait 本身失败时不要误当成提权成功
+            Err(e) => Err(format!("检测提权进程状态失败: {e}")),
         }
     }
 
