@@ -217,7 +217,35 @@ pub fn normalize_openai_chat_request(request: &OpenAIChatRequest) -> Result<Norm
                     metadata: None,
                 });
             }
-            _ => {}
+            // OpenAI 文档：developer 指令级消息 → 映射为 system
+            "developer" => {
+                let text = extract_text_content(msg.content.as_ref());
+                if !text.is_empty() {
+                    messages.push(NormalizedMessage {
+                        role: "system".to_string(),
+                        content: Some(Value::String(text)),
+                        tool_calls: None,
+                        tool_call_id: None,
+                        metadata: None,
+                    });
+                }
+            }
+            // 旧版 OpenAI function 角色：按 tool 结果处理
+            "function" => {
+                let content = extract_text_content(msg.content.as_ref());
+                let tool_call_id = msg
+                    .tool_call_id
+                    .clone()
+                    .or_else(|| msg.name.clone())
+                    .unwrap_or_default();
+                pending_tool_results.push((tool_call_id, content));
+            }
+            other => {
+                // 官方 Chat Completions 角色仅限 system/user/assistant/tool/developer（+遗留 function）
+                return Err(format!(
+                    "不支持的 chat message.role: \"{other}\"，官方取值: system|user|assistant|tool|developer"
+                ));
+            }
         }
     }
 
@@ -534,49 +562,78 @@ pub fn convert_openai_chat_messages(messages: Option<&Value>) -> Vec<NormalizedM
     items
         .iter()
         .filter_map(|item| {
-            let role = item.get("role").and_then(Value::as_str)?.to_string();
-            let tool_calls = item
-                .get("tool_calls")
-                .and_then(Value::as_array)
-                .map(|calls| {
-                    calls
-                        .iter()
-                        .filter_map(|call| {
-                            Some(ToolCall {
-                                id: call.get("id").and_then(Value::as_str)?.to_string(),
-                                call_type: call
-                                    .get("type")
-                                    .and_then(Value::as_str)
-                                    .unwrap_or("function")
-                                    .to_string(),
-                                function: ToolCallFunction {
-                                    name: call
-                                        .get("function")?
-                                        .get("name")
-                                        .and_then(Value::as_str)?
-                                        .to_string(),
-                                    arguments: call
-                                        .get("function")?
-                                        .get("arguments")
+            // 官方 Chat Completions roles: system | user | assistant | tool | developer
+            // 另兼容遗留 function（按 tool 结果处理）
+            let raw_role = item.get("role").and_then(Value::as_str)?;
+            let (role, tool_call_id) = match raw_role {
+                "system" | "user" | "assistant" | "tool" => {
+                    let tool_call_id = item
+                        .get("tool_call_id")
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                    (raw_role.to_string(), tool_call_id)
+                }
+                // OpenAI developer 指令级消息 → 内部 system
+                "developer" => ("system".to_string(), None),
+                // 旧版 function 角色 → tool，name 作 tool_call_id 回退
+                "function" => {
+                    let tool_call_id = item
+                        .get("tool_call_id")
+                        .and_then(Value::as_str)
+                        .or_else(|| item.get("name").and_then(Value::as_str))
+                        .map(str::to_string);
+                    ("tool".to_string(), tool_call_id)
+                }
+                other => {
+                    log::warn!(
+                        "[协议映射] 不支持的 chat message.role=\"{other}\"，已跳过。官方取值: system|user|assistant|tool|developer"
+                    );
+                    return None;
+                }
+            };
+
+            let tool_calls = if role == "assistant" {
+                item.get("tool_calls")
+                    .and_then(Value::as_array)
+                    .map(|calls| {
+                        calls
+                            .iter()
+                            .filter_map(|call| {
+                                Some(ToolCall {
+                                    id: call.get("id").and_then(Value::as_str)?.to_string(),
+                                    call_type: call
+                                        .get("type")
                                         .and_then(Value::as_str)
-                                        .unwrap_or("{}")
+                                        .unwrap_or("function")
                                         .to_string(),
-                                },
+                                    function: ToolCallFunction {
+                                        name: call
+                                            .get("function")?
+                                            .get("name")
+                                            .and_then(Value::as_str)?
+                                            .to_string(),
+                                        arguments: call
+                                            .get("function")?
+                                            .get("arguments")
+                                            .and_then(Value::as_str)
+                                            .unwrap_or("{}")
+                                            .to_string(),
+                                    },
+                                })
                             })
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .filter(|calls| !calls.is_empty());
+                            .collect::<Vec<_>>()
+                    })
+                    .filter(|calls| !calls.is_empty())
+            } else {
+                None
+            };
 
             let content = item.get("content").map(convert_openai_chat_content);
             Some(NormalizedMessage {
                 role,
                 content,
                 tool_calls,
-                tool_call_id: item
-                    .get("tool_call_id")
-                    .and_then(Value::as_str)
-                    .map(str::to_string),
+                tool_call_id,
                 metadata: None,
             })
         })
@@ -1350,7 +1407,12 @@ pub async fn build_kiro_payload(
                         },
                     });
                 }
-                _ => {}
+                other => {
+                    // 归一化后理论上只有 system/user/assistant/tool；此处仅防御日志
+                    log::warn!(
+                        "[协议映射] history 遇到未处理角色 \"{other}\"，已跳过（应在 normalize 阶段映射）"
+                    );
+                }
             }
         }
 
@@ -1609,14 +1671,26 @@ fn convert_responses_input_items(items: &[Value]) -> Vec<NormalizedMessage> {
     for item in items {
         let item_type = item.get("type").and_then(Value::as_str).unwrap_or_default();
 
-        if let Some(role) = item.get("role").and_then(Value::as_str) {
+        // EasyInputMessage / message 项：官方 role = system|developer|user|assistant
+        if let Some(raw_role) = item.get("role").and_then(Value::as_str) {
             flush_pending_responses_user_items(&mut messages, &mut pending_user_items);
+            let role = match raw_role {
+                "system" | "user" | "assistant" => raw_role.to_string(),
+                // OpenAI Responses: developer 指令级 → 内部 system
+                "developer" => "system".to_string(),
+                other => {
+                    log::warn!(
+                        "[协议映射] Responses 不支持的 message.role=\"{other}\"，已跳过。官方取值: system|developer|user|assistant"
+                    );
+                    continue;
+                }
+            };
             messages.push(NormalizedMessage {
-                role: role.to_string(),
+                role: role.clone(),
                 content: responses_message_content(item),
                 tool_calls: None,
                 tool_call_id: None,
-                metadata: extract_responses_message_metadata(item, role),
+                metadata: extract_responses_message_metadata(item, &role),
             });
             continue;
         }
@@ -1624,11 +1698,8 @@ fn convert_responses_input_items(items: &[Value]) -> Vec<NormalizedMessage> {
         match item_type {
             "message" => {
                 flush_pending_responses_user_items(&mut messages, &mut pending_user_items);
-                let role = item
-                    .get("role")
-                    .and_then(Value::as_str)
-                    .unwrap_or("user")
-                    .to_string();
+                // type=message 但缺 role 时官方默认按 user 处理
+                let role = "user".to_string();
                 messages.push(NormalizedMessage {
                     role: role.clone(),
                     content: responses_message_content(item),
@@ -1690,20 +1761,72 @@ fn convert_responses_input_items(items: &[Value]) -> Vec<NormalizedMessage> {
             "input_text" | "output_text" | "input_image" | "image_url" | "image" => {
                 pending_user_items.push(item.clone());
             }
+            // OpenAI Responses 文档 reasoning item → Kiro reasoningContent
+            "reasoning" => {
+                flush_pending_responses_user_items(&mut messages, &mut pending_user_items);
+                let mut metadata = Map::new();
+                if let Some(reasoning) = extract_responses_reasoning_item(item)
+                    .or_else(|| extract_reasoning_content(Some(item)))
+                    .or_else(|| extract_reasoning_content(item.get("content")))
+                {
+                    metadata.insert("reasoningContent".to_string(), reasoning);
+                }
+                messages.push(NormalizedMessage {
+                    role: "assistant".to_string(),
+                    content: None,
+                    tool_calls: None,
+                    tool_call_id: None,
+                    metadata: if metadata.is_empty() {
+                        None
+                    } else {
+                        Some(Value::Object(metadata))
+                    },
+                });
+            }
+            // 官方工具类 item：按 function_call / function_call_output 语义映射到 Kiro tools
+            "custom_tool_call" | "web_search_call" | "file_search_call" | "code_interpreter_call"
+            | "computer_call" | "local_shell_call" | "image_generation_call" | "mcp_call" => {
+                flush_pending_responses_user_items(&mut messages, &mut pending_user_items);
+                push_responses_tool_call_message(&mut messages, item, item_type);
+            }
+            "custom_tool_call_output" | "computer_call_output" | "local_shell_call_output"
+            | "mcp_approval_response" => {
+                flush_pending_responses_user_items(&mut messages, &mut pending_user_items);
+                push_responses_tool_output_message(&mut messages, item);
+            }
+            // 会话引用：依赖 previous_response_id 恢复，input 内 item_reference 本身无正文可转
+            "item_reference" => {
+                log::info!(
+                    "[协议映射] Responses item_reference 跳过（依赖 previous_response_id 会话恢复）"
+                );
+            }
+            // 服务端审批/列表类：无对等 Kiro 语义，记录后跳过（不伪造 user 文本）
+            "mcp_list_tools" | "mcp_approval_request" => {
+                log::warn!(
+                    "[协议映射] Responses 官方类型 \"{item_type}\" 暂无 Kiro 对等语义，已跳过"
+                );
+            }
+            // compaction 非 Responses 核心 input 类型；若客户端带入则保留标记（非 /compact 实现）
             "compaction" => {
-                // Compact item 需要原样保留，作为 system 消息传递
                 flush_pending_responses_user_items(&mut messages, &mut pending_user_items);
                 messages.push(NormalizedMessage {
                     role: "system".to_string(),
                     content: Some(item.clone()),
                     tool_calls: None,
                     tool_call_id: None,
-                    metadata: Some(json!({
-                        "is_compaction": true
-                    })),
+                    metadata: Some(json!({ "is_compaction": true })),
                 });
             }
-            _ => {}
+            other => {
+                // 不在官方已知表内的 type：明确告警并跳过，禁止塞成假 user 文本
+                log::warn!(
+                    "[协议映射] 非官方/未映射的 Responses input type=\"{other}\"，已跳过。\
+                     已映射: message|function_call|function_call_output|reasoning|\
+                     custom_tool_call(|_output)|web_search_call|file_search_call|\
+                     code_interpreter_call|computer_call(|_output)|local_shell_call(|_output)|\
+                     image_generation_call|mcp_call|item_reference|input_text|output_text|image*"
+                );
+            }
         }
     }
 
@@ -1724,6 +1847,133 @@ fn flush_pending_responses_user_items(
         content: Some(Value::Array(std::mem::take(pending_user_items))),
         tool_calls: None,
         tool_call_id: None,
+        metadata: None,
+    });
+}
+
+/// OpenAI Responses 官方 reasoning item → Kiro reasoningContent 结构
+/// 文档字段：summary[].summary_text / content[].reasoning_text / encrypted_content
+fn extract_responses_reasoning_item(item: &Value) -> Option<Value> {
+    let mut texts = Vec::new();
+
+    if let Some(summary) = item.get("summary") {
+        let text = extract_text_content(Some(summary));
+        if !text.is_empty() {
+            texts.push(text);
+        }
+    }
+
+    if let Some(content) = item.get("content") {
+        match content {
+            Value::Array(parts) => {
+                for part in parts {
+                    let part_type = part.get("type").and_then(Value::as_str).unwrap_or_default();
+                    if matches!(part_type, "reasoning_text" | "summary_text" | "text") {
+                        if let Some(text) = part.get("text").and_then(Value::as_str) {
+                            if !text.is_empty() {
+                                texts.push(text.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            Value::String(text) if !text.is_empty() => texts.push(text.clone()),
+            _ => {}
+        }
+    }
+
+    // summary / content 都没有时，兜底 text 字段
+    if texts.is_empty() {
+        if let Some(text) = item.get("text").and_then(Value::as_str) {
+            if !text.is_empty() {
+                texts.push(text.to_string());
+            }
+        }
+    }
+
+    let encrypted = item
+        .get("encrypted_content")
+        .or_else(|| item.get("encryptedContent"))
+        .cloned();
+
+    if texts.is_empty() && encrypted.is_none() {
+        return None;
+    }
+
+    let mut reasoning_text = Map::new();
+    let merged = texts.join("\n");
+    if !merged.is_empty() {
+        reasoning_text.insert("text".to_string(), Value::String(merged));
+    }
+
+    let mut reasoning = Map::new();
+    if !reasoning_text.is_empty() {
+        reasoning.insert("reasoningText".to_string(), Value::Object(reasoning_text));
+    }
+    if let Some(enc) = encrypted {
+        reasoning.insert("encryptedContent".to_string(), enc);
+    }
+
+    meaningful_optional_value(Some(Value::Object(reasoning)))
+}
+
+/// Responses 官方工具调用 item → assistant.tool_calls（function 语义）
+fn push_responses_tool_call_message(
+    messages: &mut Vec<NormalizedMessage>,
+    item: &Value,
+    item_type: &str,
+) {
+    let name = item
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or(item_type)
+        .to_string();
+    let arguments = item
+        .get("arguments")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_else(|| {
+            serde_json::to_string(
+                item.get("arguments")
+                    .or_else(|| item.get("action"))
+                    .or_else(|| item.get("input"))
+                    .unwrap_or(&json!({})),
+            )
+            .unwrap_or_else(|_| "{}".to_string())
+        });
+    messages.push(NormalizedMessage {
+        role: "assistant".to_string(),
+        content: None,
+        tool_calls: Some(vec![ToolCall {
+            id: item
+                .get("call_id")
+                .or_else(|| item.get("id"))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            call_type: "function".to_string(),
+            function: ToolCallFunction { name, arguments },
+        }]),
+        tool_call_id: None,
+        metadata: None,
+    });
+}
+
+/// Responses 官方工具输出 item → role=tool
+fn push_responses_tool_output_message(messages: &mut Vec<NormalizedMessage>, item: &Value) {
+    messages.push(NormalizedMessage {
+        role: "tool".to_string(),
+        content: responses_tool_output_content(
+            item.get("output")
+                .or_else(|| item.get("result"))
+                .or_else(|| item.get("content")),
+        ),
+        tool_calls: None,
+        tool_call_id: item
+            .get("call_id")
+            .or_else(|| item.get("id"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
         metadata: None,
     });
 }
@@ -2916,23 +3166,32 @@ fn normalize_tool_choice(
         _ => return Err("tool_choice 格式无效".to_string()),
     };
 
+    // 官方取值：
+    // - Anthropic: auto | any | tool | none
+    // - OpenAI Chat/Responses: auto | none | required | function
+    // 内部统一为 auto | none | required | function(name)
     match choice_type {
         "auto" => Ok(Some(json!({ "type": "auto" }))),
         "none" => Ok(Some(json!({ "type": "none" }))),
-        "required" => {
+        // Anthropic any ≡ OpenAI required
+        "any" | "required" => {
             if tools.as_ref().is_none_or(|items| items.is_empty()) {
-                return Err("tool_choice=required 时必须同时提供 tools".to_string());
+                return Err("tool_choice=required/any 时必须同时提供 tools".to_string());
             }
             Ok(Some(json!({ "type": "required" })))
         }
-        "function" => {
+        // Anthropic tool ≡ OpenAI function
+        "function" | "tool" => {
             let name = choice
                 .get("name")
                 .or_else(|| choice.pointer("/function/name"))
                 .and_then(Value::as_str)
                 .map(str::trim)
                 .filter(|value| !value.is_empty())
-                .ok_or_else(|| "tool_choice.function.name 不能为空".to_string())?;
+                .ok_or_else(|| {
+                    "tool_choice 指定具体工具时 name 不能为空（Anthropic: type=tool+name；OpenAI: type=function+function.name）"
+                        .to_string()
+                })?;
 
             let tool_exists = tools
                 .as_ref()
@@ -2947,7 +3206,9 @@ fn normalize_tool_choice(
                 "name": name
             })))
         }
-        other => Err(format!("暂不支持的 tool_choice.type: {other}")),
+        other => Err(format!(
+            "不支持的 tool_choice.type: \"{other}\"，官方取值: auto|none|any|required|tool|function"
+        )),
     }
 }
 
@@ -3591,6 +3852,135 @@ mod tests {
             Some("call_1")
         );
         assert_eq!(converted.messages[2].content, Some(json!("命中结果")));
+    }
+
+    #[test]
+    fn convert_openai_chat_messages_maps_official_developer_and_legacy_function() {
+        let messages = convert_openai_chat_messages(Some(&json!([
+            { "role": "developer", "content": "你是网关助手" },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [{
+                    "id": "call_1",
+                    "type": "function",
+                    "function": { "name": "search", "arguments": "{\"q\":\"x\"}" }
+                }]
+            },
+            { "role": "function", "name": "search", "content": "结果" },
+            { "role": "user", "content": "继续" },
+            { "role": "invalid_role", "content": "应被跳过" }
+        ])));
+
+        assert_eq!(messages.len(), 4);
+        assert_eq!(messages[0].role, "system");
+        assert_eq!(messages[0].content, Some(json!("你是网关助手")));
+        assert_eq!(messages[1].role, "assistant");
+        assert_eq!(
+            messages[1]
+                .tool_calls
+                .as_ref()
+                .and_then(|c| c.first())
+                .map(|c| c.function.name.as_str()),
+            Some("search")
+        );
+        assert_eq!(messages[2].role, "tool");
+        assert_eq!(messages[2].tool_call_id.as_deref(), Some("search"));
+        assert_eq!(messages[2].content, Some(json!("结果")));
+        assert_eq!(messages[3].role, "user");
+    }
+
+    #[test]
+    fn normalize_openai_chat_request_rejects_unknown_role() {
+        let request: OpenAIChatRequest = serde_json::from_value(json!({
+            "model": "claude-sonnet-4",
+            "messages": [
+                { "role": "not_a_role", "content": "x" }
+            ]
+        }))
+        .expect("request should parse");
+
+        let err = normalize_openai_chat_request(&request).expect_err("should reject unknown role");
+        assert!(err.contains("不支持的 chat message.role"));
+    }
+
+    #[test]
+    fn normalize_openai_responses_maps_developer_and_reasoning_and_skips_unknown_type() {
+        let payload = json!({
+            "model": "claude-sonnet-4",
+            "input": [
+                { "role": "developer", "content": "系统约束" },
+                {
+                    "type": "reasoning",
+                    "summary": [{ "type": "summary_text", "text": "思考过程" }],
+                    "content": [{ "type": "reasoning_text", "text": "思考过程" }]
+                },
+                {
+                    "type": "function_call",
+                    "call_id": "call_2",
+                    "name": "lookup",
+                    "arguments": "{}"
+                },
+                {
+                    "type": "function_call_output",
+                    "call_id": "call_2",
+                    "output": "ok"
+                },
+                { "type": "totally_unknown_item", "foo": 1 }
+            ]
+        });
+
+        let converted =
+            normalize_openai_responses_request(&payload).expect("responses should convert");
+        assert_eq!(converted.messages[0].role, "system");
+        assert_eq!(converted.messages[0].content, Some(json!("系统约束")));
+        assert_eq!(converted.messages[1].role, "assistant");
+        assert!(converted.messages[1].metadata.is_some());
+        assert_eq!(
+            converted.messages[2]
+                .tool_calls
+                .as_ref()
+                .and_then(|c| c.first())
+                .map(|c| c.function.name.as_str()),
+            Some("lookup")
+        );
+        assert_eq!(converted.messages[3].role, "tool");
+        assert_eq!(converted.messages[3].tool_call_id.as_deref(), Some("call_2"));
+        // unknown type 被跳过，不伪造 user 文本
+        assert_eq!(converted.messages.len(), 4);
+    }
+
+    #[test]
+    fn normalize_tool_choice_maps_anthropic_any_and_tool() {
+        let tools = Some(vec![Tool {
+            tool_type: "function".to_string(),
+            function: crate::gateway::models::ToolFunction {
+                name: "search_docs".to_string(),
+                description: Some("搜索".to_string()),
+                parameters: Some(json!({"type": "object"})),
+            },
+            cache_control: None,
+        }]);
+
+        assert_eq!(
+            normalize_tool_choice(&Some(json!({ "type": "any" })), &tools).unwrap(),
+            Some(json!({ "type": "required" }))
+        );
+        assert_eq!(
+            normalize_tool_choice(
+                &Some(json!({ "type": "tool", "name": "search_docs" })),
+                &tools
+            )
+            .unwrap(),
+            Some(json!({ "type": "function", "name": "search_docs" }))
+        );
+        assert_eq!(
+            normalize_tool_choice(&Some(json!({ "type": "required" })), &tools).unwrap(),
+            Some(json!({ "type": "required" }))
+        );
+        let err = normalize_tool_choice(&Some(json!({ "type": "mystery" })), &tools)
+            .expect_err("unknown type should fail");
+        assert!(err.contains("不支持的 tool_choice.type"));
     }
 
     #[test]

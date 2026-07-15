@@ -581,6 +581,9 @@ pub struct OpenAIMessage {
     pub tool_calls: Option<Vec<OpenAIToolCall>>,
     #[serde(default)]
     pub tool_call_id: Option<String>,
+    /// 旧版 function 角色用 name 标识函数；映射为 tool 时作 tool_call_id 回退
+    #[serde(default)]
+    pub name: Option<String>,
     #[serde(default)]
     #[allow(dead_code)]
     pub audio: Option<AudioInput>,
