@@ -12,6 +12,7 @@ use std::{
     collections::{HashMap, HashSet},
     convert::Infallible,
     net::{IpAddr, SocketAddr},
+    sync::OnceLock,
     time::{Duration, Instant},
 };
 use tokio::sync::mpsc;
@@ -595,6 +596,16 @@ fn extract_plain_text(value: Option<&Value>) -> String {
     }
 }
 
+/// 使用 tiktoken 对 OpenAI 模型进行精确 token 计数
+/// 使用 OnceLock 缓存编码器，避免重复初始化
+fn count_openai_tokens(text: &str) -> usize {
+    static ENCODING: OnceLock<tiktoken_rs::CoreBPE> = OnceLock::new();
+    let bpe = ENCODING.get_or_init(|| {
+        tiktoken_rs::o200k_base().expect("无法初始化 o200k_base 编码器")
+    });
+    bpe.encode_with_special_tokens(text).len()
+}
+
 /// 估算单个文本的 token 数量（支持多种模型）
 ///
 /// 参考 Kiro IDE 源码：extension.js 行 310878-310911
@@ -634,8 +645,8 @@ fn estimate_text_tokens(text: &str, tokenizer_type: TokenizerType) -> usize {
             text.len().div_ceil(4)
         }
         TokenizerType::OpenAI => {
-            // OpenAI: 使用 Generic 方法（tiktoken 需要额外依赖，这里简化处理）
-            estimate_generic_tokens(text)
+            // OpenAI: 使用 tiktoken-rs 精确计数（o200k_base 编码）
+            count_openai_tokens(text)
         }
         TokenizerType::Llama => {
             // Llama: length / 3.5 (向上取整)
@@ -5427,7 +5438,7 @@ mod tests {
     #[test]
     fn normalize_request_accepts_openai_chat_payloads() {
         let responses_payload = json!({
-            "model": "claude-3-7-sonnet-20250219",
+            "model": "claude-sonnet-4",
             "stream": true,
             "previous_response_id": "resp_prev_123",
             "tool_choice": { "type": "function", "name": "search_docs" },
@@ -5468,7 +5479,7 @@ mod tests {
         });
 
         let chat_payload = json!({
-            "model": "claude-3-7-sonnet-20250219",
+            "model": "claude-sonnet-4",
             "stream": true,
             "tool_choice": { "type": "function", "name": "search_docs" },
             "tools": [
@@ -5520,7 +5531,7 @@ mod tests {
         let chat_request = normalize_request(ResponseFormat::Responses, &chat_payload)
             .expect("chat payload should normalize through the OpenAI protocol adapter");
 
-        assert_eq!(responses_request.model, "claude-3-7-sonnet-20250219");
+        assert_eq!(responses_request.model, "claude-sonnet-4");
         assert!(responses_request.stream);
         assert_eq!(
             responses_request.previous_response_id.as_deref(),
@@ -5575,7 +5586,7 @@ mod tests {
     #[test]
     fn test_tokenizer_type_from_model_id() {
         assert!(matches!(
-            TokenizerType::from_model_id("claude-3-7-sonnet-20250219"),
+            TokenizerType::from_model_id("claude-sonnet-4"),
             TokenizerType::Claude
         ));
         assert!(matches!(
@@ -5644,14 +5655,14 @@ mod tests {
             },
         ];
 
-        let tokens = estimate_request_tokens(&messages, "claude-3-7-sonnet-20250219");
+        let tokens = estimate_request_tokens(&messages, "claude-sonnet-4");
         assert!(tokens > 0);
     }
 
     #[test]
     fn test_get_payload_size() {
         let payload = json!({
-            "model": "claude-3-7-sonnet-20250219",
+            "model": "claude-sonnet-4",
             "messages": [
                 {"role": "user", "content": "Hello"}
             ]
@@ -5765,7 +5776,7 @@ mod tests {
     async fn test_get_model_max_input_tokens() {
         assert_eq!(get_model_max_input_tokens("auto").await, 1_000_000);
         assert_eq!(
-            get_model_max_input_tokens("claude-3-7-sonnet-20250219").await,
+            get_model_max_input_tokens("claude-sonnet-4").await,
             200_000
         );
         assert_eq!(get_model_max_input_tokens("gpt-4").await, 200_000);

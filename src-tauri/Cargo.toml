@@ -57,6 +57,7 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 anyhow = "1.0"
 lru = "0.12"
 toml_edit = "0.25.11"
+tiktoken-rs = "0.5"
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 

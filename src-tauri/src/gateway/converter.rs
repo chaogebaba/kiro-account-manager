@@ -732,18 +732,9 @@ pub fn get_internal_model_id(external_model: &str) -> Result<String, String> {
         "haiku" | "haiku-4-5" => return Ok("claude-haiku-4.5".to_string()),
         "claude-sonnet-latest" => return Ok("claude-sonnet-5".to_string()),
         "claude-sonnet-5" => return Ok("claude-sonnet-5".to_string()),
-        // Claude 3.x 旧版兜底到 Claude 4.x
-        "claude-3-5-sonnet"
-        | "claude-3-5-sonnet-latest"
-        | "claude-3-opus"
-        | "claude-3-opus-latest" => {
-            return Ok("claude-sonnet-4.5".to_string());
-        }
-        "claude-3-sonnet" => return Ok("claude-sonnet-4".to_string()),
-        "claude-3-haiku" | "claude-3-5-haiku" => return Ok("claude-haiku-4.5".to_string()),
-        // OpenAI GPT 兼容映射（默认全部映射到 sonnet-4.5；用户可以在前端「模型映射」配置里覆盖）
+        // OpenAI GPT 兼容映射（默认映射到 claude-sonnet-4；用户可以在前端「模型映射」配置里覆盖）
         "gpt-4" | "gpt-4o" | "gpt-4-turbo" | "gpt-3.5-turbo" | "gpt-4o-mini" => {
-            return Ok("claude-sonnet-4.5".to_string());
+            return Ok("claude-sonnet-4".to_string());
         }
         // GPT-5.6 系列（Kiro 原生 GPT 模型，不做映射）
         "gpt-5-6-sol" | "gpt-5.6-sol" => return Ok("gpt-5.6-sol".to_string()),
@@ -3465,7 +3456,7 @@ mod tests {
     #[test]
     fn normalize_openai_responses_request_preserves_message_content_items() {
         let payload = json!({
-            "model": "claude-3-7-sonnet-20250219",
+            "model": "claude-sonnet-4",
             "stream": true,
             "input": [
                 {
@@ -3524,7 +3515,7 @@ mod tests {
     #[test]
     fn normalize_openai_responses_request_keeps_tools_tool_choice_and_function_call_items() {
         let payload = json!({
-            "model": "claude-3-7-sonnet-20250219",
+            "model": "claude-sonnet-4",
             "tool_choice": { "type": "function", "name": "search_docs" },
             "tools": [
                 {
@@ -3605,7 +3596,7 @@ mod tests {
     #[test]
     fn normalize_openai_responses_request_preserves_assistant_message_metadata() {
         let payload = json!({
-            "model": "claude-3-7-sonnet-20250219",
+            "model": "claude-sonnet-4",
             "input": [
                 {
                     "type": "message",
