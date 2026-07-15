@@ -1392,6 +1392,7 @@
   "gateway.observabilityOverview": "观测总览",
   "gateway.operationsTroubleshooting": "运维与排障",
   "gateway.requestLogs": "请求日志",
+  "gateway.apiPlayground": "API Playground",
   "gateway.fixBeforeSave": "保存前需修正",
   "gateway.accountPool": "账号池",
   "gateway.localOnly": "仅本机",

@@ -1437,6 +1437,7 @@
   "gateway.observabilityOverview": "Observability Overview",
   "gateway.operationsTroubleshooting": "Operations & Troubleshooting",
   "gateway.requestLogs": "Request Logs",
+  "gateway.apiPlayground": "API Playground",
   "gateway.fixBeforeSave": "Fix Before Save",
   "gateway.accountPool": "Account pool",
   "gateway.localOnly": "Local only",

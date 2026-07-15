@@ -513,11 +513,11 @@ function GatewayPage() {
                     <Group gap="xs">
                       <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setShowRequestLogs(true)} disabled={!status.running}>
                         <ScrollText size={12} className="mr-1" />
-                        请求日志
+                        {t('gateway.requestLogs')}
                       </Button>
                       <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setShowApiPlayground(true)} disabled={!status.running}>
                         <TestTube2 size={12} className="mr-1" />
-                        在线测试
+                        {t('gateway.apiPlayground')}
                       </Button>
                     </Group>
                   </Group>
@@ -655,7 +655,7 @@ function GatewayPage() {
                 </DialogContent>
               </DialogRoot>
 
-              {/* API Playground / 在线测试 */}
+              {/* API Playground */}
               <ApiPlaygroundDialog
                 open={showApiPlayground}
                 onOpenChange={setShowApiPlayground}

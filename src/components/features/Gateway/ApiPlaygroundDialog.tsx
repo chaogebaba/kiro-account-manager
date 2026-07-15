@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Play, Copy, RotateCw } from 'lucide-react'
 import { Group } from '@/components/shared/layout'
+import { useApp } from '../../../hooks/useApp'
 
 interface Account {
   id: string
@@ -154,6 +155,7 @@ export function ApiPlaygroundDialog({
   gatewayApiKey,
   routing,
 }: ApiPlaygroundDialogProps) {
+  const { t } = useApp()
   const [protocol, setProtocol] = useState<Protocol>('anthropic')
   const [selectedAccount, setSelectedAccount] = useState<string>('')
   const [requestBody, setRequestBody] = useState<string>(JSON.stringify(DEFAULT_REQUESTS['anthropic'], null, 2))
@@ -305,8 +307,7 @@ export function ApiPlaygroundDialog({
             <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary/10">
               <Play className="w-3.5 h-3.5 text-primary" />
             </div>
-            在线测试
-            <span className="text-xs font-normal text-muted-foreground">API Playground</span>
+            {t('gateway.apiPlayground')}
             <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-muted/60 border border-border/50 px-2.5 py-0.5 text-[10px] font-mono text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-green-500/80 animate-pulse"></span>
               {getEndpointPath()}

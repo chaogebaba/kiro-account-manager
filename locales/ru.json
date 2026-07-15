@@ -1459,6 +1459,7 @@
   "gateway.observabilityOverview": "Обзор наблюдаемости",
   "gateway.operationsTroubleshooting": "Операции и устранение неполадок",
   "gateway.requestLogs": "Логи запросов",
+  "gateway.apiPlayground": "API Playground",
   "gateway.fixBeforeSave": "Исправить перед сохранением",
   
   "gateway.logStatus": "Статус логов",
