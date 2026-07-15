@@ -2862,7 +2862,7 @@ fn verify_client_auth(headers: &HeaderMap, config: &GatewayConfig) -> Result<(),
     }
 }
 
-/// 从请求头读取可选的指定账号 ID（在线测试 / 客户端调试用）
+/// 从请求头读取可选的指定账号 ID（API Playground / 客户端调试用）
 fn extract_preferred_account_id(headers: &HeaderMap) -> Option<String> {
     headers
         .get("x-account-id")

@@ -1,5 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Play, Square, ScrollText, Copy, Zap, TestTube2 } from 'lucide-react'
+import { Play, Square, ScrollText, Copy, Zap, TestTube2, Network } from 'lucide-react'
 import { Alert as AlertPrimitive, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { configureProxyClients } from '../../../api/gatewayApi'
@@ -16,6 +16,7 @@ import {
 import GatewayConfigComponent from './GatewayConfig'
 import { RequestLogsDialog } from './RequestLogsDialog'
 import { ApiPlaygroundDialog } from './ApiPlaygroundDialog'
+import { RouteTestDialog } from './RouteTestDialog'
 import { GatewayConfig, GatewayStatus } from './gatewayPageState'
 import { ErrorHistoryEntry } from './gatewayPageUtils'
 
@@ -96,6 +97,7 @@ function GatewayPage() {
   const [logDir, setLogDir] = useState('')
   const [showRequestLogs, setShowRequestLogs] = useState(false)
   const [showApiPlayground, setShowApiPlayground] = useState(false)
+  const [showRouteTest, setShowRouteTest] = useState(false)
   const [savedConfigSnapshot, setSavedConfigSnapshot] = useState(() => buildGatewayConfigSnapshot(DEFAULT_GATEWAY_CONFIG))
   const [appliedRuntimeSnapshot, setAppliedRuntimeSnapshot] = useState<any>(null)
   const [lastStatusSyncAt, setLastStatusSyncAt] = useState('-')
@@ -515,6 +517,10 @@ function GatewayPage() {
                         <ScrollText size={12} className="mr-1" />
                         {t('gateway.requestLogs')}
                       </Button>
+                      <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setShowRouteTest(true)}>
+                        <Network size={12} className="mr-1" />
+                        {t('gateway.routeAllocationTest')}
+                      </Button>
                       <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setShowApiPlayground(true)} disabled={!status.running}>
                         <TestTube2 size={12} className="mr-1" />
                         {t('gateway.apiPlayground')}
@@ -654,6 +660,12 @@ function GatewayPage() {
                   </DialogBody>
                 </DialogContent>
               </DialogRoot>
+
+              <RouteTestDialog
+                open={showRouteTest}
+                onOpenChange={setShowRouteTest}
+                config={effectiveConfig}
+              />
 
               {/* API Playground */}
               <ApiPlaygroundDialog

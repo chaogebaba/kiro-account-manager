@@ -54,6 +54,15 @@ export function getAvailableModels() {
   return invoke<string[]>('get_available_models')
 }
 
+/** 按当前 2API 配置模拟负载均衡选号（不发起真实上游请求） */
+export function testRouteConfig(config: any) {
+  return invoke<{
+    matched_accounts: string[]
+    selected_account: string | null
+    error: string | null
+  }>('test_route_config', { config })
+}
+
 // 为选中的客户端写入反代配置
 export function configureProxyClients(args: {
   clients: string[]
