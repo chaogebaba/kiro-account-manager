@@ -12,10 +12,10 @@ use crate::commands::account_models::{
 use crate::commands::common::{
     account_machine_id_or_new, calc_expires_at, ensure_account_machine_id, extract_user_info,
     find_account_by_id, find_existing_account_idx, generate_account_machine_id,
-    get_enterprise_usage, get_usage_by_account,
-    get_usage_by_provider_with_machine_id, is_auth_error_message, is_token_expired,
-    is_token_expiring_soon, lock_store, normalize_expires_at, refresh_token_by_provider,
-    save_store, token_needs_refresh, update_account_status, RefreshResult,
+    get_usage_by_account, get_usage_by_provider_with_machine_id, is_auth_error_message,
+    is_token_expired, is_token_expiring_soon, lock_store, normalize_expires_at,
+    refresh_token_by_provider, save_store, token_needs_refresh, update_account_status,
+    RefreshResult,
 };
 use crate::core::account::{Account, AccountProxyConfig};
 use crate::state::AppState;
@@ -136,9 +136,7 @@ pub async fn sync_account(
 ) -> Result<SyncAccountResult, String> {
     let mut account = find_account_by_id(&state, &id)?;
 
-    let provider_str = account.provider.as_deref().unwrap_or("Google");
     let access_token = account.access_token.clone().ok_or("No access token")?;
-    let is_enterprise = provider_str == "Enterprise";
 
     // 如果账号缺少 machine_id，自动生成账号独立 ID（所有账号都需要）
     if account
@@ -153,16 +151,9 @@ pub async fn sync_account(
         );
     }
 
-    // 先尝试用现有 token 获取配额
-    let mut usage_result = if is_enterprise {
-        let machine_id = account
-            .machine_id
-            .as_ref()
-            .ok_or("Enterprise account missing machine_id")?;
-        get_enterprise_usage(&access_token, machine_id).await
-    } else {
-        get_usage_by_account(&account, &access_token).await
-    };
+    // 统一走 get_usage_by_account：getUsageLimits 不带 profileArn；
+    // Enterprise 还会按账号 region + us-east-1/eu-central-1 回退
+    let mut usage_result = get_usage_by_account(&account, &access_token).await;
 
     let mut refresh_result: Option<RefreshResult> = None;
 
@@ -175,15 +166,7 @@ pub async fn sync_account(
     if needs_refresh {
         match refresh_token_by_provider(&account).await {
             Ok(refreshed) => {
-                usage_result = if is_enterprise {
-                    let machine_id = account
-                        .machine_id
-                        .as_ref()
-                        .ok_or("Enterprise account missing machine_id")?;
-                    get_enterprise_usage(&refreshed.access_token, machine_id).await
-                } else {
-                    get_usage_by_account(&account, &refreshed.access_token).await
-                };
+                usage_result = get_usage_by_account(&account, &refreshed.access_token).await;
                 refresh_result = Some(refreshed);
             }
             Err(e) => {
@@ -298,9 +281,7 @@ pub async fn get_usage_limits(
 ) -> Result<SyncAccountResult, String> {
     let mut account = find_account_by_id(&state, &id)?;
 
-    let provider_str = account.provider.as_deref().unwrap_or("Google");
     let access_token = account.access_token.clone().ok_or("No access token")?;
-    let is_enterprise = provider_str == "Enterprise";
 
     // 如果账号缺少 machine_id，自动生成账号独立 ID（所有账号都需要）
     if account
@@ -315,17 +296,15 @@ pub async fn get_usage_limits(
         );
     }
 
-    // 直接获取配额，不自动刷新 token
-    let usage_result = if is_enterprise {
-        let machine_id = account
-            .machine_id
-            .as_ref()
-            .ok_or("Enterprise account missing machine_id")?;
-        log::info!("[Enterprise] Fetching usage for account {} with machine_id: {}", account.id, machine_id);
-        get_enterprise_usage(&access_token, machine_id).await
-    } else {
-        get_usage_by_account(&account, &access_token).await
-    };
+    // 直接获取配额，不自动刷新 token（Enterprise 同样走统一路径）
+    if account.provider.as_deref() == Some("Enterprise") {
+        log::info!(
+            "[Enterprise] Fetching usage for account {} region={:?}",
+            account.id,
+            account.region
+        );
+    }
+    let usage_result = get_usage_by_account(&account, &access_token).await;
 
     // 如果是认证错误，直接返回错误，不刷新 token
     let usage = match usage_result {

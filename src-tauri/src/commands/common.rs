@@ -547,36 +547,37 @@ async fn get_usage_by_account_inner(
     use_account_proxy: bool,
 ) -> Result<UsageResult, String> {
     use crate::clients::http_client::build_http_client_with_timeout_for_account;
-    use crate::clients::kiro_client::KiroClient;
+    use crate::clients::kiro_client::{usage_limits_region_candidates, KiroClient};
 
     let ctx = resolve_kiro_call_context(account, "us-east-1");
+    let is_enterprise = account.provider.as_deref() == Some("Enterprise");
+    let regions = usage_limits_region_candidates(&ctx.region, is_enterprise);
 
     let client = if use_account_proxy {
         KiroClient::from_client(build_http_client_with_timeout_for_account(account, 30, 10)?)
     } else {
         KiroClient::new()?
     };
-    let usage_call = client
-        .get_usage_limits(
-            access_token,
-            &ctx.machine_id,
-            &ctx.region,
-            ctx.profile_arn.as_deref(),
-            account.auth_method.as_deref(),
-            account.provider.as_deref(),
-        )
-        .await;
 
-    // 如果 getUsageLimits 成功，额外调用 ListAvailableModels 检测封禁
-    // 因为某些封禁状态下 getUsageLimits 会正常返回，但 ListAvailableModels 会返回 403
-    let mut result = parse_usage_result(usage_call)?;
+    // getUsageLimits 不带 profileArn；企业号优先账号 region，再回退常见 region
+    let (used_region, usage_data) = match client
+        .get_usage_limits_with_region_fallback(access_token, &ctx.machine_id, &regions)
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => return parse_usage_result(Err(e)),
+    };
+
+    // 某些封禁状态下 getUsageLimits 正常返回，但 ListAvailableModels 会 403
+    // Enterprise 的 profile_arn 为 None，跳过该探测
+    let mut result = parse_usage_result(Ok(usage_data))?;
 
     if !result.is_banned && ctx.profile_arn.is_some() {
         match client
             .list_available_models(
                 access_token,
                 &ctx.machine_id,
-                &ctx.region,
+                &used_region,
                 ctx.profile_arn.as_deref(),
             )
             .await
@@ -588,9 +589,7 @@ async fn get_usage_by_account_inner(
                 );
                 result.is_banned = true;
             }
-            _ => {
-                // 其他情况忽略（AUTH_ERROR 或成功都不影响 usage 结果）
-            }
+            _ => {}
         }
     }
 
@@ -623,38 +622,6 @@ pub async fn get_usage_by_provider_with_machine_id(
     }
 
     get_usage_by_account(&temp_account, access_token).await
-}
-
-/// 为企业账号获取 usage 数据
-pub async fn get_enterprise_usage(
-    access_token: &str,
-    machine_id: &str,
-) -> Result<UsageResult, String> {
-    use crate::clients::kiro_client::KiroClient;
-
-    let client = KiroClient::new()?;
-    let result = client
-        .get_enterprise_usage_limits(access_token, machine_id)
-        .await;
-
-    match result {
-        Ok(usage_data) => Ok(UsageResult {
-            usage_data,
-            is_banned: false,
-            is_auth_error: false,
-        }),
-        Err(e) if e.starts_with("BANNED:") => Ok(UsageResult {
-            usage_data: serde_json::Value::Null,
-            is_banned: true,
-            is_auth_error: false,
-        }),
-        Err(e) if is_auth_error_message(&e) => Ok(UsageResult {
-            usage_data: serde_json::Value::Null,
-            is_banned: false,
-            is_auth_error: true,
-        }),
-        Err(e) => Err(e),
-    }
 }
 
 /// 解析 usage 结果，提取封禁状态和认证错误

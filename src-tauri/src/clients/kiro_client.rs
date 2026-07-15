@@ -5,7 +5,6 @@ use crate::clients::http_client::{
     build_http_client, build_kiro_control_plane_user_agent,
     build_kiro_management_user_agent, build_kiro_management_x_amz_user_agent,
 };
-use crate::commands::common::resolve_default_profile_arn;
 use reqwest::{Client, RequestBuilder};
 use uuid::Uuid;
 
@@ -46,27 +45,36 @@ fn build_kiro_management_service_url(region: &str) -> String {
     format!("https://{}", build_kiro_management_host(region))
 }
 
-// getUsageLimits 已不再携带 profileArn；该函数仍被单测与其它可能路径复用默认 arn 解析。
-#[allow(dead_code)]
-fn effective_profile_arn<'a>(profile_arn: Option<&'a str>, provider: Option<&str>) -> String {
-    profile_arn
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
-        .unwrap_or_else(|| resolve_default_profile_arn(provider).to_string())
-}
-
 fn build_get_usage_limits_url(region: &str) -> String {
     let base = build_kiro_management_service_url(region);
-    // ponytail: profileArn 不传给 getUsageLimits — 企业账号会因此 400（kiro.rs 同款修复）
+    // getUsageLimits 不携带 profileArn：企业账号带了会 400（对齐 kiro.rs v0.6.11）
     format!(
         "{base}/getUsageLimits?isEmailRequired=true&origin=AI_EDITOR&resourceType=AGENTIC_REQUEST"
     )
 }
 
+/// 构造 getUsageLimits 的 region 尝试顺序：优先账号 region，企业号再回退常见 region。
+pub fn usage_limits_region_candidates(preferred: &str, is_enterprise: bool) -> Vec<String> {
+    let mut regions = Vec::new();
+    let preferred = preferred.trim();
+    if !preferred.is_empty() {
+        regions.push(preferred.to_string());
+    }
+    if is_enterprise {
+        for fallback in ["us-east-1", "eu-central-1"] {
+            if !regions.iter().any(|r| r == fallback) {
+                regions.push(fallback.to_string());
+            }
+        }
+    }
+    if regions.is_empty() {
+        regions.push("us-east-1".to_string());
+    }
+    regions
+}
+
 fn build_list_available_models_body(profile_arn: Option<&str>) -> serde_json::Value {
-    // ponytail: kiro.rs v0.6.11 也从 ListAvailableModels 移除了 profileArn（企业账号传了会 400）
-    // 当前保留传参以兼容旧逻辑，待验证后可移除
+    // ListAvailableModels 仍可选 profileArn；企业号解析结果为 None，不会带上
     let mut body = serde_json::json!({
         "origin": "AI_EDITOR",
     });
@@ -160,22 +168,16 @@ impl KiroClient {
         Self { client }
     }
 
-    /// 统一的 getUsageLimits 接口（支持所有账号类型）
+    /// 统一的 getUsageLimits 接口（支持所有账号类型；URL 不带 profileArn）
     pub async fn get_usage_limits(
         &self,
         access_token: &str,
         machine_id: &str,
         region: &str,
-        _profile_arn: Option<&str>,
-        _auth_method: Option<&str>,
-        _provider: Option<&str>,
     ) -> Result<serde_json::Value, String> {
         let url = build_get_usage_limits_url(region);
 
-        log::info!(
-            "[GetUsageLimits] Request - region: {}",
-            region
-        );
+        log::info!("[GetUsageLimits] Request - region: {region}");
 
         let request = with_kiro_runtime_management_headers(
             self.client.get(&url),
@@ -200,24 +202,26 @@ impl KiroClient {
             .map_err(|e| format!("Failed to parse JSON: {e}"))
     }
 
-    /// 获取 Enterprise 账号的 usage limits（带 region 回退）
-    pub async fn get_enterprise_usage_limits(
+    /// 按 region 候选列表依次尝试 getUsageLimits。
+    /// AUTH_ERROR / BANNED 直接返回（换 region 无意义）；其它错误继续回退。
+    pub async fn get_usage_limits_with_region_fallback(
         &self,
         access_token: &str,
         machine_id: &str,
-    ) -> Result<serde_json::Value, String> {
-        // ponytail: getUsageLimits 不需要 profileArn，企业账号传了反而 400
-        // 企业账号可能在 us-east-1 或 eu-central-1，逐个尝试
-        let regions = ["us-east-1", "eu-central-1"];
+        regions: &[String],
+    ) -> Result<(String, serde_json::Value), String> {
         let mut last_err = String::new();
-        for region in &regions {
+        for region in regions {
             match self
-                .get_usage_limits(access_token, machine_id, region, None, None, Some("Enterprise"))
+                .get_usage_limits(access_token, machine_id, region)
                 .await
             {
-                Ok(v) => return Ok(v),
+                Ok(v) => return Ok((region.clone(), v)),
+                Err(e) if e.starts_with("AUTH_ERROR:") || e.starts_with("BANNED:") => {
+                    return Err(e);
+                }
                 Err(e) => {
-                    log::warn!("[get_enterprise_usage_limits] region {region} failed: {e}");
+                    log::warn!("[GetUsageLimits] region {region} failed: {e}");
                     last_err = e;
                 }
             }
@@ -338,8 +342,9 @@ impl KiroClient {
 mod tests {
     use super::{
         build_get_usage_limits_url, build_kiro_management_host, build_kiro_management_service_url,
-        build_list_available_models_body, build_list_available_profiles_body, effective_profile_arn,
-        with_kiro_control_plane_headers, with_kiro_runtime_management_headers,
+        build_list_available_models_body, build_list_available_profiles_body,
+        usage_limits_region_candidates, with_kiro_control_plane_headers,
+        with_kiro_runtime_management_headers,
     };
 
     #[test]
@@ -355,19 +360,30 @@ mod tests {
     }
 
     #[test]
-    fn builds_get_usage_limits_url_like_kiro_0_12_301_capture() {
-        // ponytail: getUsageLimits 不传 profileArn（企业账号会因此 400）
+    fn builds_get_usage_limits_url_without_profile_arn() {
         assert_eq!(
             build_get_usage_limits_url("us-east-1"),
             "https://management.us-east-1.kiro.dev/getUsageLimits?isEmailRequired=true&origin=AI_EDITOR&resourceType=AGENTIC_REQUEST"
         );
+    }
+
+    #[test]
+    fn usage_limits_region_candidates_prefers_account_region_and_dedupes_enterprise_fallback() {
         assert_eq!(
-            effective_profile_arn(None, Some("BuilderId")),
-            crate::commands::common::KIRO_BUILDER_ID_PROFILE_ARN
+            usage_limits_region_candidates("eu-central-1", true),
+            vec!["eu-central-1".to_string(), "us-east-1".to_string()]
         );
         assert_eq!(
-            effective_profile_arn(None, Some("Github")),
-            crate::commands::common::KIRO_SOCIAL_PROFILE_ARN
+            usage_limits_region_candidates("us-east-1", true),
+            vec!["us-east-1".to_string(), "eu-central-1".to_string()]
+        );
+        assert_eq!(
+            usage_limits_region_candidates("ap-southeast-1", false),
+            vec!["ap-southeast-1".to_string()]
+        );
+        assert_eq!(
+            usage_limits_region_candidates("", true),
+            vec!["us-east-1".to_string(), "eu-central-1".to_string()]
         );
     }
 
