@@ -46,6 +46,8 @@ fn build_kiro_management_service_url(region: &str) -> String {
     format!("https://{}", build_kiro_management_host(region))
 }
 
+// getUsageLimits 已不再携带 profileArn；该函数仍被单测与其它可能路径复用默认 arn 解析。
+#[allow(dead_code)]
 fn effective_profile_arn<'a>(profile_arn: Option<&'a str>, provider: Option<&str>) -> String {
     profile_arn
         .map(str::trim)
@@ -425,7 +427,7 @@ mod tests {
     fn with_kiro_runtime_management_headers_uses_kiro_aws_sdk_js_user_agents() {
         let request = with_kiro_runtime_management_headers(
             reqwest::Client::new().get(
-                "https://management.eu-central-1.kiro.dev/getUsageLimits?isEmailRequired=true&origin=AI_EDITOR&profileArn=arn%3Aaws%3Acodewhisperer%3Aeu-central-1%3A123456789012%3Aprofile%2Ftest&resourceType=AGENTIC_REQUEST",
+                "https://management.eu-central-1.kiro.dev/getUsageLimits?isEmailRequired=true&origin=AI_EDITOR&resourceType=AGENTIC_REQUEST",
             ),
             "token-ua",
             "machine-ua",
