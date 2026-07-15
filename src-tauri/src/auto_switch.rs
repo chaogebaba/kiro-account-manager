@@ -12,6 +12,8 @@ use tokio::time::{interval, Duration};
 // 默认值
 const DEFAULT_THRESHOLD: f64 = 1.0; // 余额阈值
 const DEFAULT_INTERVAL: i32 = 5; // 检查间隔（分钟）
+/// 关闭时轮询间隔：过长会导致用户打开开关后长时间不生效（旧实现 30 分钟）
+const DISABLED_POLL_SECS: u64 = 15;
 
 /// 启动自动换号后台任务
 pub fn start_auto_switch_task(app_handle: AppHandle) {
@@ -52,8 +54,11 @@ pub fn start_auto_switch_task(app_handle: AppHandle) {
 
             // 检查是否启用自动换号
             if settings.auto_switch_enabled != Some(true) {
-                log::debug!("[AutoSwitch] 自动换号已禁用，等待 30 分钟后重新检查");
-                tokio::time::sleep(Duration::from_secs(1800)).await;
+                log::debug!(
+                    "[AutoSwitch] 自动换号已禁用，{} 秒后重新检查开关",
+                    DISABLED_POLL_SECS
+                );
+                tokio::time::sleep(Duration::from_secs(DISABLED_POLL_SECS)).await;
                 continue;
             }
 
@@ -148,24 +153,40 @@ async fn check_and_auto_switch(app_handle: &AppHandle, threshold: f64) {
         return;
     }
 
-    // 获取当前使用的账号（从本地 Kiro 凭证）
-    let current_account = match get_current_account(&accounts).await {
+    // 获取当前使用的账号（从本地 Kiro 凭证；token 轮换后可按 email 回退匹配）
+    let current_account = match get_current_account(app_handle, &accounts).await {
         Some(acc) => acc,
         None => {
-            log::debug!("[AutoSwitch] 未检测到当前账号");
+            log::warn!(
+                "[AutoSwitch] 未检测到当前账号：本地 kiro-auth-token 与账号列表 token 均不匹配，\
+                 且无法通过 usage 反查 email。请先在本应用中「切换」一次目标账号，或刷新列表账号 token"
+            );
             return;
         }
     };
 
-    log::debug!(
-        "[AutoSwitch] 当前账号: {}",
-        current_account.email.as_deref().unwrap_or("未知")
+    log::info!(
+        "[AutoSwitch] 当前账号: {} (enabled={}, status={})",
+        current_account.email.as_deref().unwrap_or("未知"),
+        current_account.enabled,
+        current_account.status
     );
 
-    // 直接使用本地数据计算剩余额度（不刷新，避免频繁调用 API）
-    // 注意：自动刷新任务已经在定期更新所有账号数据，这里直接读取即可
+    // 开着自动切号时必须实时拉当前号配额：仅靠本地缓存会「开了+有号也不切」
+    // （IDE 刚用完额度，列表 usage 还是旧的 → remaining 仍大于阈值）
+    let current_account =
+        match refresh_account_usage_for_switch(app_handle, &current_account).await {
+            Ok(acc) => acc,
+            Err(e) => {
+                log::warn!(
+                    "[AutoSwitch] 刷新当前账号配额失败，回退本地缓存: {e}"
+                );
+                current_account
+            }
+        };
+
     let remaining = calculate_remaining(&current_account);
-    log::debug!(
+    log::info!(
         "[AutoSwitch] 当前账号剩余额度: {}, 阈值: {}",
         remaining,
         threshold
@@ -189,7 +210,23 @@ async fn check_and_auto_switch(app_handle: &AppHandle, threshold: f64) {
     let available_account = match available_account {
         Some(acc) => acc,
         None => {
-            log::warn!("[AutoSwitch] 没有可用账号");
+            let enabled_count = accounts.iter().filter(|a| a.enabled).count();
+            let above_threshold = accounts
+                .iter()
+                .filter(|a| {
+                    a.enabled
+                        && a.id != current_account.id
+                        && !matches!(a.status.to_lowercase().as_str(), "banned" | "invalid")
+                        && calculate_remaining(a) > threshold
+                })
+                .count();
+            log::warn!(
+                "[AutoSwitch] 没有可用账号可切换（列表共 {} 个，enabled={}，余额>阈值={}）。\
+                 候选需同时满足：已启用、非 banned/invalid、剩余额度 > 阈值",
+                accounts.len(),
+                enabled_count,
+                above_threshold
+            );
             return;
         }
     };
@@ -221,7 +258,14 @@ async fn check_and_auto_switch(app_handle: &AppHandle, threshold: f64) {
 }
 
 /// 获取当前使用的账号
-async fn get_current_account(accounts: &[Account]) -> Option<Account> {
+///
+/// 匹配顺序：
+/// 1. refreshToken 全等
+/// 2. accessToken 全等 / 前缀
+/// 3. IdC clientIdHash
+/// 4. 用本地 accessToken 调 getUsageLimits 取 email，再按 email 匹配列表，
+///    并回写本地 token 到 store（修复 IDE/本机刷新后 RT 漂移导致永远匹配不上）
+async fn get_current_account(app_handle: &AppHandle, accounts: &[Account]) -> Option<Account> {
     // 读取本地 Kiro Token
     let local_token = crate::kiro::ide::get_kiro_local_token().await?;
 
@@ -237,8 +281,16 @@ async fn get_current_account(accounts: &[Account]) -> Option<Account> {
         }
     }
 
-    // 降级：用 accessToken 前缀匹配（token refresh 后 refreshToken 变了，但 accessToken 前缀一样）
+    // 降级：accessToken 全等，再前缀（token refresh 后 RT 变了）
     if let Some(access_token) = local_token.access_token.as_ref() {
+        if let Some(acc) = accounts.iter().find(|acc| {
+            acc.access_token
+                .as_ref()
+                .map(|at| at == access_token)
+                .unwrap_or(false)
+        }) {
+            return Some(acc.clone());
+        }
         let prefix = &access_token[..access_token.len().min(20)];
         if let Some(acc) = accounts.iter().find(|acc| {
             acc.access_token
@@ -250,22 +302,153 @@ async fn get_current_account(accounts: &[Account]) -> Option<Account> {
         }
     }
 
-    // 再降级：用 clientIdHash 匹配（IdC 账号）
+    // 再降级：用 clientIdHash 匹配（IdC 账号；Social 通常为空）
     if let Some(hash) = local_token.client_id_hash.as_ref() {
-        if let Some(acc) = accounts.iter().find(|acc| {
-            acc.client_id_hash
-                .as_ref()
-                .map(|h| h == hash)
-                .unwrap_or(false)
-        }) {
-            return Some(acc.clone());
+        if !hash.trim().is_empty() {
+            if let Some(acc) = accounts.iter().find(|acc| {
+                acc.client_id_hash
+                    .as_ref()
+                    .map(|h| h == hash)
+                    .unwrap_or(false)
+            }) {
+                return Some(acc.clone());
+            }
         }
     }
 
+    // 最终回退：usage 反查 email（并同步 token，避免下次再失败）
+    if let Some(account) =
+        resolve_current_account_by_usage(app_handle, accounts, &local_token).await
+    {
+        return Some(account);
+    }
+
     log::warn!(
-        "[AutoSwitch] 无法匹配当前账号 (refreshToken/accessToken/clientIdHash 均不匹配)"
+        "[AutoSwitch] 无法匹配当前账号 (refreshToken/accessToken/clientIdHash/email 均不匹配)"
     );
     None
+}
+
+/// 用本地 accessToken 请求 getUsageLimits，按 userInfo.email 匹配列表账号，并回写 token
+async fn resolve_current_account_by_usage(
+    app_handle: &AppHandle,
+    accounts: &[Account],
+    local_token: &crate::kiro::ide::KiroLocalToken,
+) -> Option<Account> {
+    let access_token = local_token.access_token.as_deref().filter(|s| !s.is_empty())?;
+    let region = local_token
+        .region
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("us-east-1");
+
+    // machineId：优先用任一已绑定机器码的账号，否则用占位（API 多数场景可接受）
+    let machine_id = accounts
+        .iter()
+        .find_map(|a| {
+            a.machine_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| "auto-switch".to_string());
+
+    let client = match crate::clients::kiro_client::KiroClient::new() {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("[AutoSwitch] 创建 HTTP 客户端失败: {e}");
+            return None;
+        }
+    };
+    let regions = crate::clients::kiro_client::usage_limits_region_candidates(region, false);
+    let usage = match client
+        .get_usage_limits_with_region_fallback(access_token, &machine_id, &regions)
+        .await
+    {
+        Ok((_region, data)) => data,
+        Err(e) => {
+            log::warn!("[AutoSwitch] 通过 usage 反查当前账号失败: {e}");
+            return None;
+        }
+    };
+
+    let (email, user_id) = crate::commands::common::extract_user_info(&usage);
+    let matched = accounts.iter().find(|acc| {
+        if let (Some(uid), Some(acc_uid)) = (user_id.as_ref(), acc.user_id.as_ref()) {
+            if uid == acc_uid {
+                return true;
+            }
+        }
+        match (email.as_ref(), acc.email.as_ref()) {
+            (Some(e1), Some(e2)) => e1.eq_ignore_ascii_case(e2),
+            _ => false,
+        }
+    })?;
+
+    log::info!(
+        "[AutoSwitch] token 漂移后按 email/userId 匹配到当前账号: {}",
+        matched.email.as_deref().unwrap_or("未知")
+    );
+
+    // 回写本地 token，避免下一轮仍匹配失败
+    if let Err(e) = sync_local_tokens_to_account(
+        app_handle,
+        &matched.id,
+        local_token.refresh_token.as_deref(),
+        local_token.access_token.as_deref(),
+        Some(&usage),
+    ) {
+        log::warn!("[AutoSwitch] 回写本地 token 到账号失败: {e}");
+    }
+
+    // 返回更新后的账号快照（含最新 usage，便于本轮 remaining 判断）
+    let mut updated = matched.clone();
+    if local_token.refresh_token.is_some() {
+        updated.refresh_token = local_token.refresh_token.clone();
+    }
+    if local_token.access_token.is_some() {
+        updated.access_token = local_token.access_token.clone();
+    }
+    updated.usage_data = Some(usage);
+    Some(updated)
+}
+
+fn sync_local_tokens_to_account(
+    app_handle: &AppHandle,
+    account_id: &str,
+    refresh_token: Option<&str>,
+    access_token: Option<&str>,
+    usage_data: Option<&serde_json::Value>,
+) -> Result<(), String> {
+    let state = app_handle.state::<AppState>();
+    let mut store = match state.store.lock() {
+        Ok(store) => store,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    store.reload();
+    let Some(acc) = store.accounts.iter_mut().find(|a| a.id == account_id) else {
+        return Err("账号不存在".to_string());
+    };
+    if let Some(rt) = refresh_token.filter(|s| !s.is_empty()) {
+        acc.refresh_token = Some(rt.to_string());
+    }
+    if let Some(at) = access_token.filter(|s| !s.is_empty()) {
+        acc.access_token = Some(at.to_string());
+    }
+    if let Some(usage) = usage_data {
+        acc.usage_data = Some(usage.clone());
+        let (email, user_id) = crate::commands::common::extract_user_info(usage);
+        if acc.email.as_ref().map(|e| e.trim().is_empty()).unwrap_or(true) {
+            if let Some(email) = email {
+                acc.email = Some(email);
+            }
+        }
+        if acc.user_id.is_none() {
+            acc.user_id = user_id;
+        }
+    }
+    save_store(&store)
 }
 
 /// 计算剩余额度（主配额 + 试用 + 奖励 + 已开启的超额，减去全部已用）
@@ -273,6 +456,60 @@ fn calculate_remaining(account: &Account) -> f64 {
     crate::core::usage::UsageDetails::from_usage_data(account.usage_data.as_ref())
         .map(|d| d.remaining())
         .unwrap_or(0.0)
+}
+
+/// 实时刷新账号 usage 并写回 store（自动切号决策用）
+async fn refresh_account_usage_for_switch(
+    app_handle: &AppHandle,
+    account: &Account,
+) -> Result<Account, String> {
+    // 优先本地 IDE token（当前登录态），否则用列表里缓存的 accessToken
+    let local = crate::kiro::ide::get_kiro_local_token().await;
+    let access_token = local
+        .as_ref()
+        .and_then(|t| t.access_token.clone())
+        .filter(|s| !s.is_empty())
+        .or_else(|| account.access_token.clone())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "当前账号无 accessToken，无法刷新配额".to_string())?;
+
+    let usage_result =
+        crate::commands::common::get_usage_by_account(account, &access_token).await?;
+
+    if usage_result.is_auth_error {
+        return Err("AUTH_ERROR: 刷新配额时 token 无效".to_string());
+    }
+
+    let usage_data = usage_result.usage_data;
+
+    // 写回 store，保持列表与切号判断一致
+    let state = app_handle.state::<AppState>();
+    let mut store = match state.store.lock() {
+        Ok(s) => s,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    store.reload();
+    let mut updated = account.clone();
+    if let Some(acc) = store.accounts.iter_mut().find(|a| a.id == account.id) {
+        acc.usage_data = Some(usage_data.clone());
+        if usage_result.is_banned {
+            acc.status = "banned".to_string();
+        } else if crate::core::usage::is_usage_capped(Some(&usage_data)) {
+            acc.status = "capped".to_string();
+        }
+        updated = acc.clone();
+        save_store(&store)?;
+    } else {
+        updated.usage_data = Some(usage_data);
+    }
+
+    let remaining = calculate_remaining(&updated);
+    log::info!(
+        "[AutoSwitch] 已实时刷新配额: {} remaining={}",
+        updated.email.as_deref().unwrap_or("未知"),
+        remaining
+    );
+    Ok(updated)
 }
 
 /// 查找可用账号（选择剩余额度最多的）
@@ -492,7 +729,7 @@ pub async fn quick_switch_next(app_handle: AppHandle) -> Result<String, String> 
     }
 
     // 获取当前账号
-    let current_account = get_current_account(&accounts).await;
+    let current_account = get_current_account(&app_handle, &accounts).await;
 
     // 查找下一个可用账号（使用轮换逻辑，跳过额度为0的）
     let next_account = if let Some(ref current) = current_account {

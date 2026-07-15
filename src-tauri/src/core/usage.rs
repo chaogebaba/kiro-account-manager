@@ -142,14 +142,11 @@ impl UsageDetails {
     pub fn from_usage_data(usage_data: Option<&Value>) -> Option<Self> {
         let item = usage_data?.get("usageBreakdownList")?.as_array()?.first()?;
 
-        let main_limit = item
-            .get("usageLimit")
-            .and_then(Value::as_f64)
-            .unwrap_or(0.0);
-        let main_usage = item
-            .get("currentUsage")
-            .and_then(Value::as_f64)
-            .unwrap_or(0.0);
+        // 与 UsageBreakdown 一致：优先精度字段，避免仅有 *WithPrecision 时 remaining 被算成 0
+        let main_limit =
+            read_amount(item, "usageLimit", "usageLimitWithPrecision").unwrap_or(0.0);
+        let main_usage =
+            read_amount(item, "currentUsage", "currentUsageWithPrecision").unwrap_or(0.0);
 
         // 免费试用（仅 ACTIVE 时计入）
         let trial_info = item.get("freeTrialInfo");
@@ -159,12 +156,14 @@ impl UsageDetails {
             == Some("ACTIVE");
         let (trial_limit, trial_usage) = if trial_active {
             let l = trial_info
-                .and_then(|t| t.get("usageLimit"))
-                .and_then(Value::as_f64)
+                .and_then(|t| {
+                    read_amount(t, "usageLimit", "usageLimitWithPrecision")
+                })
                 .unwrap_or(0.0);
             let u = trial_info
-                .and_then(|t| t.get("currentUsage"))
-                .and_then(Value::as_f64)
+                .and_then(|t| {
+                    read_amount(t, "currentUsage", "currentUsageWithPrecision")
+                })
                 .unwrap_or(0.0);
             (l, u)
         } else {
@@ -188,8 +187,10 @@ impl UsageDetails {
                         .unwrap_or(i64::MAX);
                     let active = b.get("status").and_then(Value::as_str) == Some("ACTIVE");
                     if expiry_ms > now_ms && active {
-                        let bl = b.get("usageLimit").and_then(Value::as_f64).unwrap_or(0.0);
-                        let bu = b.get("currentUsage").and_then(Value::as_f64).unwrap_or(0.0);
+                        let bl = read_amount(b, "usageLimit", "usageLimitWithPrecision")
+                            .unwrap_or(0.0);
+                        let bu = read_amount(b, "currentUsage", "currentUsageWithPrecision")
+                            .unwrap_or(0.0);
                         (l + bl, u + bu)
                     } else {
                         (l, u)
@@ -199,9 +200,7 @@ impl UsageDetails {
             .unwrap_or((0.0, 0.0));
 
         let overage_cap = if OverageStatus::from_usage_data(usage_data).is_enabled() {
-            item.get("overageCap")
-                .and_then(Value::as_f64)
-                .unwrap_or(0.0)
+            read_amount(item, "overageCap", "overageCapWithPrecision").unwrap_or(0.0)
         } else {
             0.0
         };
