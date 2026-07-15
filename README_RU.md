@@ -36,11 +36,11 @@ Kiro Account Manager - это десктопное приложение на б�
 
 **Основные модули**:
 - Управление аккаунтами: импорт, экспорт, обновление, проверка, группировка, теги, удаление удалённо
-- Аутентификация входа: Google / GitHub Social OAuth, AWS IAM Identity Center (BuilderId / Enterprise)
+- Аутентификация входа: Google / GitHub Social OAuth; AWS IAM Identity Center (BuilderId / Enterprise); Microsoft Entra ID / Azure AD (`external_idp` — только импорт + обновление токена, без интерактивного входа Microsoft в приложении)
 - Интеграция Kiro: переключение аккаунтов, синхронизация моделей / прокси / MCP / Steering / Skills / Hooks / Custom Agents / Powers
 - Автоматизация: автообновление токенов, автопереключение при низком балансе, привязка и сброс ID машины
 - Возможности десктопа: Deep Link OAuth обратный вызов, одиночный экземпляр, системный трей, автообновление
-- Возможности шлюза: встроенный Kiro API Gateway, поддерживает Anthropic Messages, OpenAI Responses, Chat Completions и потоковую пересылку
+- Возможности шлюза: встроенный Kiro API Gateway, поддерживает Anthropic Messages, OpenAI Responses, Chat Completions и потоковую пересылку; оценка токенов OpenAI через tiktoken
 
 ---
 
@@ -83,7 +83,16 @@ Kiro Account Manager - это десктопное приложение на б�
 
 ## 📝 История изменений
 
-Записи сгруппированы по фактическим окнам публикации GitHub Release. «Не выпущено» содержит изменения после v1.9.1, которые ещё не упакованы в релиз.
+Записи сгруппированы по фактическим окнам публикации GitHub Release.  
+**«Не выпущено»** — изменения уже в ветке `public`, но **ещё не** в GitHub Release (установочные пакеты по-прежнему по Releases).
+
+### 🚧 Не выпущено (public, после v1.9.2)
+
+- **Новое**: аккаунты Microsoft Entra ID / Azure AD (`external_idp`) — импорт + обновление токена через Microsoft OAuth2 token endpoint (не AWS OIDC); только импорт, без входа Microsoft в приложении
+- **Исправлено**: при импорте Enterprise IdC извлекаются `startUrl` / provider из JWT `clientSecret`, предпочтение enterprise-доменам — меньше ложных BuilderId и 400 при refresh
+- **Исправлено**: `getUsageLimits` больше не передаёт `profileArn` (у enterprise давало 400); Enterprise и обычные аккаунты на одном пути, region с приоритетом аккаунта и fallback `us-east-1` / `eu-central-1`
+- **Усилено**: защита от injection в имени ветки Skill, подтверждение elevation restart, восстановление после poison lock deep link OAuth
+- **Шлюз**: серии GPT-5.6 и Claude Sonnet 5; оценка OpenAI-токенов через tiktoken-rs (`o200k_base`); удалены устаревшие алиасы Claude 3
 
 ### 🏗️ v1.9.2 - 2026-06-17 — поддержка архитектуры Linux ARM64 и исправление запуска macOS
 
@@ -224,11 +233,14 @@ Kiro Account Manager - это десктопное приложение на б�
 ### 🔐 Аутентификация входа
 - **Social вход**: Google / GitHub OAuth, автоматическое обновление токена
 - **IdC вход**: BuilderId / Enterprise, полный поток SSO OIDC
+- **External IdP (Microsoft Entra ID / Azure AD)**: импорт существующих учётных данных и обновление токена (**не** «почта Outlook = Microsoft IdP»; смотрите token endpoint / тип auth)
+- Примечание: у `external_idp` **нет** экрана входа Microsoft в приложении — вход через Kiro / портал организации, затем импорт
 
 ### 📊 Управление аккаунтами
 - Двойной вид карточка / список, индикатор прогресса квоты, индикаторы типа подписки
 - Обнаружение бана, обратный отсчёт истечения токена, выделение статуса
 - Теги и группы, расширенная фильтрация (тип подписки / статус / степень использования)
+- Enterprise usage: `getUsageLimits` без `profileArn`; приоритет region аккаунта и fallback по распространённым region
 
 ### 🔄 Переключение аккаунтов одним кликом
 - Бесшовное переключение аккаунтов Kiro IDE, автоматический сброс ID машины
@@ -236,7 +248,7 @@ Kiro Account Manager - это десктопное приложение на б�
 - Автоматическое включение аккаунтов при восстановлении квоты
 
 ### 📦 Пакетные операции
-- Импорт / экспорт JSON, импорт из Kiro IDE / kiro-cli
+- Импорт / экспорт JSON, импорт из Kiro IDE / kiro-cli (включая классификацию `external_idp`)
 - Пакетное обновление / удаление / присвоение тегов / удалённый выход
 
 ### 🔌 Синхронизация конфигурации Kiro
@@ -248,6 +260,8 @@ Kiro Account Manager - это десктопное приложение на б�
 ### 🌐 Kiro API шлюз
 Встроенный шлюз, совместимый с OpenAI, поддерживает прямую интеграцию со сторонними инструментами, такими как Cursor / Continue / Cline.
 - Совместим с Anthropic `/v1/messages`, OpenAI `/v1/responses`, `/v1/chat/completions`
+- Модели: Claude 4.x / Sonnet 5, серии GPT-5.6 (см. `/v1/models` шлюза и список в UI)
+- Оценка токенов OpenAI-совместимых запросов через tiktoken (`o200k_base`)
 - Интеллектуальное понижение модели, балансировка нагрузки нескольких аккаунтов, аутентификация API Key
 - Проброс исходного формата JSON для не-200 ответов
 - Проброс ответов об ошибках Anthropic 429

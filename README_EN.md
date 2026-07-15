@@ -36,11 +36,11 @@ Kiro Account Manager is a desktop application based on **Tauri 2.x** for central
 
 **Core Modules**:
 - Account Management: Import, export, refresh, verify, grouping, tagging, remote deletion
-- Login Authentication: Google / GitHub Social OAuth, AWS IAM Identity Center (BuilderId / Enterprise)
+- Login Authentication: Google / GitHub Social OAuth; AWS IAM Identity Center (BuilderId / Enterprise); Microsoft Entra ID / Azure AD (`external_idp` — import + token refresh only, no in-app Microsoft login)
 - Kiro Integration: Switch accounts, sync models / proxy / MCP / Steering / Skills / Hooks / Custom Agents / Powers
 - Automation: Auto-refresh tokens, auto-switch on low balance, machine ID binding and reset
 - Desktop Capabilities: Deep Link OAuth callback, single instance, system tray, auto-update
-- Gateway Capabilities: Built-in Kiro API Gateway, supports Anthropic Messages, OpenAI Responses, Chat Completions and streaming forwarding
+- Gateway Capabilities: Built-in Kiro API Gateway, supports Anthropic Messages, OpenAI Responses, Chat Completions and streaming; OpenAI-side token estimates via tiktoken
 
 ---
 
@@ -83,7 +83,16 @@ Kiro Account Manager is a desktop application based on **Tauri 2.x** for central
 
 ## 📝 Changelog
 
-Entries are grouped by the actual GitHub Release publish windows. “Unreleased” contains changes merged after v1.9.1 but not yet packaged in a release.
+Entries are grouped by the actual GitHub Release publish windows.  
+**Unreleased** lists changes already on the `public` branch that are **not** yet in a GitHub Release (installed packages still follow Releases).
+
+### 🚧 Unreleased (public, since v1.9.2)
+
+- **New**: Microsoft Entra ID / Azure AD accounts (`external_idp`) — import + token refresh via Microsoft OAuth2 token endpoint (not AWS OIDC); import-only, no in-app Microsoft login
+- **Fix**: Enterprise IdC import extracts `startUrl` / provider from `clientSecret` JWT and prefers enterprise domains to avoid mis-classifying as BuilderId (refresh 400)
+- **Fix**: `getUsageLimits` no longer sends `profileArn` (enterprise 400); Enterprise usage uses the same path as other accounts with region preference + `us-east-1` / `eu-central-1` fallback
+- **Harden**: Skill branch-name injection guard, elevation restart confirmation, OAuth deep-link lock poison recovery
+- **Gateway**: GPT-5.6 series and Claude Sonnet 5; OpenAI token estimates via tiktoken-rs (`o200k_base`); removed retired Claude 3 alias mapping
 
 ### 🏗️ v1.9.2 - 2026-06-17 — Linux ARM64 Architecture Support and macOS Startup Fix
 
@@ -235,11 +244,14 @@ For older versions, see GitHub Releases.
 ### 🔐 Login Authentication
 - **Social Login**: Google / GitHub OAuth, automatic token refresh
 - **IdC Login**: BuilderId / Enterprise, complete SSO OIDC flow
+- **External IdP (Microsoft Entra ID / Azure AD)**: import existing credentials and refresh tokens (not “Outlook email ⇒ Microsoft IdP”; depends on token endpoint / auth type)
+- Note: `external_idp` has **no in-app Microsoft login UI** — sign in via Kiro / your org portal, then import
 
 ### 📊 Account Management
 - Card / List dual view, quota progress bar, subscription type indicators
 - Ban detection, token expiration countdown, status highlighting
 - Tags and groups, advanced filtering (subscription type / status / usage rate)
+- Enterprise usage: `getUsageLimits` without `profileArn`; prefer account region with common-region fallback
 
 ### 🔄 One-click Account Switching
 - Seamless Kiro IDE account switching, automatic machine ID reset
@@ -247,7 +259,7 @@ For older versions, see GitHub Releases.
 - Auto-enable accounts when quota is restored
 
 ### 📦 Batch Operations
-- JSON import/export, import from Kiro IDE / kiro-cli
+- JSON import/export, import from Kiro IDE / kiro-cli (including `external_idp` classification)
 - Batch refresh / delete / tag / remote logout
 
 ### 🔌 Kiro Configuration Sync
@@ -259,6 +271,8 @@ Four themes, AI model locking, Agent autonomous mode, auto token refresh, proxy 
 ### 🌐 Kiro API Gateway
 Built-in OpenAI-compatible gateway, supports direct integration with third-party tools like Cursor / Continue / Cline.
 - Compatible with Anthropic `/v1/messages`, OpenAI `/v1/responses`, `/v1/chat/completions`
+- Models include Claude 4.x / Sonnet 5, GPT-5.6 series (see gateway `/v1/models` and UI list)
+- OpenAI-compatible token estimation via tiktoken (`o200k_base`)
 - Intelligent model degradation, multi-account load balancing, API Key authentication
 - Passthrough original JSON format for non-200 responses
 - Anthropic 429 error response passthrough

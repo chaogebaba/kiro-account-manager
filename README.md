@@ -38,11 +38,11 @@ Kiro Account Manager 是一个基于 **Tauri 2.x** 的桌面应用，用于集�
 
 **核心模块**：
 - 账号管理：导入、导出、刷新、验证、分组、标签、远程删除
-- 登录认证：Google / GitHub Social OAuth，AWS IAM Identity Center（BuilderId / Enterprise）
+- 登录认证：Google / GitHub Social OAuth；AWS IAM Identity Center（BuilderId / Enterprise）；微软 Entra ID / Azure AD（`external_idp`，导入 + Token 刷新，无应用内交互登录）
 - Kiro 集成：切换账号、同步模型 / 代理 / MCP / Steering / Skills / Hooks / Custom Agents / Powers
 - 自动化能力：Token 自动刷新、余额不足自动换号、机器 ID 绑定与重置
 - 桌面端能力：Deep Link OAuth 回调、单实例、系统托盘、自动更新
-- 网关能力：内置 Kiro API Gateway，支持 Anthropic Messages、OpenAI Responses、Chat Completions 与流式转发
+- 网关能力：内置 Kiro API Gateway，支持 Anthropic Messages、OpenAI Responses、Chat Completions 与流式转发；OpenAI 侧用 tiktoken 精确估算 token
 
 ---
 
@@ -85,7 +85,16 @@ Kiro Account Manager 是一个基于 **Tauri 2.x** 的桌面应用，用于集�
 
 ## 📝 更新日志
 
-以下内容按 GitHub Release 的实际发布时间窗口整理。
+以下内容按 GitHub Release 的实际发布时间窗口整理。  
+**「未发版」** 为 `public` 分支已合入、尚未打 GitHub Release 的改动（用户安装包仍以 Releases 为准）。
+
+### 🚧 未发版（public，相对 v1.9.2）
+
+- **新增**: 微软 Entra ID / Azure AD 账号（`external_idp`）导入与 Token 刷新 — 刷新走微软 OAuth2 token 端点，不走 AWS OIDC；仅支持导入，不支持应用内微软登录
+- **修复**: 企业 IdC 导入时从 `clientSecret` JWT 提取 `startUrl` / 纠正 provider，并优先企业域，减少误判 BuilderId 导致刷新 400
+- **修复**: `getUsageLimits` 不再携带 `profileArn`（企业号带了会 400）；Enterprise 查配额与普通账号统一路径，region 优先账号自身再回退 `us-east-1` / `eu-central-1`
+- **加固**: Skill 分支名注入防护、提权重启确认、OAuth deep link 锁中毒恢复
+- **网关**: 增加 GPT-5.6 系列与 Claude Sonnet 5；OpenAI token 估算改用 tiktoken-rs（`o200k_base`）；移除已下线的 Claude 3 别名映射
 
 ### 🏗️ v1.9.2 - 2026-06-17 — Linux ARM64 架构支持与 macOS 启动修复
 
@@ -298,11 +307,14 @@ Kiro Account Manager 是一个基于 **Tauri 2.x** 的桌面应用，用于集�
 ### 🔐 登录认证
 - **Social 登录**：Google / GitHub OAuth，自动刷新 Token
 - **IdC 登录**：BuilderId / Enterprise，完整 SSO OIDC 流程
+- **External IdP（微软 Entra ID / Azure AD）**：导入已有凭据并刷新 Token（**不是**「邮箱是 Outlook 就等于微软号」；看 token 端点与 auth 类型）
+- 说明：`external_idp` **无应用内微软登录页**，登录在 Kiro / 企业门户完成后再导入
 
 ### 📊 账号管理
 - 卡片 / 列表双视图，配额进度条，订阅类型标识
 - 封禁检测、Token 过期倒计时、状态高亮
 - 标签与分组、高级筛选（订阅类型 / 状态 / 使用率）
+- 企业号查配额：`getUsageLimits` 不带 `profileArn`；region 按账号优先并支持常见 region 回退
 
 ### 🔄 一键切号
 - 无感切换 Kiro IDE 账号，自动重置机器 ID
@@ -310,7 +322,7 @@ Kiro Account Manager 是一个基于 **Tauri 2.x** 的桌面应用，用于集�
 - 账号配额恢复后自动启用
 
 ### 📦 批量操作
-- JSON 导入导出、从 Kiro IDE / kiro-cli 导入
+- JSON 导入导出、从 Kiro IDE / kiro-cli 导入（含 external_idp 分类）
 - 批量刷新 / 删除 / 打标签 / 远程注销
 
 ### 🔌 Kiro 配置同步
@@ -322,6 +334,8 @@ Kiro Account Manager 是一个基于 **Tauri 2.x** 的桌面应用，用于集�
 ### 🌐 Kiro API 网关
 内置 OpenAI 兼容网关，支持 Cursor / Continue / Cline 等第三方工具直接接入。
 - 兼容 Anthropic `/v1/messages`、OpenAI `/v1/responses`、`/v1/chat/completions`
+- 模型含 Claude 4.x / Sonnet 5、GPT-5.6 等（以网关 `/v1/models` 与前端列表为准）
+- OpenAI 兼容请求 token 估算使用 tiktoken（`o200k_base`）
 - 模型智能降级、多账号负载均衡、API Key 鉴权
 - 非 200 响应透传原始 JSON 格式
 - Anthropic 429 错误响应透传
