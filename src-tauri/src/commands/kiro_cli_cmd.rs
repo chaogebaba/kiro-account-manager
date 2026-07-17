@@ -1,5 +1,6 @@
 #![allow(clippy::needless_pass_by_value)] // Tauri 命令需要按值传递参数
 
+use crate::clients::kiro_client::KiroClient;
 use crate::commands::common::{
     ensure_account_machine_id, extract_user_info, generate_account_machine_id,
     get_usage_by_account, get_usage_by_provider_with_machine_id,
@@ -8,9 +9,57 @@ use crate::core::account::Account;
 use crate::kiro::cli::read_kiro_cli_accounts;
 use crate::state::AppState;
 use crate::utils::client_id_hash::{extract_start_url_from_client_secret, normalize_start_url};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::Serialize;
+use serde_json::Value;
 use std::sync::{Mutex, MutexGuard};
 use tauri::{Emitter, State};
+
+/// 尝试从 access_token 调用 getAccount API 获取用户信息（Enterprise 账号兜底）
+async fn fetch_enterprise_user_info(access_token: &str, machine_id: &str, region: &str) -> (Option<String>, Option<String>) {
+    let client = match KiroClient::new() {
+        Ok(c) => c,
+        Err(_) => return (None, None),
+    };
+    // 使用公共方法调用 getAccount API
+    let response = match client.get_management_api(access_token, machine_id, region, &format!("/getAccount?machineId={machine_id}")).await {
+        Ok(resp) => resp,
+        Err(_) => return (None, None),
+    };
+    let email = response.get("email").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string());
+    let user_id = response.get("userId").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string())
+        .or_else(|| response.get("user_id").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()));
+    (email, user_id)
+}
+
+/// 从 JWT (client_secret 或 id_token) 中提取 email 和 user_id
+fn extract_user_info_from_jwt(jwt: &str) -> (Option<String>, Option<String>) {
+    let parts: Vec<&str> = jwt.split('.').collect();
+    if parts.len() != 3 {
+        return (None, None);
+    }
+    let payload = parts[1];
+    let mut padded = payload.to_string();
+    while padded.len() % 4 != 0 {
+        padded.push('=');
+    }
+    let decoded = match URL_SAFE_NO_PAD.decode(&padded) {
+        Ok(bytes) => bytes,
+        Err(_) => return (None, None),
+    };
+    let json_str = match String::from_utf8(decoded) {
+        Ok(s) => s,
+        Err(_) => return (None, None),
+    };
+    let payload_json: Value = match serde_json::from_str(&json_str) {
+        Ok(v) => v,
+        Err(_) => return (None, None),
+    };
+    let email = payload_json.get("email").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string());
+    let user_id = payload_json.get("user_id").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string())
+        .or_else(|| payload_json.get("cognito:username").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()));
+    (email, user_id)
+}
 
 /// 展开路径中的 ~ 为用户主目录
 fn expand_home_dir(path: &str) -> Result<String, String> {
@@ -202,6 +251,34 @@ pub async fn import_from_kiro_cli(
     let (email, user_id, usage_data, is_banned, is_auth_error) = match usage_result {
         Ok(result) => {
             let (email, user_id) = extract_user_info(&result.usage_data);
+            let (email, user_id) = if provider == "Enterprise" && email.is_none() && user_id.is_none() {
+                eprintln!("[Kiro CLI Import] Enterprise account: getUsageLimits returned no userInfo, trying fallback APIs");
+                // 尝试从 client_secret JWT 解析
+                let (email_from_secret, user_id_from_secret) = cli_account
+                    .client_secret
+                    .as_ref()
+                    .and_then(|cs| Some(extract_user_info_from_jwt(cs)))
+                    .unwrap_or((None, None));
+                if email_from_secret.is_some() || user_id_from_secret.is_some() {
+                    eprintln!("[Kiro CLI Import] Decoded from client_secret - email: {:?}, user_id: {:?}", email_from_secret, user_id_from_secret);
+                    (email_from_secret, user_id_from_secret)
+                } else {
+                    // 尝试调用 getAccount API
+                    let (email_from_api, user_id_from_api) = fetch_enterprise_user_info(
+                        &cli_account.access_token,
+                        &account_machine_id,
+                        &cli_account.region,
+                    ).await;
+                    if email_from_api.is_some() || user_id_from_api.is_some() {
+                        eprintln!("[Kiro CLI Import] Fetched from getAccount API - email: {:?}, user_id: {:?}", email_from_api, user_id_from_api);
+                        (email_from_api, user_id_from_api)
+                    } else {
+                        (email, user_id)
+                    }
+                }
+            } else {
+                (email, user_id)
+            };
             (
                 email,
                 user_id,

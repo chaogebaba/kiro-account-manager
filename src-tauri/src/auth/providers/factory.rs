@@ -51,6 +51,7 @@ pub fn get_provider_config(provider: &str) -> Option<ProviderConfig> {
 }
 
 /// 获取支持的 providers
+#[tauri::command]
 pub fn get_supported_providers() -> Vec<&'static str> {
     vec!["Google", "Github", "BuilderId", "Enterprise"]
 }

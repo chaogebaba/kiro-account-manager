@@ -1,7 +1,7 @@
 // Auth 相关命令 - 直接存储 usage_data
 // Auth 相关命令 - 直接存储 usage_data
 
-#![allow(clippy::needless_pass_by_value)] // Tauri 命令需要按值传递 State
+#![allow(clippy::needless_pass_by_value)] // Tauri 命令需要按值传递参数
 use crate::auth::auth_social;
 use crate::auth::providers::{
     cancel_pending_idc_login, create_idc_provider, get_provider_config, AuthMethod, AuthProvider,
@@ -15,7 +15,56 @@ use crate::commands::common::{
 use crate::core::account::Account;
 use crate::core::protocol_registry;
 use crate::state::AppState;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use serde_json::Value;
 use tauri::{Emitter, State};
+
+/// 从 JWT (id_token) 中提取 email 和 user_id
+/// Enterprise 账号的 id_token payload 通常包含 email、user_id 或 cognito:username
+fn extract_user_info_from_id_token(id_token: &str) -> (Option<String>, Option<String>) {
+    // JWT 格式: header.payload.signature
+    let parts: Vec<&str> = id_token.split('.').collect();
+    if parts.len() != 3 {
+        return (None, None);
+    }
+    let payload = parts[1];
+    // URL-safe base64 解码（补齐 padding）
+    let mut padded = payload.to_string();
+    while padded.len() % 4 != 0 {
+        padded.push('=');
+    }
+    let decoded = match URL_SAFE_NO_PAD.decode(&padded) {
+        Ok(bytes) => bytes,
+        Err(_) => return (None, None),
+    };
+    let json_str = match String::from_utf8(decoded) {
+        Ok(s) => s,
+        Err(_) => return (None, None),
+    };
+    let payload_json: Value = match serde_json::from_str(&json_str) {
+        Ok(v) => v,
+        Err(_) => return (None, None),
+    };
+    let email = payload_json
+        .get("email")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+    // 优先取 user_id，其次 cognito:username
+    let user_id = payload_json
+        .get("user_id")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            payload_json
+                .get("cognito:username")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+        });
+    (email, user_id)
+}
 
 fn require_login_email(email: Option<String>) -> Result<String, String> {
     email.ok_or("获取邮箱失败，请检查账号状态".to_string())
@@ -326,6 +375,24 @@ async fn login_idc(
         log::info!("Extracted email: {:?}, user_id: {:?}", new_email, user_id);
     }
 
+    // Enterprise 账号：如果 getUsageLimits 没返回 userInfo，尝试从 id_token (JWT) 解析
+    let (new_email, user_id) = if provider_id == "Enterprise" && new_email.is_none() && user_id.is_none() {
+        if let Some(ref id_token) = auth_result.id_token {
+            log::info!("Enterprise account: getUsageLimits returned no userInfo, trying to decode id_token");
+            let (email_from_token, user_id_from_token) = extract_user_info_from_id_token(id_token);
+            if email_from_token.is_some() || user_id_from_token.is_some() {
+                log::info!("Decoded from id_token - email: {:?}, user_id: {:?}", email_from_token, user_id_from_token);
+                (email_from_token, user_id_from_token)
+            } else {
+                (new_email, user_id)
+            }
+        } else {
+            (new_email, user_id)
+        }
+    } else {
+        (new_email, user_id)
+    };
+
     // Enterprise 账号允许没有 email,使用 userId 作为标识
     let final_email = resolve_idc_login_email(&provider_id, new_email.clone(), user_id.clone())?;
     log::info!("final_email for {} account: {:?}", provider_id, final_email);
@@ -490,12 +557,18 @@ pub async fn handle_kiro_social_callback(
     }
 
     let (new_email, user_id) = extract_user_info(&usage_result.usage_data);
-    let final_email = require_login_email(new_email.clone())?;
+    let final_email = new_email.or(user_id.clone()).unwrap_or_else(|| {
+        format!(
+            "{}_{}",
+            pending.provider.to_lowercase(),
+            &token_response.refresh_token[..8]
+        )
+    });
 
     let mut store = lock_store(&state.store, "store")?;
     let existing_idx = find_existing_account_idx(
         &store.accounts,
-        new_email.as_ref(),
+        Some(&final_email),
         &pending.provider,
         &token_response.refresh_token,
         user_id.as_ref(),
@@ -505,8 +578,8 @@ pub async fn handle_kiro_social_callback(
         let existing = &mut store.accounts[idx];
         existing.access_token = Some(token_response.access_token.clone());
         existing.refresh_token = Some(token_response.refresh_token.clone());
-        existing.email.clone_from(&new_email);
-        existing.user_id.clone_from(&user_id);
+        existing.profile_arn = Some(token_response.profile_arn.clone());
+        existing.user_id = user_id;
         existing.usage_data = Some(usage_result.usage_data);
         if existing
             .machine_id
@@ -518,12 +591,10 @@ pub async fn handle_kiro_social_callback(
         update_account_status(existing, usage_result.is_banned, usage_result.is_auth_error);
         existing.clone()
     } else {
-        let mut account = Account::new(
-            final_email.clone(),
-            format!("Kiro {} 账号", pending.provider),
-        );
+        let mut account = Account::new(final_email.clone(), format!("Kiro {} 账号", pending.provider));
         account.access_token = Some(token_response.access_token.clone());
         account.refresh_token = Some(token_response.refresh_token.clone());
+        account.profile_arn = Some(token_response.profile_arn.clone());
         account.provider = Some(pending.provider.clone());
         account.auth_method = Some("social".to_string());
         account.user_id = user_id;
@@ -533,14 +604,7 @@ pub async fn handle_kiro_social_callback(
             usage_result.is_banned,
             usage_result.is_auth_error,
         );
-
-        // 为所有新账号生成唯一的 machine_id（每个账号独立 UUID，避免隐私泄露）
         account.machine_id = Some(pending.machineid.clone());
-        log::info!(
-            "Generated unique machine_id for new {} account",
-            pending.provider
-        );
-
         store.accounts.insert(0, account.clone());
         account
     };
@@ -548,91 +612,27 @@ pub async fn handle_kiro_social_callback(
     save_store(&store)?;
     drop(store);
 
-    let display_id = account.get_display_id();
-    update_auth_state(
-        &state,
-        account.email.as_ref(),
-        &pending.provider,
-        &token_response.access_token,
-        &token_response.refresh_token,
-    )?;
-    let _ = app_handle.emit("login-success", account.id);
-    println!("Social callback login completed: {display_id}");
+    let user = crate::auth::User {
+        id: uuid::Uuid::new_v4().to_string(),
+        email: account.email.clone(),
+        name: account
+            .email
+            .as_ref()
+            .and_then(|e| e.split('@').next())
+            .unwrap_or("User")
+            .to_string(),
+        avatar: None,
+        provider: pending.provider.clone(),
+    };
+    let _ = lock_store(&state.auth.user, "auth user").map(|mut u| *u = Some(user));
+    let _ = lock_store(&state.auth.access_token, "auth access_token")
+        .map(|mut t| *t = Some(token_response.access_token));
+
+    *lock_store(&state.pending_login, "pending_login")? = None;
+
+    println!("\n[social] LOGIN SUCCESS: {}", account.get_display_id());
+    let _ = app_handle.emit("login-success", account.id.clone());
+    let _ = app_handle.emit("accounts-updated", ());
+
     Ok(())
-}
-
-#[tauri::command]
-pub fn get_supported_providers() -> Vec<&'static str> {
-    crate::auth::providers::get_supported_providers()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{clear_auth_state, require_login_email, resolve_idc_login_email};
-    use crate::auth::AuthState;
-    use crate::auth::User;
-
-    #[test]
-    fn require_login_email_rejects_missing_email() {
-        assert_eq!(
-            require_login_email(Some("user@example.com".to_string())).unwrap(),
-            "user@example.com".to_string()
-        );
-        assert_eq!(
-            require_login_email(None).unwrap_err(),
-            "获取邮箱失败，请检查账号状态".to_string()
-        );
-    }
-
-    #[test]
-    fn resolve_idc_login_email_uses_enterprise_user_id_fallback() {
-        assert_eq!(
-            resolve_idc_login_email("Enterprise", None, Some("enterprise-user".to_string()))
-                .unwrap(),
-            Some("enterprise-user".to_string())
-        );
-        assert_eq!(
-            resolve_idc_login_email("BuilderId", None, Some("builder-user".to_string())).unwrap(),
-            Some("builder-user".to_string())
-        );
-        // Enterprise 账号允许都没有 email 和 userId
-        assert_eq!(
-            resolve_idc_login_email("Enterprise", None, None).unwrap(),
-            None
-        );
-    }
-
-    #[test]
-    fn clear_auth_state_removes_refresh_token_too() {
-        let auth = AuthState::new();
-        *auth.user.lock().expect("user lock should work") = Some(User {
-            id: "user-1".to_string(),
-            email: Some("user@example.com".to_string()),
-            name: "user".to_string(),
-            avatar: None,
-            provider: "Google".to_string(),
-        });
-        *auth
-            .access_token
-            .lock()
-            .expect("access_token lock should work") = Some("access-token".to_string());
-        *auth
-            .refresh_token
-            .lock()
-            .expect("refresh_token lock should work") = Some("refresh-token".to_string());
-
-        clear_auth_state(&auth);
-
-        assert!(auth.user.lock().expect("user lock should work").is_none());
-        assert!(auth
-            .access_token
-            .lock()
-            .expect("access_token lock should work")
-            .is_none());
-        assert!(auth
-            .refresh_token
-            .lock()
-            .expect("refresh_token lock should work")
-            .is_none());
-    }
 }

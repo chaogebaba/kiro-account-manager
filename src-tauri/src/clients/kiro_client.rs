@@ -295,6 +295,39 @@ impl KiroClient {
             .map_err(|e| format!("Failed to parse JSON: {e}"))
     }
 
+    /// 通用 GET 请求到 Kiro Management API（用于 getAccount 等自定义端点）
+    pub async fn get_management_api(
+        &self,
+        access_token: &str,
+        machine_id: &str,
+        region: &str,
+        path: &str,
+    ) -> Result<serde_json::Value, String> {
+        let url = format!("{}{}", build_kiro_management_service_url(region), path);
+
+        let request = with_kiro_runtime_management_headers(
+            self.client.get(&url),
+            access_token,
+            machine_id,
+            region,
+        )
+        .header("accept", "application/json");
+
+        let response = request
+            .send()
+            .await
+            .map_err(|e| format!("GET {path} 请求失败: {e}"))?;
+
+        if !response.status().is_success() {
+            return Err(classify_kiro_management_error(&format!("GET {path}"), response).await);
+        }
+
+        response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse JSON: {e}"))
+    }
+
     /// setUserPreference 接口 - 设置用户偏好（超额开关）
     pub async fn set_user_preference(
         &self,
