@@ -179,6 +179,11 @@ const api = {
     return ipcRenderer.invoke('switch-account-cli', credentials)
   },
 
+  // 检查 Kiro IDE 是否已安装
+  checkKiroIdeInstalled: (): Promise<{ installed: boolean; path: string | null }> => {
+    return ipcRenderer.invoke('check-kiro-ide-installed')
+  },
+
   // 退出登录 - 清除本地 SSO 缓存
   logoutAccount: (): Promise<{ success: boolean; deletedCount?: number; error?: string }> => {
     return ipcRenderer.invoke('logout-account')

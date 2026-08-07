@@ -4909,18 +4909,27 @@ app.whenReady().then(async () => {
       })
 
       // 构建 token JSON（snake_case 字段名，与 kiro-cli Rust 结构一致）
+      // kiro-cli 反序列化为 struct BuilderIdToken { access_token, expires_at, refresh_token, region, start_url, oauth_flow, scopes }
+      // 其中 start_url 是必填字段（缺失会导致 "start_url is required" → whoami 报 Not logged in）
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString()
+      const cliScopes = scopes || [
+        'codewhisperer:completions',
+        'codewhisperer:analysis',
+        'codewhisperer:conversations'
+      ]
       const tokenData: Record<string, unknown> = {
         access_token: accessToken,
         refresh_token: refreshToken,
         expires_at: expiresAt,
-        region
+        region,
+        start_url: 'https://view.awsapps.com/start',
+        oauth_flow: 'PKCE',
+        scopes: cliScopes
       }
       // profileArn 仅在解析出有效值时附加，BuilderId 等不带（避免 kiro-cli 拿占位符 ARN 调 REST 触发 403）
       if (resolvedProfileArn) {
         tokenData.profile_arn = resolvedProfileArn
       }
-      if (scopes) tokenData.scopes = scopes
 
       // 使用 sqlite3 命令行操作（跨平台兼容，无需原生模块编译）
       const { execFileSync } = await import('child_process')
@@ -4933,8 +4942,18 @@ app.whenReady().then(async () => {
       ]
 
       // 写入 device-registration（仅 IdC 登录）
+      // kiro-cli 反序列化为 struct DeviceRegistration { client_id, client_secret, client_secret_expires_at, region, oauth_flow, scopes }
+      // 缺少 oauth_flow 会导致刷新时报 "Stored client registration has oauth flow: but current access token has oauth flow: PKCE"
       if (clientId && clientSecret && !isSocial) {
-        const regData = { client_id: clientId, client_secret: clientSecret, region }
+        const clientSecretExpiresAt = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString()
+        const regData = {
+          client_id: clientId,
+          client_secret: clientSecret,
+          client_secret_expires_at: clientSecretExpiresAt,
+          region,
+          oauth_flow: 'PKCE',
+          scopes: cliScopes
+        }
         sqlStatements.push(
           `INSERT OR REPLACE INTO auth_kv (key, value) VALUES ('${preferredRegKey}', '${JSON.stringify(regData).replace(/'/g, "''")}');`
         )
@@ -7106,6 +7125,61 @@ app.whenReady().then(async () => {
       console.error('[KiroSettings] Failed to delete steering file:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Failed to delete file' }
     }
+  })
+
+  // ============ Kiro IDE 安装检测 ============
+
+  // IPC: 检查 Kiro IDE 是否已安装（检测默认路径下是否存在可执行文件）
+  ipcMain.handle('check-kiro-ide-installed', async () => {
+    const os = await import('os')
+    const path = await import('path')
+    const fs = await import('fs')
+    const platform = process.platform
+
+    const candidates: string[] = []
+    if (platform === 'win32') {
+      candidates.push(
+        path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Kiro', 'Kiro.exe'),
+        'C:\\Program Files\\Kiro\\Kiro.exe',
+        'C:\\Program Files (x86)\\Kiro\\Kiro.exe',
+        'D:\\Program\\Kiro\\Kiro.exe'
+      )
+    } else if (platform === 'darwin') {
+      candidates.push(
+        '/Applications/Kiro.app',
+        path.join(os.homedir(), 'Applications', 'Kiro.app')
+      )
+    } else {
+      // Linux
+      candidates.push(
+        '/usr/share/kiro/kiro',
+        '/opt/Kiro/kiro',
+        path.join(os.homedir(), '.local', 'share', 'kiro', 'kiro'),
+        '/usr/bin/kiro',
+        '/snap/bin/kiro'
+      )
+    }
+
+    for (const candidate of candidates) {
+      try {
+        if (fs.existsSync(candidate)) {
+          return { installed: true, path: candidate }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 额外检查：如果 ~/.aws/sso/cache/kiro-auth-token.json 存在，说明 IDE 曾经使用过
+    try {
+      if (fs.existsSync(KIRO_AUTH_TOKEN_PATH)) {
+        return { installed: true, path: KIRO_AUTH_TOKEN_PATH }
+      }
+    } catch {
+      // ignore
+    }
+
+    return { installed: false, path: null }
   })
 
   // ============ 机器码管理 IPC ============

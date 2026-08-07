@@ -147,6 +147,23 @@ function AccountListRowComponent({
       return
     }
 
+    const target = switchTarget || 'ide'
+
+    // 如果切换目标包含 IDE，先检查 IDE 是否已安装
+    if (target === 'ide' || target === 'both') {
+      const ideCheck = await window.api.checkKiroIdeInstalled()
+      if (!ideCheck.installed) {
+        if (target === 'ide') {
+          alert(isEn
+            ? 'Kiro IDE not installed. No Kiro IDE executable found at the default path. Please check if IDE is installed, or configure "Custom Kiro IDE Install Path" in Settings → General.'
+            : 'IDE 未安装\n\n未检测到默认路径的 Kiro IDE 可执行文件。请检查 IDE 是否已安装，或在「设置」→「通用」中配置「自定义 Kiro IDE 安装路径」。')
+          return
+        }
+        // both 模式下 IDE 未安装，降级为仅 CLI
+        console.warn('[Switch] IDE not installed, falling back to CLI-only switch')
+      }
+    }
+
     const cliPayload = {
       accessToken: credentials.accessToken,
       refreshToken: credentials.refreshToken,
@@ -171,32 +188,35 @@ function AccountListRowComponent({
 
     let success = true
     let errorMsg = ''
-    const target = switchTarget || 'ide'
     if (target === 'ide' || target === 'both') {
-      const result = await window.api.switchAccount(idePayload)
-      if (!result.success) {
-        success = false
-        errorMsg = result.error || ''
-      } else if (result.refreshedCredentials) {
-        // 同步 main 进程 refresh 后的最新 credentials 到 store，避免反代 store 留下已作废的 refreshToken
-        const rc = result.refreshedCredentials
-        useAccountsStore.setState((state) => {
-          const accounts = new Map(state.accounts)
-          const acc = accounts.get(account.id)
-          if (acc) {
-            accounts.set(account.id, {
-              ...acc,
-              credentials: {
-                ...acc.credentials,
-                accessToken: rc.accessToken,
-                refreshToken: rc.refreshToken,
-                expiresAt: Date.now() + rc.expiresIn * 1000
-              }
-            })
-          }
-          return { accounts }
-        })
-        useAccountsStore.getState().saveToStorage()
+      // 仅在 IDE 已安装时才调用 IDE 切换
+      const ideCheck = await window.api.checkKiroIdeInstalled()
+      if (ideCheck.installed) {
+        const result = await window.api.switchAccount(idePayload)
+        if (!result.success) {
+          success = false
+          errorMsg = result.error || ''
+        } else if (result.refreshedCredentials) {
+          // 同步 main 进程 refresh 后的最新 credentials 到 store，避免反代 store 留下已作废的 refreshToken
+          const rc = result.refreshedCredentials
+          useAccountsStore.setState((state) => {
+            const accounts = new Map(state.accounts)
+            const acc = accounts.get(account.id)
+            if (acc) {
+              accounts.set(account.id, {
+                ...acc,
+                credentials: {
+                  ...acc.credentials,
+                  accessToken: rc.accessToken,
+                  refreshToken: rc.refreshToken,
+                  expiresAt: Date.now() + rc.expiresIn * 1000
+                }
+              })
+            }
+            return { accounts }
+          })
+          useAccountsStore.getState().saveToStorage()
+        }
       }
     }
     if (target === 'cli' || target === 'both') {

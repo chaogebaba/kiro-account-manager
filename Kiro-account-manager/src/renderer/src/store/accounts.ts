@@ -2164,39 +2164,45 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         const { switchTarget: target } = get()
         const creds = availableAccount.credentials
         if (target === 'ide' || target === 'both') {
-          const switchResult = await window.api.switchAccount({
-            accessToken: creds.accessToken || '',
-            refreshToken: creds.refreshToken || '',
-            clientId: creds.clientId || '',
-            clientSecret: creds.clientSecret || '',
-            region: creds.region || 'us-east-1',
-            startUrl: creds.startUrl,
-            authMethod: creds.authMethod,
-            provider: creds.provider,
-            profileArn: (availableAccount as { profileArn?: string }).profileArn,
-            accountId: availableAccount.id
-          })
-          // 把 main 进程 refresh 后的最新 credentials 同步回 store，
-          // 否则 store 里的 refreshToken 仍是 v1（已被服务端 rotate 作废），下次任何 refresh 都会失败
-          if (switchResult?.success && switchResult.refreshedCredentials) {
-            const rc = switchResult.refreshedCredentials
-            set((state) => {
-              const accounts = new Map(state.accounts)
-              const acc = accounts.get(availableAccount.id)
-              if (acc) {
-                accounts.set(availableAccount.id, {
-                  ...acc,
-                  credentials: {
-                    ...acc.credentials,
-                    accessToken: rc.accessToken,
-                    refreshToken: rc.refreshToken,
-                    expiresAt: Date.now() + rc.expiresIn * 1000
-                  }
-                })
-              }
-              return { accounts }
+          // 仅在 IDE 已安装时才调用 IDE 切换
+          const ideCheck = await window.api.checkKiroIdeInstalled()
+          if (ideCheck.installed) {
+            const switchResult = await window.api.switchAccount({
+              accessToken: creds.accessToken || '',
+              refreshToken: creds.refreshToken || '',
+              clientId: creds.clientId || '',
+              clientSecret: creds.clientSecret || '',
+              region: creds.region || 'us-east-1',
+              startUrl: creds.startUrl,
+              authMethod: creds.authMethod,
+              provider: creds.provider,
+              profileArn: (availableAccount as { profileArn?: string }).profileArn,
+              accountId: availableAccount.id
             })
-            get().saveToStorage()
+            // 把 main 进程 refresh 后的最新 credentials 同步回 store，
+            // 否则 store 里的 refreshToken 仍是 v1（已被服务端 rotate 作废），下次任何 refresh 都会失败
+            if (switchResult?.success && switchResult.refreshedCredentials) {
+              const rc = switchResult.refreshedCredentials
+              set((state) => {
+                const accounts = new Map(state.accounts)
+                const acc = accounts.get(availableAccount.id)
+                if (acc) {
+                  accounts.set(availableAccount.id, {
+                    ...acc,
+                    credentials: {
+                      ...acc.credentials,
+                      accessToken: rc.accessToken,
+                      refreshToken: rc.refreshToken,
+                      expiresAt: Date.now() + rc.expiresIn * 1000
+                    }
+                  })
+                }
+                return { accounts }
+              })
+              get().saveToStorage()
+            }
+          } else {
+            console.warn('[AutoSwitch] IDE not installed, skipping IDE switch')
           }
         }
         if (target === 'cli' || target === 'both') {

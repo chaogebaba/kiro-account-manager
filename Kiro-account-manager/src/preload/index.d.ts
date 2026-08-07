@@ -246,6 +246,9 @@ interface KiroApi {
     scopes?: string[]
   }) => Promise<{ success: boolean; error?: string; dbPath?: string }>
 
+  // 检查 Kiro IDE 是否已安装
+  checkKiroIdeInstalled: () => Promise<{ installed: boolean; path: string | null }>
+
   // 退出登录 - 清除本地 SSO 缓存
   logoutAccount: () => Promise<{ success: boolean; deletedCount?: number; error?: string }>
 
