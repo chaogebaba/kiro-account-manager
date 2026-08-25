@@ -90,6 +90,7 @@ const api = {
   backgroundBatchCheck: (accounts: Array<{
     id: string
     email: string
+    profileArn?: string
     credentials: {
       accessToken: string
       refreshToken?: string
@@ -98,6 +99,7 @@ const api = {
       region?: string
       authMethod?: string
       provider?: string
+      profileArn?: string
     }
     idp?: string
   }>, concurrency?: number): Promise<{ success: boolean; completed: number; successCount: number; failedCount: number }> => {

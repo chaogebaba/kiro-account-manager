@@ -1168,28 +1168,38 @@ async function getUsageLimitsRest(
   const logTag = email || `token:${accessToken?.slice(-6) || '?'}`
   console.log(`[Kiro REST API] GetUsageLimits [${logTag}] region=${ssoRegion || 'default'}`)
   
-  const params = new URLSearchParams({
-    origin: 'AI_EDITOR',
-    resourceType: 'AGENTIC_REQUEST',
-    isEmailRequired: 'true'
-  })
-  if (profileArn) {
-    params.set('profileArn', profileArn)
+  const buildPath = (arn?: string): string => {
+    const params = new URLSearchParams({
+      origin: 'AI_EDITOR',
+      resourceType: 'AGENTIC_REQUEST',
+      isEmailRequired: 'true'
+    })
+    if (arn) params.set('profileArn', arn)
+    return `/getUsageLimits?${params.toString()}`
   }
-  const path = `/getUsageLimits?${params.toString()}`
-  
+
   // 根据 SSO 区域选择主端点
   const primaryBase = getRestApiBase(ssoRegion)
   const fallbackBase = getFallbackRestApiBase(ssoRegion)
-  
-  let response = await fetchRestApi(primaryBase, path, accessToken, machineId)
-  
-  // 如果主端点返回 403，尝试备用端点
-  if (response.status === 403) {
-    console.log(`[Kiro REST API] Primary 403, fallback → ${fallbackBase}`)
-    response = await fetchRestApi(fallbackBase, path, accessToken, machineId)
+
+  // 尝试组合（依次降级，仅在 400/403 这类"权限/参数"错误上继续，5xx 直接抛）：
+  //   1) 主端点 + profileArn        —— 正常路径
+  //   2) 备用端点 + profileArn      —— 区域绑定账号：token 区域与 ARN 区域不一致时主端点会 400/403
+  //   3) 主端点不带 profileArn      —— 旧行为兜底（万一后端又允许省略，或兜底 ARN 推错）
+  const attempts: Array<{ base: string; arn?: string }> = profileArn
+    ? [{ base: primaryBase, arn: profileArn }, { base: fallbackBase, arn: profileArn }, { base: primaryBase }]
+    : [{ base: primaryBase }, { base: fallbackBase }]
+
+  const describe = (a: { base: string; arn?: string }): string =>
+    `${a.base}${a.arn ? ' +profileArn' : ' (no profileArn)'}`
+
+  let response = await fetchRestApi(attempts[0].base, buildPath(attempts[0].arn), accessToken, machineId)
+  for (let i = 1; i < attempts.length; i++) {
+    if (response.ok || (response.status !== 403 && response.status !== 400)) break
+    console.log(`[Kiro REST API] ${response.status} on ${describe(attempts[i - 1])}, retry → ${describe(attempts[i])}`)
+    response = await fetchRestApi(attempts[i].base, buildPath(attempts[i].arn), accessToken, machineId)
   }
-  
+
   if (!response.ok) {
     const errorText = await response.text()
     console.error(`[Kiro REST API] GetUsageLimits failed: ${response.status}`, errorText)
@@ -1264,9 +1274,18 @@ async function getUsageAndLimits(
   ssoRegion?: string,         // SSO 区域，用于选择正确的 REST API 端点
   email?: string              // 用于日志标识
 ): Promise<UnifiedUsageResponse> {
+  // Kiro 后端对 GetUsageLimits 强制要求 profileArn：不带该字段一律
+  //   403 {"message":"User is not authorized to make this call.","reason":null}
+  // BuilderId 也不例外（实测：带官方固定 ARN 立刻 200）。
+  // 且 BuilderId 无法用 ListAvailableProfiles 发现 ARN —— 该操作对 BuilderId 直接返回
+  //   403 "AWS Builder ID is not supported for this operation."
+  // 所以只能走本地 profileArn 决策中心兜底：
+  //   BuilderId → Kiro 官方固定 ARN；Github/Google → Social ARN；Enterprise → 账号自身 ARN / 区域化兜底。
+  const effectiveProfileArn = resolveProfileArnForWrite({ profileArn, provider: idp, region: ssoRegion })
+
   if (currentUsageApiType === 'rest') {
     // 使用 REST API (GetUsageLimits)
-    const result = await getUsageLimitsRest(accessToken, profileArn, accountMachineId, ssoRegion, email)
+    const result = await getUsageLimitsRest(accessToken, effectiveProfileArn, accountMachineId, ssoRegion, email)
     // REST API 返回的字段名和 CBOR API 相同，直接返回
     return {
       usageBreakdownList: result.usageBreakdownList?.map(b => ({
@@ -1333,7 +1352,7 @@ async function getUsageAndLimits(
       // CBOR 401/403 时自动 fallback 到 REST API
       if (errorMsg.includes('401') || errorMsg.includes('403')) {
         console.log(`[API] CBOR API failed (${errorMsg}), falling back to REST API...`)
-        const result = await getUsageLimitsRest(accessToken, profileArn, accountMachineId, ssoRegion, email)
+        const result = await getUsageLimitsRest(accessToken, effectiveProfileArn, accountMachineId, ssoRegion, email)
         return {
           usageBreakdownList: result.usageBreakdownList?.map(b => ({
             resourceType: b.resourceType || b.type,
@@ -3528,6 +3547,8 @@ app.whenReady().then(async () => {
 
       // 获取账户绑定的设备 ID
       const accountMachineId = account?.machineId as string | undefined
+      // 账号自身的 profileArn（Enterprise 用真实 ARN，优于 getUsageAndLimits 内部的区域化兜底）
+      const accountProfileArn = (account?.profileArn || account.credentials?.profileArn) as string | undefined
 
       // 第一次尝试：使用当前 accessToken
       try {
@@ -3540,7 +3561,7 @@ app.whenReady().then(async () => {
             }
             return undefined
           }),
-          getUsageAndLimits(accessToken, idp, undefined, accountMachineId, region, account?.email)
+          getUsageAndLimits(accessToken, idp, accountProfileArn, accountMachineId, region, account?.email)
         ])
         return parseUsageResponse(usageResult, undefined, userInfoResult)
       } catch (apiError) {
@@ -3582,7 +3603,7 @@ app.whenReady().then(async () => {
                 }
                 return undefined
               }),
-              getUsageAndLimits(refreshResult.accessToken, idp, undefined, accountMachineId, region)
+              getUsageAndLimits(refreshResult.accessToken, idp, accountProfileArn, accountMachineId, region)
             ])
             
             // 返回结果并包含新凭证
@@ -3831,7 +3852,7 @@ app.whenReady().then(async () => {
                   }
                 }
                 console.log(`[BackgroundRefresh] Account ${account.id} machineId: ${account.machineId || 'undefined'}`)
-                const rawUsage = await getUsageAndLimits(newAccessToken, idp, undefined, account.machineId, region) as UsageResponse
+                const rawUsage = await getUsageAndLimits(newAccessToken, idp, account.profileArn || account.credentials?.profileArn, account.machineId, region) as UsageResponse
                 
                 // 解析使用量数据
                 const creditUsage = rawUsage.usageBreakdownList?.find(b => b.resourceType === 'CREDIT')
@@ -3998,6 +4019,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('background-batch-check', async (_event, accounts: Array<{
     id: string
     email: string
+    profileArn?: string
     credentials: {
       accessToken: string
       refreshToken?: string
@@ -4006,6 +4028,7 @@ app.whenReady().then(async () => {
       region?: string
       authMethod?: string
       provider?: string
+      profileArn?: string
     }
     idp?: string
   }>, concurrency: number = 10) => {
@@ -4043,7 +4066,7 @@ app.whenReady().then(async () => {
 
             // 调用 API 获取用量和用户信息（根据配置选择 REST 或 CBOR 格式）
             const [usageRes, userInfoRes] = await Promise.allSettled([
-              getUsageAndLimits(accessToken, idp, undefined, undefined, account.credentials?.region, account.email) as Promise<{
+              getUsageAndLimits(accessToken, idp, account.profileArn || account.credentials?.profileArn, undefined, account.credentials?.region, account.email) as Promise<{
                 usageBreakdownList?: Array<{
                   resourceType?: string
                   displayName?: string
