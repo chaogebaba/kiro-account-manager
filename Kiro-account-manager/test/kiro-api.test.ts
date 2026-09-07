@@ -5,6 +5,7 @@
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 
 import { setKiroApiFetch, type KiroFetch } from '../src/main/kiroApi/transport'
 import {
@@ -64,6 +65,18 @@ import {
   USAGE_API_KIRO_VERSION,
   KIRO_VERSION_FALLBACK
 } from '../src/main/kiroApi/version'
+import {
+  generatePkce,
+  generateOAuthState,
+  buildPortalRedirectUri,
+  buildPortalUrl,
+  buildExchangeRedirectUri,
+  parseCallbackRequest,
+  providerFromLoginOption,
+  exchangeSocialCode,
+  SOCIAL_CALLBACK_PORTS,
+  SOCIAL_REDIRECT_FROM
+} from '../src/main/kiroApi/socialLogin'
 
 const MID = 'a'.repeat(64)
 const LONG_TOKEN = 'r'.repeat(120)
@@ -827,4 +840,200 @@ test('shouldRefreshBeforeVerify: 有 accessToken 但已到刷新窗口 ⇒ 先�
     shouldRefreshBeforeVerify({ accessToken: 'AT', expiresAt: 1, needsRefresh: () => true }),
     true
   )
+})
+
+// ============================ socialLogin（浏览器登录） ============================
+
+test('socialLogin: PKCE verifier 43 字符 base64url，challenge = base64url(SHA256(verifier ASCII))', () => {
+  resetAll()
+  const { codeVerifier, codeChallenge } = generatePkce()
+  assert.equal(codeVerifier.length, 43)
+  assert.match(codeVerifier, /^[A-Za-z0-9_-]+$/)
+  assert.match(codeChallenge, /^[A-Za-z0-9_-]{43}$/)
+  // 逐字复算一遍，确认哈希取的是 verifier 的文本而不是随机字节
+  const expected = createHash('sha256').update(codeVerifier, 'ascii').digest('base64url')
+  assert.equal(codeChallenge, expected)
+  // 已知向量（RFC 7636 附录 B 的 verifier）
+  assert.equal(
+    createHash('sha256').update('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk', 'ascii').digest('base64url'),
+    'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
+  )
+})
+
+test('socialLogin: state 每次不同', () => {
+  resetAll()
+  assert.notEqual(generateOAuthState(), generateOAuthState())
+})
+
+test('socialLogin: 给 portal 的 redirect_uri 是裸的 127.0.0.1:<port>，无路径无结尾斜杠', () => {
+  resetAll()
+  assert.equal(buildPortalRedirectUri(3128), 'http://127.0.0.1:3128')
+})
+
+test('socialLogin: portal URL 参数顺序与 kiro.rs social.rs:276-285 逐字一致', () => {
+  resetAll()
+  const url = buildPortalUrl({
+    state: 'st ate',
+    codeChallenge: 'ch-al_len',
+    redirectUri: 'http://127.0.0.1:3128'
+  })
+  assert.equal(
+    url,
+    'https://app.kiro.dev/signin?state=st%20ate&code_challenge=ch-al_len&code_challenge_method=S256' +
+      '&redirect_uri=http%3A%2F%2F127.0.0.1%3A3128&redirect_from=KiroIDE'
+  )
+  assert.equal(SOCIAL_REDIRECT_FROM, 'KiroIDE')
+  assert.deepEqual(
+    [...SOCIAL_CALLBACK_PORTS],
+    [3128, 4649, 6588, 8008, 9091, 49153, 50153, 51153, 52153, 53153]
+  )
+})
+
+test('socialLogin: parseCallbackRequest 两个回调路径都认，login_option 透传', () => {
+  resetAll()
+  for (const path of ['/oauth/callback', '/signin/callback']) {
+    const r = parseCallbackRequest('GET', `${path}?code=C1&state=S1&login_option=Google`)
+    assert.equal(r.kind, 'success')
+    if (r.kind !== 'success') return
+    assert.equal(r.code, 'C1')
+    assert.equal(r.state, 'S1')
+    assert.equal(r.loginOption, 'Google')
+    assert.equal(r.path, path)
+  }
+})
+
+test('socialLogin: parseCallbackRequest 其它路径/非 GET 一律 ignore（favicon 不能终止会话）', () => {
+  resetAll()
+  assert.equal(parseCallbackRequest('GET', '/favicon.ico').kind, 'ignore')
+  assert.equal(parseCallbackRequest('GET', '/').kind, 'ignore')
+  assert.equal(parseCallbackRequest('GET', '/oauth/callback/x?code=C').kind, 'ignore')
+  assert.equal(parseCallbackRequest('POST', '/oauth/callback?code=C&state=S').kind, 'ignore')
+})
+
+test('socialLogin: parseCallbackRequest error → error，error_description 优先', () => {
+  resetAll()
+  const onlyError = parseCallbackRequest('GET', '/oauth/callback?error=access_denied')
+  assert.equal(onlyError.kind, 'error')
+  if (onlyError.kind === 'error') assert.equal(onlyError.message, 'access_denied')
+
+  const withDesc = parseCallbackRequest(
+    'GET',
+    '/oauth/callback?error=access_denied&error_description=User%20refused'
+  )
+  assert.equal(withDesc.kind, 'error')
+  if (withDesc.kind === 'error') assert.equal(withDesc.message, 'User refused')
+
+  const noCode = parseCallbackRequest('GET', '/oauth/callback?state=S')
+  assert.equal(noCode.kind, 'error')
+  if (noCode.kind === 'error') assert.equal(noCode.message, 'missing code')
+})
+
+test('socialLogin: parseCallbackRequest 查询串里的 + 按 URL 规则解成空格', () => {
+  resetAll()
+  const r = parseCallbackRequest('GET', '/oauth/callback?code=a+b&state=S&login_option=Sign+in')
+  assert.equal(r.kind, 'success')
+  if (r.kind !== 'success') return
+  assert.equal(r.code, 'a b')
+  assert.equal(r.loginOption, 'Sign in')
+})
+
+test('socialLogin: 换 token 的 redirectUri = 裸值 + 实际路径 (+ ?login_option)', () => {
+  resetAll()
+  // 无 login_option
+  assert.equal(
+    buildExchangeRedirectUri('http://127.0.0.1:3128', '/oauth/callback', ''),
+    'http://127.0.0.1:3128/oauth/callback'
+  )
+  // 有 login_option
+  assert.equal(
+    buildExchangeRedirectUri('http://127.0.0.1:3128', '/oauth/callback', 'Google'),
+    'http://127.0.0.1:3128/oauth/callback?login_option=Google'
+  )
+  // 另一个路径 + 需要转义的 login_option
+  assert.equal(
+    buildExchangeRedirectUri('http://127.0.0.1:4649', '/signin/callback', 'a b&c'),
+    'http://127.0.0.1:4649/signin/callback?login_option=a%20b%26c'
+  )
+})
+
+test('socialLogin: providerFromLoginOption 大小写不敏感，认不出返回 null', () => {
+  resetAll()
+  assert.equal(providerFromLoginOption('Google'), 'Google')
+  assert.equal(providerFromLoginOption('SIGNIN_WITH_GOOGLE'), 'Google')
+  assert.equal(providerFromLoginOption('github'), 'Github')
+  assert.equal(providerFromLoginOption('GitHub OAuth'), 'Github')
+  assert.equal(providerFromLoginOption(''), null)
+  assert.equal(providerFromLoginOption('builderId'), null)
+})
+
+test('socialLogin: exchangeSocialCode 的 URL / 方法 / 头 / camelCase 请求体', async () => {
+  resetAll()
+  const calls = installFakeFetch(() => ({ json: { accessToken: 'AT', refreshToken: 'RT' } }))
+  const out = await exchangeSocialCode({
+    code: 'C1',
+    codeVerifier: 'V1',
+    redirectUri: 'http://127.0.0.1:3128/oauth/callback?login_option=Google'
+  })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].url, 'https://prod.us-east-1.auth.desktop.kiro.dev/oauth/token')
+  assert.equal(calls[0].init.method, 'POST')
+  const headers = calls[0].init.headers as Record<string, string>
+  assert.equal(headers['Content-Type'], 'application/json')
+  // 交换这一条只带版本，不带 machineId（与 refreshToken 那条刻意不同）
+  assert.equal(headers['User-Agent'], `KiroIDE-${KIRO_VERSION_FALLBACK}`)
+  assert.ok(!headers['User-Agent'].includes(MID))
+  assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
+    code: 'C1',
+    codeVerifier: 'V1',
+    redirectUri: 'http://127.0.0.1:3128/oauth/callback?login_option=Google'
+  })
+  // 没有 grant_type / client_id / code_verifier 蛇形键
+  assert.equal(String(calls[0].init.body).includes('grant_type'), false)
+  assert.equal(String(calls[0].init.body).includes('code_verifier'), false)
+  assert.equal(out.accessToken, 'AT')
+  assert.equal(out.refreshToken, 'RT')
+  assert.equal(out.expiresAt, undefined)
+  resetAll()
+})
+
+test('socialLogin: expiresAt 优先于 expiresIn，两者都没有时不编造有效期', async () => {
+  resetAll()
+  installFakeFetch(() => ({
+    json: { accessToken: 'AT', expiresAt: '2030-01-01T00:00:00Z', expiresIn: 3600 }
+  }))
+  const withAbsolute = await exchangeSocialCode({ code: 'c', codeVerifier: 'v', redirectUri: 'r' })
+  assert.equal(withAbsolute.expiresAt, Date.parse('2030-01-01T00:00:00Z'))
+
+  installFakeFetch(() => ({ json: { accessToken: 'AT', expiresIn: 3600 } }))
+  const before = Date.now()
+  const withRelative = await exchangeSocialCode({ code: 'c', codeVerifier: 'v', redirectUri: 'r' })
+  assert.ok(withRelative.expiresAt !== undefined)
+  assert.ok(withRelative.expiresAt! >= before + 3600 * 1000)
+
+  installFakeFetch(() => ({ json: { accessToken: 'AT' } }))
+  const neither = await exchangeSocialCode({ code: 'c', codeVerifier: 'v', redirectUri: 'r' })
+  assert.equal(neither.expiresAt, undefined)
+  resetAll()
+})
+
+test('socialLogin: 非 2xx 抛错并带状态码，429 归到 UpstreamRateLimitError', async () => {
+  resetAll()
+  installFakeFetch(() => ({ status: 400, body: 'bad code' }))
+  await assert.rejects(
+    () => exchangeSocialCode({ code: 'c', codeVerifier: 'v', redirectUri: 'r' }),
+    (e: Error) => e.message.includes('HTTP 400') && e.message.includes('bad code')
+  )
+
+  installFakeFetch(() => ({ status: 429, body: 'slow down', headers: { 'retry-after': '30' } }))
+  await assert.rejects(
+    () => exchangeSocialCode({ code: 'c', codeVerifier: 'v', redirectUri: 'r' }),
+    (e: Error) => e instanceof UpstreamRateLimitError && e.retryAfterMs === 30_000
+  )
+
+  installFakeFetch(() => ({ json: { refreshToken: 'RT' } }))
+  await assert.rejects(
+    () => exchangeSocialCode({ code: 'c', codeVerifier: 'v', redirectUri: 'r' }),
+    /缺少 accessToken/
+  )
+  resetAll()
 })

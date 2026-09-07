@@ -226,7 +226,8 @@ export async function exchangeSocialCode(p: {
     typeof data.expiresIn === 'number' && Number.isFinite(data.expiresIn) && data.expiresIn > 0
       ? data.expiresIn
       : undefined
-  const expiresAt = parseExpiresAt(data.expiresAt) ?? (expiresIn ? Date.now() + expiresIn * 1000 : undefined)
+  const expiresAt =
+    parseExpiresAt(data.expiresAt) ?? (expiresIn ? Date.now() + expiresIn * 1000 : undefined)
 
   return {
     accessToken: data.accessToken,
