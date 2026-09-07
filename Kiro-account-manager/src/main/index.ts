@@ -27,6 +27,13 @@ import {
 } from './kiroAuthSync'
 import * as kiroApi from './kiroApi'
 import {
+  startSocialLoginSession,
+  pollSocialLoginSession,
+  cancelSocialLoginSession,
+  completeSocialLoginFromUrl,
+  type SocialLoginSession
+} from './socialLoginServer'
+import {
   RefreshTokenInvalidError,
   UpstreamRateLimitError,
   classifyAccountStatusFromError
@@ -227,9 +234,6 @@ interface OidcRefreshResult {
  * 正常路径一律 newExpiresAt ?? oldExpiresAt，不编造有效期。
  */
 const DEFAULT_TOKEN_TTL_MS = 3600 * 1000
-
-// 社交登录 (GitHub/Google) 的 Token 刷新端点
-const KIRO_AUTH_ENDPOINT = 'https://prod.us-east-1.auth.desktop.kiro.dev'
 
 // ============ 代理设置 ============
 
@@ -6009,39 +6013,65 @@ app.whenReady().then(async () => {
     return { success: true }
   })
 
+  // ============ Social 登录 (Google/GitHub)：浏览器 + 本地回调服务器 ============
+  //
+  // 旧实现用 redirect_uri=kiro://kiro.kiroAgent/authenticate-success 走系统协议深链，
+  // 要求本 app 抢到 kiro:// 的注册权（真正的 Kiro IDE 也注册同一个 scheme），实际跑不通。
+  // 现在照 kiro.rs / Kiro IDE 的做法：本地 loopback 回调服务器 + renderer 轮询。
+  //
+  // 状态**不复用** currentLoginState —— 那是 Builder ID / IAM SSO 共用的一个 let，
+  // 塞第三种形状进去只会互相踩。
+  let socialLoginSession: SocialLoginSession | null = null
+
+  /** 会话结束（completed/error/expired）时由第一个观察者拆掉，与 poll-iam-sso-auth 同样的语义 */
+  const takeSocialLoginResult = (
+    outcome: ReturnType<typeof pollSocialLoginSession>
+  ): Record<string, unknown> => {
+    if (outcome.status === 'pending') return { status: 'pending' }
+    if (outcome.status === 'expired') {
+      cancelSocialLoginSession(socialLoginSession)
+      socialLoginSession = null
+      return { status: 'expired', errorCode: 'SOCIAL_LOGIN_EXPIRED' }
+    }
+    cancelSocialLoginSession(socialLoginSession)
+    socialLoginSession = null
+    if (outcome.status === 'error') {
+      // 服务器把已知错误码原样放进 error，其余是上游文案
+      const known = outcome.error === 'SOCIAL_LOGIN_STATE_MISMATCH'
+      return {
+        status: 'error',
+        errorCode: known ? outcome.error : 'SOCIAL_LOGIN_EXCHANGE_FAILED',
+        error: outcome.error
+      }
+    }
+    return {
+      status: 'completed',
+      accessToken: outcome.accessToken,
+      refreshToken: outcome.refreshToken,
+      expiresAt: outcome.expiresAt,
+      profileArn: outcome.profileArn,
+      authMethod: 'social',
+      provider: outcome.provider
+    }
+  }
+
   // IPC: 启动 Social Auth 登录 (Google/GitHub)
   ipcMain.handle('start-social-login', async (_event, provider: 'Google' | 'Github', usePrivateMode?: boolean) => {
-    console.log(`[Login] Starting ${provider} Social Auth login... (privateMode: ${usePrivateMode})`)
-    
-    const crypto = await import('crypto')
+    console.log(`[Login] Starting ${provider} social login... (privateMode: ${usePrivateMode})`)
 
-    // 生成 PKCE
-    const codeVerifier = crypto.randomBytes(64).toString('base64url').substring(0, 128)
-    const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url')
-    const oauthState = crypto.randomBytes(32).toString('base64url')
+    // 一次只允许一个会话：开新的先把旧的端口还回去
+    cancelSocialLoginSession(socialLoginSession)
+    socialLoginSession = null
 
-    // 构建登录 URL
-    const redirectUri = 'kiro://kiro.kiroAgent/authenticate-success'
-    const loginUrl = new URL(`${KIRO_AUTH_ENDPOINT}/login`)
-    loginUrl.searchParams.set('idp', provider)
-    loginUrl.searchParams.set('redirect_uri', redirectUri)
-    loginUrl.searchParams.set('code_challenge', codeChallenge)
-    loginUrl.searchParams.set('code_challenge_method', 'S256')
-    loginUrl.searchParams.set('state', oauthState)
-
-    // 保存登录状态
-    currentLoginState = {
-      type: 'social',
-      codeVerifier,
-      codeChallenge,
-      oauthState,
-      provider
+    try {
+      socialLoginSession = await startSocialLoginSession({ provider })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '启动登录失败'
+      console.error('[Login] 无法占用回调端口:', message)
+      return { success: false, errorCode: 'SOCIAL_LOGIN_PORTS_BUSY', error: message }
     }
 
-    const urlStr = loginUrl.toString()
-    console.log(`[Login] Opening browser for ${provider} login...`)
-
-    // 根据是否使用隐私模式选择打开方式
+    const urlStr = socialLoginSession.portalUrl
     if (usePrivateMode) {
       openBrowserInPrivateMode(urlStr)
     } else {
@@ -6051,70 +6081,34 @@ app.whenReady().then(async () => {
     return {
       success: true,
       loginUrl: urlStr,
-      state: oauthState
+      port: socialLoginSession.port,
+      expiresIn: 600
     }
   })
 
-  // IPC: 交换 Social Auth token
-  ipcMain.handle('exchange-social-token', async (_event, code: string, state: string) => {
-    console.log('[Login] Exchanging Social Auth token...')
+  // IPC: 轮询 Social 登录结果
+  ipcMain.handle('poll-social-login', async () => {
+    if (!socialLoginSession) return { status: 'expired', errorCode: 'SOCIAL_LOGIN_CANCELLED' }
+    return takeSocialLoginResult(pollSocialLoginSession(socialLoginSession))
+  })
 
-    if (!currentLoginState || currentLoginState.type !== 'social') {
-      return { success: false, error: '没有进行中的社交登录' }
+  // IPC: 粘贴回调地址完成登录（浏览器在另一台机器上时的兜底）
+  ipcMain.handle('complete-social-login-url', async (_event, url: string) => {
+    if (!socialLoginSession) return { status: 'error', errorCode: 'SOCIAL_LOGIN_CANCELLED', error: '没有进行中的社交登录' }
+    const session = socialLoginSession
+    const outcome = await completeSocialLoginFromUrl(session, url)
+    // 地址压根没解析出来（用户粘错）时会话还活着：只回错误，不拆服务器
+    if (!session.result) {
+      return { status: 'error', errorCode: 'SOCIAL_LOGIN_EXCHANGE_FAILED', error: outcome.status === 'error' ? outcome.error : '' }
     }
-
-    // 验证 state
-    if (state !== currentLoginState.oauthState) {
-      currentLoginState = null
-      return { success: false, error: '状态参数不匹配，可能存在安全风险' }
-    }
-
-    const { codeVerifier, provider } = currentLoginState
-    const redirectUri = 'kiro://kiro.kiroAgent/authenticate-success'
-
-    try {
-      const tokenRes = await fetchWithAppProxy(`${KIRO_AUTH_ENDPOINT}/oauth/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code,
-          code_verifier: codeVerifier,
-          redirect_uri: redirectUri
-        })
-      })
-
-      if (!tokenRes.ok) {
-        const errText = await tokenRes.text()
-        currentLoginState = null
-        return { success: false, error: `Token 交换失败: ${errText}` }
-      }
-
-      const tokenData = await tokenRes.json()
-      console.log('[Login] Token exchange successful!')
-
-      const result = {
-        success: true,
-        accessToken: tokenData.accessToken,
-        refreshToken: tokenData.refreshToken,
-        profileArn: tokenData.profileArn,
-        expiresIn: tokenData.expiresIn,
-        authMethod: 'social' as const,
-        provider
-      }
-
-      currentLoginState = null
-      return result
-    } catch (error) {
-      console.error('[Login] Token exchange error:', error)
-      currentLoginState = null
-      return { success: false, error: error instanceof Error ? error.message : 'Token 交换失败' }
-    }
+    return takeSocialLoginResult(outcome)
   })
 
   // IPC: 取消 Social Auth 登录
   ipcMain.handle('cancel-social-login', async () => {
-    console.log('[Login] Cancelling Social Auth login...')
-    currentLoginState = null
+    console.log('[Login] Cancelling social login...')
+    cancelSocialLoginSession(socialLoginSession)
+    socialLoginSession = null
     return { success: true }
   })
 
@@ -7776,44 +7770,8 @@ app.whenReady().then(async () => {
     return await machineIdModule.restoreMachineIdFromFile(result.filePaths[0])
   })
 
-  // 更新协议处理函数以支持 Social Auth 回调
-  const originalHandleProtocolUrl = handleProtocolUrl
-  // @ts-ignore - 重新定义协议处理
-  handleProtocolUrl = (url: string): void => {
-    if (!url.startsWith(`${PROTOCOL_PREFIX}://`)) return
-
-    try {
-      const urlObj = new URL(url)
-      
-      // 处理 Social Auth 回调 (kiro://kiro.kiroAgent/authenticate-success)
-      if (url.includes('authenticate-success') || url.includes('auth')) {
-        const code = urlObj.searchParams.get('code')
-        const state = urlObj.searchParams.get('state')
-        const error = urlObj.searchParams.get('error')
-
-        if (error) {
-          console.log('[Login] Auth callback error:', error)
-          if (mainWindow) {
-            mainWindow.webContents.send('social-auth-callback', { error })
-            mainWindow.focus()
-          }
-          return
-        }
-
-        if (code && state && mainWindow) {
-          console.log('[Login] Auth callback received, code:', code.substring(0, 20) + '...')
-          mainWindow.webContents.send('social-auth-callback', { code, state })
-          mainWindow.focus()
-        }
-        return
-      }
-
-      // 调用原始处理函数处理其他协议
-      originalHandleProtocolUrl(url)
-    } catch (error) {
-      console.error('Failed to parse protocol URL:', error)
-    }
-  }
+  // 协议 URL（kiro://）仍由上面定义的 handleProtocolUrl 处理。
+  // Social 登录已改成本地回调服务器，不再需要在这里拦 authenticate-success 深链。
 
   createWindow()
 

@@ -3,6 +3,22 @@ import { electronAPI } from '@electron-toolkit/preload'
 import type { LocalCredentialCandidate } from '../main/localCredentials'
 
 /**
+ * Social 登录轮询 / 粘贴回调的统一返回形状（poll-social-login 与 complete-social-login-url 同构）。
+ * completed 时 accessToken 必有；refreshToken 缺失由 renderer 判成失败（没有它换不来后续刷新）。
+ */
+export interface SocialLoginPollResult {
+  status: 'pending' | 'expired' | 'error' | 'completed'
+  errorCode?: string
+  error?: string
+  accessToken?: string
+  refreshToken?: string
+  expiresAt?: number
+  profileArn?: string
+  authMethod?: 'social'
+  provider?: 'Google' | 'Github'
+}
+
+/**
  * WP-B 在后台刷新/检查失败时附带的错误细分信息（与 error 平级）。
  * throttled = 429 限流（账号仍可用），suspended = 账号被封禁，invalidGrant = refreshToken 失效。
  */
@@ -438,44 +454,31 @@ const api = {
     return ipcRenderer.invoke('cancel-iam-sso-login')
   },
 
-  // 启动 Social Auth 登录 (Google/GitHub)
+  // 启动 Social Auth 登录 (Google/GitHub)：本地回调服务器 + 轮询
   startSocialLogin: (provider: 'Google' | 'Github', usePrivateMode?: boolean): Promise<{
     success: boolean
     loginUrl?: string
-    state?: string
+    port?: number
+    expiresIn?: number
+    errorCode?: string
     error?: string
   }> => {
     return ipcRenderer.invoke('start-social-login', provider, usePrivateMode)
   },
 
-  // 交换 Social Auth token
-  exchangeSocialToken: (code: string, state: string): Promise<{
-    success: boolean
-    accessToken?: string
-    refreshToken?: string
-    profileArn?: string
-    expiresIn?: number
-    authMethod?: string
-    provider?: string
-    error?: string
-  }> => {
-    return ipcRenderer.invoke('exchange-social-token', code, state)
+  // 轮询 Social 登录结果
+  pollSocialLogin: (): Promise<SocialLoginPollResult> => {
+    return ipcRenderer.invoke('poll-social-login')
+  },
+
+  // 粘贴回调地址完成登录（浏览器在另一台机器上时的兜底）
+  completeSocialLoginUrl: (url: string): Promise<SocialLoginPollResult> => {
+    return ipcRenderer.invoke('complete-social-login-url', url)
   },
 
   // 取消 Social Auth 登录
   cancelSocialLogin: (): Promise<{ success: boolean }> => {
     return ipcRenderer.invoke('cancel-social-login')
-  },
-
-  // 监听 Social Auth 回调
-  onSocialAuthCallback: (callback: (data: { code?: string; state?: string; error?: string }) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, data: { code?: string; state?: string; error?: string }): void => {
-      callback(data)
-    }
-    ipcRenderer.on('social-auth-callback', handler)
-    return () => {
-      ipcRenderer.removeListener('social-auth-callback', handler)
-    }
   },
 
   // 代理设置

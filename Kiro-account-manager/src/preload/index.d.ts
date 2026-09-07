@@ -1,6 +1,22 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type { LocalCredentialCandidate } from '../main/localCredentials'
 
+/**
+ * Social 登录轮询 / 粘贴回调的统一返回形状（poll-social-login 与 complete-social-login-url 同构）。
+ * completed 时 accessToken 必有；refreshToken 缺失由 renderer 判成失败（没有它换不来后续刷新）。
+ */
+export interface SocialLoginPollResult {
+  status: 'pending' | 'expired' | 'error' | 'completed'
+  errorCode?: string
+  error?: string
+  accessToken?: string
+  refreshToken?: string
+  expiresAt?: number
+  profileArn?: string
+  authMethod?: 'social'
+  provider?: 'Google' | 'Github'
+}
+
 interface AccountData {
   accounts: Record<string, unknown>
   groups: Record<string, unknown>
@@ -522,31 +538,24 @@ interface KiroApi {
   // 取消 IAM SSO 登录
   cancelIamSsoLogin: () => Promise<{ success: boolean }>
 
-  // 启动 Social Auth 登录 (Google/GitHub)
+  // 启动 Social Auth 登录 (Google/GitHub)：本地回调服务器 + 轮询
   startSocialLogin: (provider: 'Google' | 'Github', usePrivateMode?: boolean) => Promise<{
     success: boolean
     loginUrl?: string
-    state?: string
+    port?: number
+    expiresIn?: number
+    errorCode?: string
     error?: string
   }>
 
-  // 交换 Social Auth token
-  exchangeSocialToken: (code: string, state: string) => Promise<{
-    success: boolean
-    accessToken?: string
-    refreshToken?: string
-    profileArn?: string
-    expiresIn?: number
-    authMethod?: string
-    provider?: string
-    error?: string
-  }>
+  // 轮询 Social 登录结果
+  pollSocialLogin: () => Promise<SocialLoginPollResult>
+
+  // 粘贴回调地址完成登录（浏览器在另一台机器上时的兜底）
+  completeSocialLoginUrl: (url: string) => Promise<SocialLoginPollResult>
 
   // 取消 Social Auth 登录
   cancelSocialLogin: () => Promise<{ success: boolean }>
-
-  // 监听 Social Auth 回调
-  onSocialAuthCallback: (callback: (data: { code?: string; state?: string; error?: string }) => void) => () => void
 
   // 代理设置
   setProxy: (enabled: boolean, url: string) => Promise<{ success: boolean; error?: string; normalizedUrl?: string }>

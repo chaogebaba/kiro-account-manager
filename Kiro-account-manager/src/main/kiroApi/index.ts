@@ -7,6 +7,7 @@
 //   refresh.ts  Social / IdC 刷新，含 authMethod 分派与 invalid_grant 回源重试
 //   usage.ts    getUsageLimits 候选梯子（区域 × 带不带 profileArn）
 //   expiry.ts   5 分钟 / 10 分钟过期判定
+//   socialLogin.ts Social 浏览器登录：PKCE / portal URL / 回调解析 / 授权码换 token
 //   transport.ts fetch 注入点（主进程注入带代理的 fetch）
 
 export * from './transport'
@@ -16,3 +17,4 @@ export * from './errors'
 export * from './expiry'
 export * from './refresh'
 export * from './usage'
+export * from './socialLogin'
