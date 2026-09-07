@@ -454,8 +454,8 @@ const api = {
     return ipcRenderer.invoke('cancel-iam-sso-login')
   },
 
-  // 启动 Social Auth 登录 (Google/GitHub)：本地回调服务器 + 轮询
-  startSocialLogin: (provider: 'Google' | 'Github', usePrivateMode?: boolean): Promise<{
+  // 启动 Social Auth 登录 (Google/GitHub)：本地回调服务器 + 轮询；不自动开浏览器，只返回登录地址
+  startSocialLogin: (provider: 'Google' | 'Github'): Promise<{
     success: boolean
     loginUrl?: string
     port?: number
@@ -463,7 +463,7 @@ const api = {
     errorCode?: string
     error?: string
   }> => {
-    return ipcRenderer.invoke('start-social-login', provider, usePrivateMode)
+    return ipcRenderer.invoke('start-social-login', provider)
   },
 
   // 轮询 Social 登录结果

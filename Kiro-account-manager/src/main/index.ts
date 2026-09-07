@@ -6056,8 +6056,9 @@ app.whenReady().then(async () => {
   }
 
   // IPC: 启动 Social Auth 登录 (Google/GitHub)
-  ipcMain.handle('start-social-login', async (_event, provider: 'Google' | 'Github', usePrivateMode?: boolean) => {
-    console.log(`[Login] Starting ${provider} social login... (privateMode: ${usePrivateMode})`)
+  // 不自动弹浏览器：只把登录地址交给渲染进程展示 + 复制，由用户自己决定在哪打开
+  ipcMain.handle('start-social-login', async (_event, provider: 'Google' | 'Github') => {
+    console.log(`[Login] Starting ${provider} social login...`)
 
     // 一次只允许一个会话：开新的先把旧的端口还回去
     cancelSocialLoginSession(socialLoginSession)
@@ -6071,16 +6072,9 @@ app.whenReady().then(async () => {
       return { success: false, errorCode: 'SOCIAL_LOGIN_PORTS_BUSY', error: message }
     }
 
-    const urlStr = socialLoginSession.portalUrl
-    if (usePrivateMode) {
-      openBrowserInPrivateMode(urlStr)
-    } else {
-      shell.openExternal(urlStr)
-    }
-
     return {
       success: true,
-      loginUrl: urlStr,
+      loginUrl: socialLoginSession.portalUrl,
       port: socialLoginSession.port,
       expiresIn: 600
     }

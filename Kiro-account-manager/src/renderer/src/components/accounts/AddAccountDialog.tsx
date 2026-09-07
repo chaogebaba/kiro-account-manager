@@ -609,7 +609,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     setSocialPasteUrl('')
 
     try {
-      const result = await window.api.startSocialLogin(socialProvider, usePrivateMode)
+      const result = await window.api.startSocialLogin(socialProvider)
 
       if (!result.success || !result.loginUrl) {
         setError(
@@ -634,7 +634,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     }
   }
 
-  // 复制登录地址（浏览器没自动弹出来时用）
+  // 复制登录地址（社交登录不自动弹浏览器，用户自己粘到想用的浏览器里）
   const handleCopySocialUrl = async (): Promise<void> => {
     if (!socialLoginData) return
     await navigator.clipboard.writeText(socialLoginData.loginUrl)
@@ -1359,25 +1359,23 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                     </p>
                   </div>
 
-                  {/* 登录地址：浏览器没弹出来时可以自己复制 */}
+                  {/* 登录地址：不自动弹浏览器，用户复制后自己打开 */}
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">{t('addAccount.social.loginUrl')}</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        readOnly
-                        value={socialLoginData.loginUrl}
-                        className="font-mono text-xs"
-                        onFocus={(e) => e.currentTarget.select()}
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={handleCopySocialUrl}
-                        title={t('addAccount.social.copyUrl')}
-                      >
-                        {socialUrlCopied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
-                      </Button>
-                    </div>
+                    <Input
+                      readOnly
+                      value={socialLoginData.loginUrl}
+                      className="font-mono text-xs"
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                    <Button variant="outline" className="w-full" onClick={handleCopySocialUrl}>
+                      {socialUrlCopied ? (
+                        <Check className="h-4 w-4 mr-2 text-success" />
+                      ) : (
+                        <Copy className="h-4 w-4 mr-2" />
+                      )}
+                      {socialUrlCopied ? t('addAccount.social.copied') : t('addAccount.social.copyUrl')}
+                    </Button>
                   </div>
 
                   {/* 浏览器在另一台机器上：手工粘贴回调地址 */}
@@ -1411,19 +1409,9 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                     )}
                   </div>
 
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => window.api.openExternal(socialLoginData.loginUrl, usePrivateMode)}
-                    >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      {t('addAccount.social.reopenBrowser')}
-                    </Button>
-                    <Button variant="destructive" className="flex-1" onClick={handleCancelLogin}>
-                      {isEn ? 'Cancel' : '取消登录'}
-                    </Button>
-                  </div>
+                  <Button variant="destructive" className="w-full" onClick={handleCancelLogin}>
+                    {isEn ? 'Cancel' : '取消登录'}
+                  </Button>
                 </div>
               )}
 
