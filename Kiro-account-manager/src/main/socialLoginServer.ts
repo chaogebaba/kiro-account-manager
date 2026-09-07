@@ -54,6 +54,12 @@ export interface SocialLoginSession {
   createdAt: number
   expiresAt: number
   result: SocialLoginOutcome | null
+  /** 已取消（关弹窗 / 开新会话 / 过期）。飞行中的 exchange 回来后要靠它丢弃结果。 */
+  cancelled: boolean
+  /** 取消时 abort，把还在飞的 /oauth/token 请求一并掐掉 */
+  abortController: AbortController
+  /** 换 token 时透传的代理 */
+  proxyUrl?: string
   /** 注入点：测试里换成假 exchange，绝不打真实上游 */
   exchange: typeof exchangeSocialCode
 }
@@ -85,10 +91,15 @@ function sendHtml(res: http.ServerResponse, html: string): void {
   res.end(html)
 }
 
-/** 关掉服务器并抹掉 verifier（会话结束后不再需要，别留在内存里） */
+/**
+ * 关掉服务器、抹掉 verifier、abort 掉还在飞的换 token 请求。
+ * cancelled 一旦置上，后到的 exchange 结果会被丢弃（见 finish）。
+ */
 export function cancelSocialLoginSession(s: SocialLoginSession | null): void {
   if (!s) return
+  s.cancelled = true
   s.codeVerifier = ''
+  s.abortController.abort()
   try {
     s.server.close()
   } catch {
@@ -97,7 +108,79 @@ export function cancelSocialLoginSession(s: SocialLoginSession | null): void {
 }
 
 /**
- * 起一个登录会话：占端口 → 建服务器 → 生成 PKCE/state → 拼 portal URL。
+ * 处理一次回调请求。session 由调用方传入（服务器 listen 拿到端口后才建得出来），
+ * 所以这里是模块级函数而不是闭包 —— 不存在「handler 引用了还没赋值的 session」的窗口。
+ */
+async function handleCallbackRequest(
+  session: SocialLoginSession,
+  req: http.IncomingMessage,
+  res: http.ServerResponse
+): Promise<void> {
+  const parsed = parseCallbackRequest(req.method || 'GET', req.url || '')
+
+  if (parsed.kind === 'ignore') {
+    // 浏览器的 /favicon.ico 之类：404 了事，服务器继续等真正的回调
+    res.writeHead(404)
+    res.end()
+    return
+  }
+
+  if (parsed.kind === 'error') {
+    sendHtml(res, failurePage(parsed.message))
+    finish(session, { status: 'error', error: parsed.message })
+    return
+  }
+
+  // 成功页先发出去：换 token 可能要几秒，别把浏览器标签页吊着
+  sendHtml(res, successPage())
+
+  if (parsed.state !== session.state) {
+    console.warn('[SocialLogin] state 不匹配，已拒绝该回调')
+    finish(session, { status: 'error', error: 'SOCIAL_LOGIN_STATE_MISMATCH' })
+    return
+  }
+
+  const redirectUri = buildExchangeRedirectUri(
+    session.portalRedirectUri,
+    parsed.path,
+    parsed.loginOption
+  )
+  console.log(
+    `[SocialLogin] 收到回调：port=${session.port} path=${parsed.path} login_option=${parsed.loginOption || '(空)'}`
+  )
+
+  // codeVerifier 要在 await 之前取：取消会把它抹成空串
+  const codeVerifier = session.codeVerifier
+  try {
+    const token = await session.exchange({
+      code: parsed.code,
+      codeVerifier,
+      redirectUri,
+      proxyUrl: session.proxyUrl,
+      signal: session.abortController.signal
+    })
+    // 只打 key 名，绝不打 token 值 —— 第一次真实登录靠这行确认上游到底回了哪些字段
+    console.log(
+      `[SocialLogin] 换 token 成功，响应字段: ${Object.keys(token)
+        .filter((k) => (token as unknown as Record<string, unknown>)[k] !== undefined)
+        .join(',')}`
+    )
+    finish(session, {
+      status: 'completed',
+      provider: providerFromLoginOption(parsed.loginOption) ?? session.provider,
+      accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
+      expiresAt: token.expiresAt,
+      profileArn: token.profileArn,
+      loginOption: parsed.loginOption
+    })
+  } catch (e) {
+    finish(session, { status: 'error', error: e instanceof Error ? e.message : String(e) })
+  }
+}
+
+/**
+ * 起一个登录会话：占端口 → 建会话 → 挂上请求处理 → 拼 portal URL。
  * 同一时刻只允许一个会话，调用方负责在开新会话前取消旧的。
  */
 export async function startSocialLoginSession(p: {
@@ -113,82 +196,13 @@ export async function startSocialLoginSession(p: {
   const state = generateOAuthState()
   const now = Date.now()
 
-  // 请求处理里要读 session，而 session 又需要先拿到 server/port 才能构造，只能先声明后赋值
-  // eslint-disable-next-line prefer-const
-  let session: SocialLoginSession
-
-  const handleRequest = async (
-    req: http.IncomingMessage,
-    res: http.ServerResponse
-  ): Promise<void> => {
-    const parsed = parseCallbackRequest(req.method || 'GET', req.url || '')
-
-    if (parsed.kind === 'ignore') {
-      // 浏览器的 /favicon.ico 之类：404 了事，服务器继续等真正的回调
-      res.writeHead(404)
-      res.end()
-      return
-    }
-
-    if (parsed.kind === 'error') {
-      sendHtml(res, failurePage(parsed.message))
-      finish(session, { status: 'error', error: parsed.message })
-      return
-    }
-
-    // 成功页先发出去：换 token 可能要几秒，别把浏览器标签页吊着
-    sendHtml(res, successPage())
-
-    if (parsed.state !== session.state) {
-      console.warn('[SocialLogin] state 不匹配，已拒绝该回调')
-      finish(session, { status: 'error', error: 'SOCIAL_LOGIN_STATE_MISMATCH' })
-      return
-    }
-
-    const redirectUri = buildExchangeRedirectUri(
-      session.portalRedirectUri,
-      parsed.path,
-      parsed.loginOption
-    )
-    console.log(
-      `[SocialLogin] 收到回调：port=${session.port} path=${parsed.path} login_option=${parsed.loginOption || '(空)'}`
-    )
-
-    try {
-      const token = await session.exchange({
-        code: parsed.code,
-        codeVerifier: session.codeVerifier,
-        redirectUri,
-        proxyUrl: p.proxyUrl
-      })
-      // 只打 key 名，绝不打 token 值 —— 第一次真实登录靠这行确认上游到底回了哪些字段
-      console.log(
-        `[SocialLogin] 换 token 成功，响应字段: ${Object.keys(token)
-          .filter((k) => (token as unknown as Record<string, unknown>)[k] !== undefined)
-          .join(',')}`
-      )
-      finish(session, {
-        status: 'completed',
-        provider: providerFromLoginOption(parsed.loginOption) ?? session.provider,
-        accessToken: token.accessToken,
-        refreshToken: token.refreshToken,
-        expiresAt: token.expiresAt,
-        profileArn: token.profileArn,
-        loginOption: parsed.loginOption
-      })
-    } catch (e) {
-      finish(session, { status: 'error', error: e instanceof Error ? e.message : String(e) })
-    }
-  }
-
-  const server = http.createServer((req, res) => {
-    void handleRequest(req, res)
-  })
-
+  // 先占端口再建会话：portalRedirectUri / portalUrl 都要用真实端口。
+  // 请求处理在 session 建好之后才挂上去，中间不会有请求落到半成品会话上。
+  const server = http.createServer()
   const port = await listenOnFirstFreePort(server, ports)
   const portalRedirectUri = buildPortalRedirectUri(port)
 
-  session = {
+  const session: SocialLoginSession = {
     id: randomUUID(),
     provider: p.provider,
     codeVerifier,
@@ -200,15 +214,26 @@ export async function startSocialLoginSession(p: {
     createdAt: now,
     expiresAt: now + (p.ttlMs ?? SOCIAL_LOGIN_TTL_MS),
     result: null,
+    cancelled: false,
+    abortController: new AbortController(),
+    proxyUrl: p.proxyUrl,
     exchange: p.exchange || exchangeSocialCode
   }
+
+  server.on('request', (req, res) => {
+    void handleCallbackRequest(session, req, res)
+  })
+
   console.log(`[SocialLogin] 回调服务器已监听 127.0.0.1:${port}（provider=${p.provider}）`)
   return session
 }
 
-/** 记录结果并释放端口：一次回调（成功或失败）就结束这个会话 */
+/**
+ * 记录结果并释放端口：一次回调（成功或失败）就结束这个会话。
+ * 会话已被取消（关弹窗 / 开了新会话 / 过期）时直接丢弃 —— 那份结果的归属者已经不在了。
+ */
 function finish(session: SocialLoginSession, outcome: SocialLoginOutcome): void {
-  if (session.result) return
+  if (session.result || session.cancelled) return
   session.result = outcome
   cancelSocialLoginSession(session)
 }
@@ -293,12 +318,15 @@ export async function completeSocialLoginFromUrl(
   }
 
   const redirectUri = buildExchangeRedirectUri(s.portalRedirectUri, parsed.path, parsed.loginOption)
+  // codeVerifier 要在 await 之前取：取消会把它抹成空串
+  const codeVerifier = s.codeVerifier
   try {
     const token = await s.exchange({
       code: parsed.code,
-      codeVerifier: s.codeVerifier,
+      codeVerifier,
       redirectUri,
-      proxyUrl
+      proxyUrl: proxyUrl ?? s.proxyUrl,
+      signal: s.abortController.signal
     })
     const outcome: SocialLoginOutcome = {
       status: 'completed',

@@ -323,3 +323,41 @@ test('粘贴回调地址：没有会话 / state 不匹配 / 地址无法识别 �
     cancelSocialLoginSession(session)
   }
 })
+
+test('回调服务器：换 token 飞行中取消 → abort 传到 exchange，结果被丢弃', async () => {
+  let release: (() => void) | undefined
+  const pending = new Promise<void>((r) => {
+    release = r
+  })
+  let seenSignal: AbortSignal | undefined
+  let abortedWhenResolved: boolean | undefined
+
+  const session = await startSocialLoginSession({
+    provider: 'Google',
+    ports: randomPorts(),
+    exchange: async (p) => {
+      seenSignal = p.signal
+      await pending
+      abortedWhenResolved = p.signal?.aborted
+      return { accessToken: 'AT-LATE', refreshToken: 'RT-LATE' }
+    }
+  })
+
+  // 回调进来 → 成功页已发出，exchange 卡在 pending 上
+  await get(session.port, `/oauth/callback?code=C8&state=${encodeURIComponent(session.state)}`)
+  const deadline = Date.now() + 1000
+  while (!seenSignal && Date.now() < deadline) await new Promise((r) => setTimeout(r, 5))
+  assert.ok(seenSignal, 'exchange 应该已经拿到 signal')
+  assert.equal(seenSignal!.aborted, false)
+
+  // 用户关弹窗 / 取消
+  cancelSocialLoginSession(session)
+  assert.equal(seenSignal!.aborted, true)
+
+  // 迟到的 exchange 结果不许落进会话
+  release!()
+  await new Promise((r) => setTimeout(r, 20))
+  assert.equal(abortedWhenResolved, true)
+  assert.equal(session.result, null)
+  assert.notEqual(pollSocialLoginSession(session).status, 'completed')
+})

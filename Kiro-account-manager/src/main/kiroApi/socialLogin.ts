@@ -178,11 +178,17 @@ export function socialExchangeUrl(authEndpoint: string = KIRO_AUTH_ENDPOINT): st
   return `${authEndpoint}/oauth/token`
 }
 
+/** 换 token 的超时（kiro.rs build_client(proxy, 30, ..) 也是 30 秒） */
+export const SOCIAL_EXCHANGE_TIMEOUT_MS = 30_000
+
 /**
  * 授权码换 token。
  * 头只有 Content-Type + `User-Agent: KiroIDE-<version>`（**不带 machineId**，
  * 与 refreshToken 那条刻意不同，见 kiro.rs social.rs:301-308 vs token_manager.rs:181-192）。
  * 请求体是 camelCase，没有 grant_type / client_id。
+ *
+ * 一定要带超时：上游挂住的话，用户会一直卡到会话 10 分钟 TTL 才知道失败。
+ * 调用方传进来的 signal 与超时合并，取消登录时也能把这一发请求掐掉。
  */
 export async function exchangeSocialCode(p: {
   code: string
@@ -190,24 +196,44 @@ export async function exchangeSocialCode(p: {
   redirectUri: string
   authEndpoint?: string
   proxyUrl?: string
+  /** 调用方的取消信号（会话被取消时 abort） */
+  signal?: AbortSignal
 }): Promise<SocialExchangeResult> {
   const url = socialExchangeUrl(p.authEndpoint || KIRO_AUTH_ENDPOINT)
-  const res = await kiroFetch(
-    url,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': `KiroIDE-${getEffectiveKiroVersion()}`
+  const timeoutSignal = AbortSignal.timeout(SOCIAL_EXCHANGE_TIMEOUT_MS)
+  const signal = p.signal ? AbortSignal.any([p.signal, timeoutSignal]) : timeoutSignal
+
+  let res: Response
+  try {
+    res = await kiroFetch(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': `KiroIDE-${getEffectiveKiroVersion()}`
+        },
+        body: JSON.stringify({
+          code: p.code,
+          codeVerifier: p.codeVerifier,
+          redirectUri: p.redirectUri
+        }),
+        signal
       },
-      body: JSON.stringify({
-        code: p.code,
-        codeVerifier: p.codeVerifier,
-        redirectUri: p.redirectUri
-      })
-    },
-    p.proxyUrl
-  )
+      p.proxyUrl
+    )
+  } catch (e) {
+    // 超时和主动取消都表现为 abort，分开报，免得用户以为是自己点了取消
+    if (timeoutSignal.aborted) {
+      throw new Error(
+        `social token exchange failed: timeout after ${SOCIAL_EXCHANGE_TIMEOUT_MS / 1000}s（上游无响应）`
+      )
+    }
+    if (p.signal?.aborted) {
+      throw new Error('social token exchange failed: 请求已取消 (aborted)')
+    }
+    throw e
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => '')

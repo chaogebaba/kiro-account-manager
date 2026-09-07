@@ -75,7 +75,8 @@ import {
   providerFromLoginOption,
   exchangeSocialCode,
   SOCIAL_CALLBACK_PORTS,
-  SOCIAL_REDIRECT_FROM
+  SOCIAL_REDIRECT_FROM,
+  SOCIAL_EXCHANGE_TIMEOUT_MS
 } from '../src/main/kiroApi/socialLogin'
 
 const MID = 'a'.repeat(64)
@@ -577,7 +578,6 @@ test('version: 拉取成功后 headers 用实时版本；失败静默回退', as
   resetAll()
 })
 
-
 // ============ 外部凭证源匹配（integration: setExternalRefreshTokenReader 注册的那个 reader） ============
 
 /** 造一个只有 payload 有意义的假 JWT（parseAccessTokenClaims 不校验签名） */
@@ -656,7 +656,6 @@ test('pickExternalRefreshToken: 注册后 readExternalRefreshToken 能拿到匹�
   assert.equal(found, RT_A)
   resetAll()
 })
-
 
 // ============================ expiresIn 缺失 ============================
 
@@ -744,7 +743,6 @@ test('buildSecondTargetCredentials: 上一步刷过但没给有效期 ⇒ expire
   // 上一步没给到期时间时不回填旧值：调用方（主进程）会沿用账号原有的 expiresAt
   assert.equal(out.expiresAt, undefined)
 })
-
 
 // ============ 轮换后回写本地客户端的判定 ============
 
@@ -855,7 +853,9 @@ test('socialLogin: PKCE verifier 43 字符 base64url，challenge = base64url(SHA
   assert.equal(codeChallenge, expected)
   // 已知向量（RFC 7636 附录 B 的 verifier）
   assert.equal(
-    createHash('sha256').update('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk', 'ascii').digest('base64url'),
+    createHash('sha256')
+      .update('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk', 'ascii')
+      .digest('base64url'),
     'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
   )
 })
@@ -1034,6 +1034,38 @@ test('socialLogin: 非 2xx 抛错并带状态码，429 归到 UpstreamRateLimitE
   await assert.rejects(
     () => exchangeSocialCode({ code: 'c', codeVerifier: 'v', redirectUri: 'r' }),
     /缺少 accessToken/
+  )
+  resetAll()
+})
+
+test('socialLogin: 换 token 带超时 signal，调用方 signal abort 后报「已取消」', async () => {
+  resetAll()
+  assert.equal(SOCIAL_EXCHANGE_TIMEOUT_MS, 30_000)
+
+  // 正常路径也必须带上 signal（超时靠它生效）
+  const calls = installFakeFetch(() => ({ json: { accessToken: 'AT' } }))
+  await exchangeSocialCode({ code: 'c', codeVerifier: 'v', redirectUri: 'r' })
+  const signal = (calls[0].init as { signal?: AbortSignal }).signal
+  assert.ok(signal instanceof AbortSignal)
+  assert.equal(signal.aborted, false)
+
+  // 调用方取消：合并后的 signal 已 abort，错误里说清是取消不是超时
+  const controller = new AbortController()
+  controller.abort()
+  installFakeFetch((call) => {
+    const s = (call.init as { signal?: AbortSignal }).signal
+    if (s?.aborted) throw new DOMException('This operation was aborted', 'AbortError')
+    return { json: { accessToken: 'AT' } }
+  })
+  await assert.rejects(
+    () =>
+      exchangeSocialCode({
+        code: 'c',
+        codeVerifier: 'v',
+        redirectUri: 'r',
+        signal: controller.signal
+      }),
+    /aborted/
   )
   resetAll()
 })
