@@ -340,5 +340,109 @@ test('writeKiroCliAuth rejects a non-finite expiresAt instead of throwing RangeE
   )
 })
 
+// sqlite3 命令行是否可用（兜底后端的测试需要它）
+let sqlite3Available = true
+try {
+  execFileSync('sqlite3', ['--version'], { encoding: 'utf-8', timeout: 10000 })
+} catch {
+  sqlite3Available = false
+}
+
+test('sqlite3 fallback: a failing batch throws and leaves the database untouched', (t) => {
+  if (!sqlite3Available) {
+    t.skip('sqlite3 binary not on PATH')
+    return
+  }
+  const xdg = makeXdg('binary-backend')
+  const dbPath = seedDb(xdg)
+
+  // 先用默认后端写一份基线记录
+  writeKiroCliAuth(
+    {
+      authMethod: 'social',
+      provider: 'Github',
+      accessToken: 'access-baseline',
+      refreshToken: 'refresh-baseline',
+      expiresAt: futureMs(),
+      profileArn: SOCIAL_ARN
+    },
+    dbPath
+  )
+  const before = readKiroCliAuth(dbPath)
+  assert.equal(before.token.refreshToken, 'refresh-baseline')
+
+  // 强制走 sqlite3 命令行后端，并把库设成只读 —— 整批写入必然失败。
+  // 修复前：批次只在 finally 的 close() 里执行，异常被 catch{ignore} 吞掉，
+  // writeKiroCliAuth 会"成功返回但什么都没写"。
+  const prevBackend = process.env.KIRO_CLI_SQLITE_BACKEND
+  process.env.KIRO_CLI_SQLITE_BACKEND = 'binary'
+  fs.chmodSync(dbPath, 0o444)
+  try {
+    assert.throws(() =>
+      writeKiroCliAuth(
+        {
+          authMethod: 'social',
+          provider: 'Google',
+          accessToken: 'access-should-not-land',
+          refreshToken: 'refresh-should-not-land',
+          expiresAt: futureMs(),
+          profileArn: SOCIAL_ARN
+        },
+        dbPath
+      )
+    )
+  } finally {
+    fs.chmodSync(dbPath, 0o644)
+    if (prevBackend === undefined) delete process.env.KIRO_CLI_SQLITE_BACKEND
+    else process.env.KIRO_CLI_SQLITE_BACKEND = prevBackend
+  }
+
+  // 库必须原封不动
+  const after = readKiroCliAuth(dbPath)
+  assert.equal(after.kind, 'social')
+  assert.equal(after.token.accessToken, 'access-baseline')
+  assert.equal(after.token.refreshToken, 'refresh-baseline')
+  assert.equal(after.token.provider, 'github')
+})
+
+test('sqlite3 fallback: a valid batch really lands (backend is otherwise functional)', (t) => {
+  if (!sqlite3Available) {
+    t.skip('sqlite3 binary not on PATH')
+    return
+  }
+  const xdg = makeXdg('binary-backend-ok')
+  const dbPath = seedDb(xdg)
+  const prevBackend = process.env.KIRO_CLI_SQLITE_BACKEND
+  process.env.KIRO_CLI_SQLITE_BACKEND = 'binary'
+  try {
+    writeKiroCliAuth(
+      {
+        authMethod: 'social',
+        provider: 'Github',
+        accessToken: 'access-via-binary',
+        refreshToken: 'refresh-via-binary',
+        expiresAt: futureMs(),
+        profileArn: SOCIAL_ARN
+      },
+      dbPath
+    )
+  } finally {
+    if (prevBackend === undefined) delete process.env.KIRO_CLI_SQLITE_BACKEND
+    else process.env.KIRO_CLI_SQLITE_BACKEND = prevBackend
+  }
+
+  const auth = readKiroCliAuth(dbPath)
+  assert.equal(auth.token.accessToken, 'access-via-binary')
+  assert.equal(auth.token.refreshToken, 'refresh-via-binary')
+  assert.equal(auth.token.profileArn, SOCIAL_ARN)
+  assert.equal(auth.profile.arn, SOCIAL_ARN)
+
+  if (kiroCliAvailable) {
+    const out = whoami(xdg)
+    console.log(`[whoami binary-backend] ${out}`)
+    assert.equal(out, 'Logged in with GitHub')
+  }
+})
+
 // 注：src/main/localCredentials.ts 用的是 bundler 风格的无扩展名 import（'./kiroAuthSync'），
 // 纯 node 的 ESM 解析器加载不了，所以它的单测放在应用构建体系里跑，这里只覆盖 kiroCli.ts。

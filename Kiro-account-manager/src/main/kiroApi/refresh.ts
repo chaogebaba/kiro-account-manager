@@ -257,15 +257,18 @@ export async function refreshTokenByMethod(input: RefreshInput): Promise<Refresh
  * 取到不同的值就用它再试一次；否则原样抛出。
  */
 export async function refreshTokenWithReload(
-  input: RefreshInput & { accountId?: string; email?: string }
+  input: RefreshInput & { accountId?: string; email?: string; accessToken?: string }
 ): Promise<RefreshResult & { reloadedFromSource?: boolean }> {
   try {
     return await refreshTokenByMethod(input)
   } catch (error) {
     if (!(error instanceof RefreshTokenInvalidError)) throw error
+    // accessToken 必须带上：外部凭证源的匹配首选 JWT 的 sub，
+    // 不给它就只剩 email 一条路，sub 匹配永远不会生效。
     const fresh = await readExternalRefreshToken({
       accountId: input.accountId,
       email: input.email,
+      accessToken: input.accessToken,
       refreshToken: input.refreshToken,
       authMethod: input.authMethod,
       provider: input.provider

@@ -27,6 +27,7 @@ import * as os from 'os'
 import * as path from 'path'
 import * as crypto from 'crypto'
 import { DatabaseSync } from 'node:sqlite'
+import { execFileSync } from 'child_process'
 
 export const KIROCLI_SOCIAL_TOKEN_KEY = 'kirocli:social:token'
 export const KIROCLI_IDC_TOKEN_KEY = 'kirocli:odic:token'
@@ -146,6 +147,13 @@ interface SqliteRunner {
   /** 参数化写入 */
   run(sql: string, params: unknown[]): void
   exec(sql: string): void
+  /**
+   * 把攒下来的语句真正执行掉，**必须在调用方的 try 块里调用**。
+   * sqlite3 命令行后端只在这里才真正落盘，如果放到 finally 的 close() 里，
+   * 失败（SQL 错误 / 磁盘满 / 超时）就会被 `catch { ignore }` 吞掉，
+   * writeKiroCliAuth 于是"成功返回但什么都没写"。node:sqlite 后端是空操作。
+   */
+  flush(): void
   close(): void
 }
 
@@ -162,6 +170,9 @@ function openNodeSqlite(dbPath: string): SqliteRunner {
     },
     exec(sql) {
       db.exec(sql)
+    },
+    flush() {
+      // node:sqlite 是即时执行的，没有待提交的批次
     },
     close() {
       db.close()
@@ -181,8 +192,6 @@ function inlineParams(sql: string, params: unknown[]): string {
 }
 
 function openSqlite3Binary(dbPath: string): SqliteRunner {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { execFileSync } = require('child_process') as typeof import('child_process')
   const bin = process.platform === 'win32' ? 'sqlite3.exe' : 'sqlite3'
   const pending: string[] = []
   // -bail：第一条失败的语句立刻中止整批。没有它，sqlite3 会跳过报错的语句继续跑到
@@ -209,7 +218,7 @@ function openSqlite3Binary(dbPath: string): SqliteRunner {
     exec(sql) {
       pending.push(sql.trim().endsWith(';') ? sql : sql + ';')
     },
-    close() {
+    flush() {
       if (!pending.length) return
       const batch = pending.join('\n')
       pending.length = 0
@@ -217,12 +226,24 @@ function openSqlite3Binary(dbPath: string): SqliteRunner {
       // 未提交的事务随 sqlite3 进程退出被自动回滚。
       const alreadyWrapped = /(^|\n)\s*BEGIN\b/i.test(batch)
       const sql = alreadyWrapped ? batch : `BEGIN;\n${batch}\nCOMMIT;`
+      // 异常必须往外抛：调用方在 try 里调 flush()，才能把"没写成"变成一个真错误
       call(sql + '\n', false)
+    },
+    close() {
+      // flush() 已经执行过批次；这里只兜住调用方没 flush 就 close 的情况。
+      // 走到这一步说明前面已经抛过错了，再抛一次只会盖掉真正的原因。
+      if (!pending.length) return
+      pending.length = 0
     }
   }
 }
 
 function openDb(dbPath: string): SqliteRunner {
+  // 逃生阀：node:sqlite 在某些 runtime 上不可用/有问题时可以强制走命令行后端，
+  // 测试也用它来覆盖这条兜底路径。
+  if (process.env.KIRO_CLI_SQLITE_BACKEND === 'binary') {
+    return openSqlite3Binary(dbPath)
+  }
   try {
     return openNodeSqlite(dbPath)
   } catch (e) {
@@ -475,8 +496,14 @@ export function writeKiroCliAuth(
       ])
     }
     db.exec('COMMIT;')
+    // 关键：真正落盘发生在这里，而且在 try 里 —— 失败会走下面的 catch，
+    // 不会像以前那样被 finally 里的 `close() catch { ignore }` 吞掉。
+    db.flush()
   } catch (e) {
     try {
+      // node:sqlite 是即时执行的，这一句真的会回滚；
+      // sqlite3 命令行后端此时批次已经中止、事务随进程退出自动回滚，
+      // 这条语句只会留在待执行队列里被 close() 丢掉（故意不再 flush）。
       db.exec('ROLLBACK;')
     } catch {
       // ignore

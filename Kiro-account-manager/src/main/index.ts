@@ -395,7 +395,12 @@ function initProxyServer(): ProxyServer {
             account.region || 'us-east-1',
             account.authMethod,
             account.proxyUrl,  // 账号绑定的代理（如有）
-            { accountId: account.id, email: account.email, provider: account.provider }
+            {
+              accountId: account.id,
+              email: account.email,
+              provider: account.provider,
+              accessToken: account.accessToken
+            }
           )
 
           if (refreshResult.success && refreshResult.accessToken) {
@@ -750,7 +755,8 @@ async function refreshTokenByMethod(
   region: string = 'us-east-1',
   authMethod?: string,
   proxyUrl?: string,  // 账号绑定的代理 URL（可选，优先级最高）
-  extra?: { accountId?: string; email?: string; provider?: string }
+  // accessToken 只用于 invalid_grant 后回源重读时按 JWT sub 匹配账号，不参与刷新请求
+  extra?: { accountId?: string; email?: string; provider?: string; accessToken?: string }
 ): Promise<OidcRefreshResult> {
   const method = kiroApi.resolveAuthMethod({ authMethod, clientId, clientSecret })
   const logTag = method === 'social' ? '[Social]' : '[OIDC]'
@@ -766,7 +772,8 @@ async function refreshTokenByMethod(
         machineId: getCurrentMachineId(),
         proxyUrl,
         accountId: extra?.accountId,
-        email: extra?.email
+        email: extra?.email,
+        accessToken: extra?.accessToken
       }),
     logTag
   )
@@ -1707,7 +1714,11 @@ async function syncCliTokenChangeToStore(auth: KiroCliAuth): Promise<void> {
     expiresAt: Date.parse(token.expiresAt) || Date.now() + 3600 * 1000
   }
   const arn = token.profileArn || auth.profile?.arn
-  if (arn) accountToUpdate.profileArn = arn
+  if (arn) {
+    // 两个槽位都要写：切号读顶层，用量接口读 credentials 里的那个（见 A7）
+    accountToUpdate.profileArn = arn
+    accountToUpdate.credentials.profileArn = arn
+  }
 
   store!.set('accountData', accountData)
   lastSwitchedCliAccountId = matchedId
@@ -1805,7 +1816,7 @@ async function runProactiveRenewal(accountId: string): Promise<void> {
       creds.region || 'us-east-1',
       creds.authMethod,
       account.proxyUrl,
-      { accountId, email: account.email, provider: creds.provider }
+      { accountId, email: account.email, provider: creds.provider, accessToken: creds.accessToken }
     )
   } catch (e) {
     console.warn('[ProactiveRenewal] refreshTokenByMethod threw, stop scheduling:', e)
@@ -2172,6 +2183,8 @@ const PROACTIVE_RENEWAL_LEAD_MS = 15 * 60 * 1000
 // poolRefreshInFlightIds 去重，避免对同一 refreshToken 并发刷新把其中一个用作废。
 type BackgroundRefreshAccount = {
   id: string
+  /** 仅用于日志与 invalid_grant 回源重读时的账号匹配 */
+  email?: string
   idp?: string
   profileArn?: string
   needsTokenRefresh?: boolean
@@ -2265,6 +2278,7 @@ async function runMainPoolTokenRefreshTick(): Promise<void> {
       if (!expiresAt || expiresAt - now > leadMs) continue
       toRefresh.push({
         id,
+        email: acc.email,
         idp: acc.idp,
         profileArn: acc.profileArn,
         needsTokenRefresh: true,
@@ -3324,7 +3338,12 @@ app.whenReady().then(async () => {
         region || 'us-east-1',
         authMethod,
         boundProxyUrl,
-        { accountId: account.id, email: account.email, provider }
+        {
+          accountId: account.id,
+          email: account.email,
+          provider,
+          accessToken: account.credentials?.accessToken
+        }
       )
 
       if (!refreshResult.success || !refreshResult.accessToken) {
@@ -3920,7 +3939,8 @@ app.whenReady().then(async () => {
             clientSecret || '',
             region || 'us-east-1',
             authMethod,
-            boundProxyUrl
+            boundProxyUrl,
+            { accountId: account.id, email: account.email, provider, accessToken }
           )
           
           if (refreshResult.success && refreshResult.accessToken) {
@@ -4066,7 +4086,7 @@ app.whenReady().then(async () => {
                 region || 'us-east-1',
                 authMethod,
                 boundProxyUrl,
-                { accountId: account.id, provider }
+                { accountId: account.id, email: account.email, provider, accessToken }
               )
 
               if (!refreshResult.success) {
@@ -4849,7 +4869,13 @@ app.whenReady().then(async () => {
       const refreshOnce = async (): Promise<VerifyRefreshFailure | null> => {
         console.log(`[Verify] Refreshing token (authMethod: ${authMethod || 'IdC'})...`)
         const r = await refreshTokenByMethod(
-          refreshToken, clientId, clientSecret, region, authMethod, undefined, { provider }
+          refreshToken,
+          clientId,
+          clientSecret,
+          region,
+          authMethod,
+          undefined,
+          { provider, accessToken: credentials.accessToken }
         )
         if (!r.success || !r.accessToken) {
           return {
@@ -5244,10 +5270,25 @@ app.whenReady().then(async () => {
         credentials.expiresAt ??
         (credentials.expiresIn ? Date.now() + credentials.expiresIn * 1000 : undefined)
 
+      // 账号绑定的代理：切号前的这次 refresh 也必须走它，否则该账号的出口 IP 会在切号时漂移
+      const boundProxyUrl = proxyServer
+        ? proxyServer.getAccountPool().getAccount(accountId || '')?.proxyUrl
+        : undefined
+
       // 切号前先 refresh，确保磁盘里写的是最新 access + 最新 refresh（rotating）
       if (refreshToken && !alreadyRefreshed) {
-        console.log(`[Switch Account] Refreshing token before switch (authMethod: ${authMethod})...`)
-        const refreshResult = await refreshTokenByMethod(refreshToken, clientId, clientSecret, region, authMethod)
+        console.log(
+          `[Switch Account] Refreshing token before switch (authMethod: ${authMethod})...${boundProxyUrl ? ' [via bound proxy]' : ''}`
+        )
+        const refreshResult = await refreshTokenByMethod(
+          refreshToken,
+          clientId,
+          clientSecret,
+          region,
+          authMethod,
+          boundProxyUrl,
+          { accountId, provider, accessToken: credentials.accessToken }
+        )
         if (refreshResult.success && refreshResult.accessToken) {
           finalAccessToken = refreshResult.accessToken
           // bug A 修复：OIDC 返回新 refreshToken 时必须替换；否则下次 IDE/反代 refresh 会撞已作废的 v1
@@ -5398,7 +5439,7 @@ app.whenReady().then(async () => {
           region,
           authMethod,
           boundProxyUrl,
-          { accountId, provider }
+          { accountId, provider, accessToken: credentials.accessToken }
         )
         if (refreshResult.success && refreshResult.accessToken) {
           finalAccessToken = refreshResult.accessToken
