@@ -133,14 +133,49 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     interval: number
   } | null>(null)
 
+  // Social 登录（Google/GitHub）：主进程起本地回调服务器，这里只轮询
+  const [socialLoginData, setSocialLoginData] = useState<{
+    loginUrl: string
+    port?: number
+    expiresIn: number
+  } | null>(null)
+  const [socialRemaining, setSocialRemaining] = useState(0)
+  const [socialUrlCopied, setSocialUrlCopied] = useState(false)
+  // 浏览器在另一台机器上时的兜底：手工粘贴回调地址
+  const [showSocialPaste, setShowSocialPaste] = useState(false)
+  const [socialPasteUrl, setSocialPasteUrl] = useState('')
+  const [isCompletingSocial, setIsCompletingSocial] = useState(false)
+  // 登录成功后是否顺手把本地客户端也切到这个账号；检测到 kiro-cli / IDE 时默认勾上
+  const [syncAfterLogin, setSyncAfterLogin] = useState(false)
+  const socialCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   // 清理轮询
   useEffect(() => {
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current)
       }
+      if (socialCountdownRef.current) {
+        clearInterval(socialCountdownRef.current)
+      }
     }
   }, [])
+
+  // 打开弹窗时探测本地客户端：装了 kiro-cli 或 Kiro IDE 才默认勾上"登录后设为当前账号"
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    void (async () => {
+      const [ide, cli] = await Promise.all([
+        window.api.checkKiroIdeInstalled().catch(() => ({ installed: false })),
+        window.api.checkKiroCliInstalled().catch(() => ({ installed: false }))
+      ])
+      if (!cancelled) setSyncAfterLogin(!!ide?.installed || !!cli?.installed)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen])
 
   // 打开弹窗时默认选中"当前打开的分组"（activeGroupTab 为真实分组时），否则未分组
   useEffect(() => {
@@ -148,43 +183,6 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     const isRealGroup = activeGroupTab !== 'all' && activeGroupTab !== 'ungrouped' && groups.has(activeGroupTab)
     setSelectedGroupId(isRealGroup ? activeGroupTab : undefined)
   }, [isOpen, activeGroupTab, groups])
-
-  // 监听 Social Auth 回调
-  useEffect(() => {
-    if (!isLoggingIn || loginType === 'builderid') return
-
-    const unsubscribe = window.api.onSocialAuthCallback(async (data) => {
-      console.log('[AddAccountDialog] Social auth callback:', data)
-      
-      if (data.error) {
-        setError(`登录失败: ${data.error}`)
-        setIsLoggingIn(false)
-        return
-      }
-
-      if (data.code && data.state) {
-        try {
-          const result = await window.api.exchangeSocialToken(data.code, data.state)
-          if (result.success) {
-            await handleLoginSuccess({
-              accessToken: result.accessToken!,
-              refreshToken: result.refreshToken!,
-              authMethod: 'social',
-              provider: result.provider
-            })
-          } else {
-            setError(result.error || 'Token 交换失败')
-          }
-        } catch (e) {
-          setError(e instanceof Error ? e.message : '登录失败')
-        } finally {
-          setIsLoggingIn(false)
-        }
-      }
-    })
-
-    return () => unsubscribe()
-  }, [isLoggingIn, loginType])
 
   // 验证一份凭证并落库成账号（在线登录 / 本地导入共用）
   //
@@ -482,41 +480,179 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
 
   // 取消登录
   const handleCancelLogin = async () => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current)
-      pollIntervalRef.current = null
-    }
+    stopSocialTimers()
 
     if (loginType === 'builderid') {
       await window.api.cancelBuilderIdLogin()
     } else if (loginType === 'iamsso') {
       await window.api.cancelIamSsoLogin()
     } else {
+      // 主进程会关掉回调服务器并把端口还回去
       await window.api.cancelSocialLogin()
     }
 
     setIsLoggingIn(false)
     setBuilderIdLoginData(null)
     setIamSsoLoginData(null)
+    setSocialLoginData(null)
+    setShowSocialPaste(false)
+    setSocialPasteUrl('')
     setError(null)
   }
 
+  // 关弹窗：Social 会话还挂着的话必须取消，否则回调端口会一直被占到 10 分钟超时
+  const handleDialogClose = (): void => {
+    if (socialLoginData) {
+      stopSocialTimers()
+      void window.api.cancelSocialLogin()
+      setSocialLoginData(null)
+    }
+    onClose()
+  }
+
+  // 停掉 Social 登录的轮询与倒计时（不动主进程会话）
+  const stopSocialTimers = (): void => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+    if (socialCountdownRef.current) {
+      clearInterval(socialCountdownRef.current)
+      socialCountdownRef.current = null
+    }
+  }
+
+  // 处理一次 Social 登录结果（轮询和"粘贴回调地址"共用同一个结算口）
+  const handleSocialOutcome = async (
+    result: Awaited<ReturnType<typeof window.api.pollSocialLogin>>
+  ): Promise<void> => {
+    if (result.status === 'pending') return
+
+    stopSocialTimers()
+    setSocialLoginData(null)
+    setShowSocialPaste(false)
+    setSocialPasteUrl('')
+
+    if (result.status !== 'completed') {
+      setIsLoggingIn(false)
+      const code = result.errorCode || (result.status === 'expired' ? 'SOCIAL_LOGIN_EXPIRED' : 'SOCIAL_LOGIN_EXCHANGE_FAILED')
+      const message = t(`errors.${code}`)
+      setError(result.error ? `${message}: ${result.error}` : message)
+      return
+    }
+
+    // 没有 refreshToken 就没法维持登录态，宁可不落库，也不留一个一小时后必然失效的账号
+    if (!result.refreshToken) {
+      setIsLoggingIn(false)
+      setError(t('errors.SOCIAL_LOGIN_NO_REFRESH_TOKEN'))
+      return
+    }
+
+    try {
+      // 走和本地导入完全一样的落库路径：复用刚换来的 accessToken（不轮换）、去重、
+      // profileArn 两个槽位都填
+      const outcome = await importCredentialsAsAccount({
+        accessToken: result.accessToken!,
+        refreshToken: result.refreshToken,
+        authMethod: 'social',
+        provider: result.provider,
+        profileArn: result.profileArn,
+        importSource: 'oauth',
+        expiresAt: result.expiresAt
+      })
+
+      if (!outcome.ok) {
+        const message = t(`errors.${outcome.errorCode || 'unknownError'}`)
+        setError(outcome.errorDetail ? `${message}: ${outcome.errorDetail}` : message)
+        setIsLoggingIn(false)
+        return
+      }
+
+      // 勾了"设为当前账号"就顺手写进 kiro-cli / Kiro IDE。
+      // 写盘失败只报错，不回滚上面已经添加成功的账号。
+      if (syncAfterLogin && outcome.accountId) {
+        const switched = await useAccountsStore.getState().switchAccountTo(outcome.accountId, 'auto')
+        if (!switched.success) {
+          const message = t(`errors.${switched.errorCode || 'switchCliFailed'}`)
+          setError(switched.errorDetail ? `${message}: ${switched.errorDetail}` : message)
+          setIsLoggingIn(false)
+          return
+        }
+      }
+
+      resetForm()
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('errors.unknownError'))
+      setIsLoggingIn(false)
+    }
+  }
+
+  // 轮询 Social 登录（主进程的本地回调服务器收到回调后会自己换 token）
+  const startSocialPolling = (intervalSeconds: number): void => {
+    stopSocialTimers()
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        await handleSocialOutcome(await window.api.pollSocialLogin())
+      } catch (e) {
+        console.error('[AddAccountDialog] Social poll error:', e)
+      }
+    }, intervalSeconds * 1000)
+  }
+
   // 启动 Social Auth 登录 (Google/GitHub)
-  const handleStartSocialLogin = async (socialProvider: 'Google' | 'Github') => {
+  const handleStartSocialLogin = async (socialProvider: 'Google' | 'Github'): Promise<void> => {
     setIsLoggingIn(true)
     setError(null)
+    setSocialUrlCopied(false)
+    setShowSocialPaste(false)
+    setSocialPasteUrl('')
 
     try {
       const result = await window.api.startSocialLogin(socialProvider, usePrivateMode)
-      
-      if (!result.success) {
-        setError(result.error || '启动登录失败')
+
+      if (!result.success || !result.loginUrl) {
+        setError(
+          result.errorCode
+            ? `${t(`errors.${result.errorCode}`)}${result.error ? `: ${result.error}` : ''}`
+            : result.error || (isEn ? 'Failed to start login' : '启动登录失败')
+        )
         setIsLoggingIn(false)
+        return
       }
-      // 成功后等待回调
+
+      const expiresIn = result.expiresIn || 600
+      setSocialLoginData({ loginUrl: result.loginUrl, port: result.port, expiresIn })
+      setSocialRemaining(expiresIn)
+      socialCountdownRef.current = setInterval(() => {
+        setSocialRemaining((v) => (v > 0 ? v - 1 : 0))
+      }, 1000)
+      startSocialPolling(2)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '启动登录失败')
+      setError(e instanceof Error ? e.message : (isEn ? 'Failed to start login' : '启动登录失败'))
       setIsLoggingIn(false)
+    }
+  }
+
+  // 复制登录地址（浏览器没自动弹出来时用）
+  const handleCopySocialUrl = async (): Promise<void> => {
+    if (!socialLoginData) return
+    await navigator.clipboard.writeText(socialLoginData.loginUrl)
+    setSocialUrlCopied(true)
+    setTimeout(() => setSocialUrlCopied(false), 2000)
+  }
+
+  // 兜底：把浏览器最终停留的回调地址粘进来，走和服务器一样的完成逻辑
+  const handleCompleteSocialFromUrl = async (): Promise<void> => {
+    if (!socialPasteUrl.trim()) return
+    setIsCompletingSocial(true)
+    setError(null)
+    try {
+      await handleSocialOutcome(await window.api.completeSocialLoginUrl(socialPasteUrl.trim()))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('errors.SOCIAL_LOGIN_EXCHANGE_FAILED'))
+    } finally {
+      setIsCompletingSocial(false)
     }
   }
 
@@ -1084,24 +1220,26 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     setLoginType('builderid')
     setIsLoggingIn(false)
     setBuilderIdLoginData(null)
+    setIamSsoLoginData(null)
+    setSocialLoginData(null)
+    setShowSocialPaste(false)
+    setSocialPasteUrl('')
+    setSocialUrlCopied(false)
     setCopied(false)
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current)
-      pollIntervalRef.current = null
-    }
+    stopSocialTimers()
   }
 
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={handleDialogClose} />
 
       <Card className="relative w-full max-w-lg max-h-[90vh] overflow-auto z-10">
         <CardHeader className="pb-4 border-b">
           <div className="flex flex-row items-center justify-between">
             <CardTitle className="text-xl font-bold">{isEn ? 'Add Account' : '添加账号'}</CardTitle>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-red-500 hover:text-white transition-colors" onClick={onClose}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-red-500 hover:text-white transition-colors" onClick={handleDialogClose}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -1210,8 +1348,87 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                 </div>
               )}
 
-              {/* 登录中状态 - Social Auth */}
-              {isLoggingIn && !builderIdLoginData && (
+              {/* 登录中状态 - Social Auth（本地回调服务器 + 2s 轮询） */}
+              {isLoggingIn && socialLoginData && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-primary/[0.08] rounded-lg text-center border border-primary/15">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
+                    <p className="text-sm text-primary">{t('addAccount.social.browserHint')}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('addAccount.social.expiresIn', { seconds: String(socialRemaining) })}
+                    </p>
+                  </div>
+
+                  {/* 登录地址：浏览器没弹出来时可以自己复制 */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">{t('addAccount.social.loginUrl')}</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={socialLoginData.loginUrl}
+                        className="font-mono text-xs"
+                        onFocus={(e) => e.currentTarget.select()}
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleCopySocialUrl}
+                        title={t('addAccount.social.copyUrl')}
+                      >
+                        {socialUrlCopied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 浏览器在另一台机器上：手工粘贴回调地址 */}
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
+                      onClick={() => setShowSocialPaste(!showSocialPaste)}
+                    >
+                      {t('addAccount.social.remoteTitle')}
+                    </button>
+                    {showSocialPaste && (
+                      <div className="space-y-2 p-3 bg-muted/40 rounded-lg border">
+                        <p className="text-xs text-muted-foreground">{t('addAccount.social.remoteHint')}</p>
+                        <Input
+                          value={socialPasteUrl}
+                          onChange={(e) => setSocialPasteUrl(e.target.value)}
+                          placeholder={t('addAccount.social.remotePlaceholder')}
+                          className="font-mono text-xs"
+                        />
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          disabled={isCompletingSocial || !socialPasteUrl.trim()}
+                          onClick={handleCompleteSocialFromUrl}
+                        >
+                          {isCompletingSocial && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          {t('addAccount.social.remoteSubmit')}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => window.api.openExternal(socialLoginData.loginUrl, usePrivateMode)}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      {t('addAccount.social.reopenBrowser')}
+                    </Button>
+                    <Button variant="destructive" className="flex-1" onClick={handleCancelLogin}>
+                      {isEn ? 'Cancel' : '取消登录'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* 登录中状态 - IAM SSO（等回调服务器） */}
+              {isLoggingIn && !builderIdLoginData && !socialLoginData && (
                 <div className="space-y-4">
                   <div className="p-4 bg-primary/[0.08] rounded-lg text-center border border-primary/15">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
@@ -1277,6 +1494,19 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                     </button>
                   </div>
                   
+                  {/* 登录后是否把本地客户端也切到这个账号（检测到 kiro-cli / IDE 时默认勾上） */}
+                  <div className="px-2">
+                    <label className="flex items-center gap-3 px-4 py-3 rounded-xl border border-transparent bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={syncAfterLogin}
+                        onChange={(e) => setSyncAfterLogin(e.target.checked)}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      <span className="text-sm text-muted-foreground">{t('addAccount.social.syncAfterLogin')}</span>
+                    </label>
+                  </div>
+
                   <div className="space-y-3 px-2">
                     {/* Google */}
                     <button 
@@ -1940,7 +2170,7 @@ email----password----refreshToken----clientId----clientSecret`
           {/* 提交按钮 - 只在 OIDC 模式显示 */}
           {importMode === 'oidc' && (
             <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={onClose} className="rounded-xl h-10 px-6">
+              <Button type="button" variant="outline" onClick={handleDialogClose} className="rounded-xl h-10 px-6">
                 {isEn ? 'Cancel' : '取消'}
               </Button>
               {oidcImportMode === 'single' ? (
