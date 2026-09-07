@@ -102,10 +102,10 @@ export function EditAccountDialog({
         setRegion(result.data.region)
         setError(null)
       } else {
-        setError(result.error || '导入失败')
+        setError(t(`errors.${result.errorCode || 'importFailed'}`))
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '导入失败')
+      setError(e instanceof Error ? e.message : t('errors.importFailed'))
     }
   }
 

@@ -113,6 +113,16 @@ function App(): React.JSX.Element {
     return unsubscribe
   }, [loadFromStorage])
 
+  // 同上，但来源是 kiro-cli 自己 rotate token（CLI-only 机器上这是唯一的反向同步来源）
+  useEffect(() => {
+    if (typeof window.api.onKiroCliTokenChanged !== 'function') return
+    const unsubscribe = window.api.onKiroCliTokenChanged((data) => {
+      console.log(`[App] kiro-cli rotated token for account ${data.accountId} (${data.reason}), reloading accounts...`)
+      loadFromStorage().catch((e) => console.warn('[App] reload after kiro-cli token change failed:', e))
+    })
+    return unsubscribe
+  }, [loadFromStorage])
+
   // 反代关键事件 → 触发 webhook（v1.8 新增）
   // 由 main/proxyServer 内置的 webhookTrigger 通过 IPC 推送过来，统一在 renderer 调 useWebhookStore
   useEffect(() => {

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select } from '../ui'
 import { useAccountsStore } from '@/store/accounts'
 import { useTranslation } from '@/hooks/useTranslation'
-import type { SubscriptionType } from '@/types/account'
+import type { SubscriptionType, AccountSource } from '@/types/account'
 import { X, Loader2, Download, Copy, Check, ExternalLink, Info, EyeOff } from 'lucide-react'
 import { splitCredentialLine } from '@/lib/utils'
 
@@ -119,6 +119,9 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     interval: number
   } | null>(null)
   const [copied, setCopied] = useState(false)
+  // 本地导入（kiro-cli / Kiro IDE）
+  const [isImportingLocal, setIsImportingLocal] = useState(false)
+  const [importSummary, setImportSummary] = useState<string | null>(null)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   
   // IAM SSO 登录相关状态
@@ -183,6 +186,98 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     return () => unsubscribe()
   }, [isLoggingIn, loginType])
 
+  // 验证一份凭证并落库成账号（在线登录 / 本地导入共用）
+  //
+  // 返回 errorCode 而不是文案，调用方自己决定怎么展示。
+  const importCredentialsAsAccount = async (tokenData: {
+    accessToken: string
+    refreshToken: string
+    clientId?: string
+    clientSecret?: string
+    region?: string
+    startUrl?: string
+    authMethod?: string
+    provider?: string
+    profileArn?: string
+    importSource?: AccountSource
+  }): Promise<{ ok: boolean; accountId?: string; email?: string; errorCode?: string; errorDetail?: string }> => {
+    const result = await window.api.verifyAccountCredentials({
+      refreshToken: tokenData.refreshToken,
+      clientId: tokenData.clientId || '',
+      clientSecret: tokenData.clientSecret || '',
+      region: tokenData.region || 'us-east-1',
+      authMethod: tokenData.authMethod,
+      provider: tokenData.provider
+    })
+
+    if (!result.success || !result.data) {
+      return { ok: false, errorCode: 'invalidCredentials', errorDetail: result.error }
+    }
+
+    const { email, userId } = result.data
+    const providerName = tokenData.provider || 'BuilderId'
+    if (isAccountExists(email, userId, providerName)) {
+      return { ok: false, email, errorCode: 'accountAlreadyExists' }
+    }
+
+    // profileArn 两个槽位都要填：切号读顶层，用量接口读嵌套（历史遗留，见 A7）
+    const profileArn = result.data.profileArn || tokenData.profileArn
+    const now = Date.now()
+    const accountId = addAccount({
+      email,
+      userId,
+      nickname: email ? email.split('@')[0] : undefined,
+      idp: providerName as 'BuilderId' | 'Google' | 'Github',
+      groupId: selectedGroupId,
+      profileArn,
+      importSource: tokenData.importSource || 'oauth',
+      credentials: {
+        accessToken: result.data.accessToken,
+        csrfToken: '',
+        refreshToken: result.data.refreshToken,
+        clientId: tokenData.clientId || '',
+        clientSecret: tokenData.clientSecret || '',
+        region: tokenData.region || 'us-east-1',
+        startUrl: tokenData.startUrl,
+        expiresAt: result.data.expiresIn ? now + result.data.expiresIn * 1000 : now + 3600 * 1000,
+        authMethod: tokenData.authMethod as 'IdC' | 'social',
+        provider: (tokenData.provider || 'BuilderId') as 'BuilderId' | 'Github' | 'Google',
+        profileArn
+      },
+      subscription: {
+        type: result.data.subscriptionType as SubscriptionType,
+        title: result.data.subscriptionTitle,
+        rawType: result.data.subscription?.rawType,
+        daysRemaining: result.data.daysRemaining,
+        expiresAt: result.data.expiresAt,
+        managementTarget: result.data.subscription?.managementTarget,
+        upgradeCapability: result.data.subscription?.upgradeCapability,
+        overageCapability: result.data.subscription?.overageCapability
+      },
+      usage: {
+        current: result.data.usage.current,
+        limit: result.data.usage.limit,
+        percentUsed: result.data.usage.limit > 0
+          ? result.data.usage.current / result.data.usage.limit
+          : 0,
+        lastUpdated: now,
+        baseLimit: result.data.usage.baseLimit,
+        baseCurrent: result.data.usage.baseCurrent,
+        freeTrialLimit: result.data.usage.freeTrialLimit,
+        freeTrialCurrent: result.data.usage.freeTrialCurrent,
+        freeTrialExpiry: result.data.usage.freeTrialExpiry,
+        bonuses: result.data.usage.bonuses,
+        nextResetDate: result.data.usage.nextResetDate,
+        resourceDetail: result.data.usage.resourceDetail
+      },
+      tags: [],
+      status: 'active',
+      lastUsedAt: now
+    })
+
+    return { ok: true, accountId, email }
+  }
+
   // 处理登录成功
   const handleLoginSuccess = async (tokenData: {
     accessToken: string
@@ -195,87 +290,17 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     provider?: string
   }) => {
     console.log('[AddAccountDialog] Login successful, verifying credentials...')
-    
     try {
-      // 验证凭证并获取账号信息
-      const result = await window.api.verifyAccountCredentials({
-        refreshToken: tokenData.refreshToken,
-        clientId: tokenData.clientId || '',
-        clientSecret: tokenData.clientSecret || '',
-        region: tokenData.region || 'us-east-1',
-        authMethod: tokenData.authMethod,
-        provider: tokenData.provider
-      })
-
-      if (result.success && result.data) {
-        const { email, userId } = result.data
-        const providerName = tokenData.provider || 'BuilderId'
-        
-        // 检查账户是否已存在
-        if (isAccountExists(email, userId, providerName)) {
-          setError(isEn ? 'This account already exists' : '该账号已存在，无需重复添加')
-          return
-        }
-        
-        // 添加账号
-        const now = Date.now()
-        addAccount({
-          email,
-          userId,
-          nickname: email ? email.split('@')[0] : undefined,
-          idp: providerName as 'BuilderId' | 'Google' | 'Github',
-          groupId: selectedGroupId,
-          credentials: {
-            accessToken: result.data.accessToken,
-            csrfToken: '',
-            refreshToken: result.data.refreshToken,
-            clientId: tokenData.clientId || '',
-            clientSecret: tokenData.clientSecret || '',
-            region: tokenData.region || 'us-east-1',
-            startUrl: tokenData.startUrl,
-            expiresAt: result.data.expiresIn ? now + result.data.expiresIn * 1000 : now + 3600 * 1000,
-            authMethod: tokenData.authMethod as 'IdC' | 'social',
-            provider: (tokenData.provider || 'BuilderId') as 'BuilderId' | 'Github' | 'Google',
-            profileArn: result.data.profileArn
-          },
-          subscription: {
-            type: result.data.subscriptionType as SubscriptionType,
-            title: result.data.subscriptionTitle,
-            rawType: result.data.subscription?.rawType,
-            daysRemaining: result.data.daysRemaining,
-            expiresAt: result.data.expiresAt,
-            managementTarget: result.data.subscription?.managementTarget,
-            upgradeCapability: result.data.subscription?.upgradeCapability,
-            overageCapability: result.data.subscription?.overageCapability
-          },
-          usage: {
-            current: result.data.usage.current,
-            limit: result.data.usage.limit,
-            percentUsed: result.data.usage.limit > 0 
-              ? result.data.usage.current / result.data.usage.limit 
-              : 0,
-            lastUpdated: now,
-            baseLimit: result.data.usage.baseLimit,
-            baseCurrent: result.data.usage.baseCurrent,
-            freeTrialLimit: result.data.usage.freeTrialLimit,
-            freeTrialCurrent: result.data.usage.freeTrialCurrent,
-            freeTrialExpiry: result.data.usage.freeTrialExpiry,
-            bonuses: result.data.usage.bonuses,
-            nextResetDate: result.data.usage.nextResetDate,
-            resourceDetail: result.data.usage.resourceDetail
-          },
-          tags: [],
-          status: 'active',
-          lastUsedAt: now
-        })
-
+      const outcome = await importCredentialsAsAccount(tokenData)
+      if (outcome.ok) {
         resetForm()
         onClose()
       } else {
-        setError(result.error || '验证失败')
+        const message = t(`errors.${outcome.errorCode || 'unknownError'}`)
+        setError(outcome.errorDetail ? `${message}: ${outcome.errorDetail}` : message)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '添加账号失败')
+      setError(e instanceof Error ? e.message : t('errors.unknownError'))
     }
   }
 
@@ -493,23 +518,84 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     }
   }
 
-  // 从本地配置导入
+  // 本地导入：一键把 kiro-cli / Kiro IDE 里的登录态导进账号管理器
+  //
+  // 流程：main 返回候选列表 → 逐个 verify → 去重 → addAccount（两个 profileArn 槽位都填）
+  //       → 把来源里"当前正在使用"的那个标记为激活。
+  // 一个候选都没有时，退回旧行为（把凭证填进表单让用户手工补全）。
   const handleImportFromLocal = async () => {
+    setIsImportingLocal(true)
+    setError(null)
     try {
-      const result = await window.api.loadKiroCredentials()
-      if (result.success && result.data) {
-        setRefreshToken(result.data.refreshToken)
-        setClientId(result.data.clientId)
-        setClientSecret(result.data.clientSecret)
-        setRegion(result.data.region)
-        setAuthMethod(result.data.authMethod as 'IdC' | 'social' || 'IdC')
-        setProvider(result.data.provider || 'BuilderId')
-        setError(null)
-      } else {
-        setError(result.error || '导入失败')
+      const result = await window.api.importLocalCredentials()
+      if (!result.success || !result.candidates?.length) {
+        setError(t(`errors.${result.errorCode || 'localCredentialsNotFound'}`))
+        return
+      }
+
+      const candidates = result.candidates
+      const imported: string[] = []
+      const skipped: string[] = []
+      const failed: string[] = []
+      let activeAccountId: string | null = null
+
+      for (const candidate of candidates) {
+        const outcome = await importCredentialsAsAccount({
+          accessToken: candidate.accessToken,
+          refreshToken: candidate.refreshToken,
+          clientId: candidate.clientId,
+          clientSecret: candidate.clientSecret,
+          region: candidate.region,
+          startUrl: candidate.startUrl,
+          authMethod: candidate.authMethod,
+          provider: candidate.provider,
+          profileArn: candidate.profileArn,
+          importSource: candidate.source
+        })
+        if (outcome.ok) {
+          imported.push(outcome.email || candidate.provider)
+          if (candidate.isCurrent && outcome.accountId) activeAccountId = outcome.accountId
+        } else if (outcome.errorCode === 'accountAlreadyExists') {
+          skipped.push(outcome.email || candidate.provider)
+        } else {
+          failed.push(`${candidate.source}/${candidate.provider}: ${outcome.errorDetail || outcome.errorCode}`)
+        }
+      }
+
+      // 来源里"当前正在使用"的账号 → 同步成 app 里的当前使用（不写盘，只是标记）
+      if (activeAccountId) {
+        await useAccountsStore.getState().setActiveAccount(activeAccountId)
+      }
+
+      if (imported.length === 0 && skipped.length === 0) {
+        // 一个都没成：退回表单填充，让用户自己补
+        const first = candidates[0]
+        setRefreshToken(first.refreshToken)
+        setClientId(first.clientId || '')
+        setClientSecret(first.clientSecret || '')
+        setRegion(first.region)
+        setAuthMethod(first.authMethod === 'social' ? 'social' : 'IdC')
+        setProvider(first.provider)
+        setError(failed.join('\n') || t('errors.importFailed'))
+        return
+      }
+
+      setImportSummary(
+        t('addAccount.localImportSummary', {
+          imported: String(imported.length),
+          skipped: String(skipped.length),
+          failed: String(failed.length)
+        })
+      )
+      if (failed.length > 0) setError(failed.join('\n'))
+      if (imported.length > 0 && failed.length === 0) {
+        resetForm()
+        onClose()
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '导入失败')
+      setError(e instanceof Error ? e.message : t('errors.importFailed'))
+    } finally {
+      setIsImportingLocal(false)
     }
   }
 
@@ -1534,14 +1620,23 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                       variant="outline" 
                       size="sm"
                       className="h-7 rounded-lg text-xs"
+                      disabled={isImportingLocal}
                       onClick={handleImportFromLocal}
                     >
-                      <Download className="h-3 w-3 mr-1" />
-                      {isEn ? 'Import' : '本地导入'}
+                      {isImportingLocal
+                        ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        : <Download className="h-3 w-3 mr-1" />}
+                      {t('addAccount.importFromLocal')}
                     </Button>
                   )}
                 </div>
               </div>
+
+              {importSummary && (
+                <div className="text-xs rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-emerald-600 dark:text-emerald-400">
+                  {importSummary}
+                </div>
+              )}
 
               {/* 单个导入模式 */}
               {oidcImportMode === 'single' && (

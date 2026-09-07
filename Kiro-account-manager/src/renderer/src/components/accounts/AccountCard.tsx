@@ -2,6 +2,7 @@ import { memo, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Card, CardContent, Badge, Button } from '../ui'
 import { useAccountsStore } from '@/store/accounts'
+import { sourceLabelKey } from '@/utils/accountSwitch'
 import { useTranslation } from '@/hooks/useTranslation'
 import type { Account, AccountTag, AccountGroup } from '@/types/account'
 import {
@@ -153,6 +154,7 @@ export const AccountCard = memo(function AccountCard({
 }: AccountCardProps) {
   const {
     setActiveAccount,
+    switchAccountTo,
     removeAccount,
     checkAccountStatus,
     refreshAccountToken,
@@ -209,101 +211,12 @@ export const AccountCard = memo(function AccountCard({
   }
 
   const handleSwitch = async (): Promise<void> => {
-    const { credentials } = account
-    const { switchTarget } = useAccountsStore.getState()
-    
-    // 社交登录只需要 refreshToken，IdC 登录需要 clientId 和 clientSecret
-    if (!credentials.refreshToken) {
-      alert(isEn ? 'Incomplete credentials, cannot switch' : '账号凭证不完整，无法切换')
-      return
-    }
-    if (credentials.authMethod !== 'social' && (!credentials.clientId || !credentials.clientSecret)) {
-      alert(isEn ? 'Incomplete credentials, cannot switch' : '账号凭证不完整，无法切换')
-      return
-    }
-
-    // 如果切换目标包含 IDE，先检查 IDE 是否已安装
-    if (switchTarget === 'ide' || switchTarget === 'both') {
-      const ideCheck = await window.api.checkKiroIdeInstalled()
-      if (!ideCheck.installed) {
-        if (switchTarget === 'ide') {
-          // 仅 IDE 模式下，IDE 未安装则直接报错
-          alert(isEn
-            ? 'Kiro IDE not installed. No Kiro IDE executable found at the default path. Please check if IDE is installed, or configure "Custom Kiro IDE Install Path" in Settings → General.'
-            : 'IDE 未安装\n\n未检测到默认路径的 Kiro IDE 可执行文件。请检查 IDE 是否已安装，或在「设置」→「通用」中配置「自定义 Kiro IDE 安装路径」。')
-          return
-        }
-        // both 模式下 IDE 未安装，降级为仅 CLI
-        console.warn('[Switch] IDE not installed, falling back to CLI-only switch')
-      }
-    }
-
-    const cliPayload = {
-      accessToken: credentials.accessToken,
-      refreshToken: credentials.refreshToken,
-      clientId: credentials.clientId,
-      clientSecret: credentials.clientSecret,
-      region: credentials.region || 'us-east-1',
-      profileArn: account.profileArn,
-      provider: credentials.provider
-    }
-    const idePayload = {
-      accessToken: credentials.accessToken,
-      refreshToken: credentials.refreshToken,
-      clientId: credentials.clientId || '',
-      clientSecret: credentials.clientSecret || '',
-      region: credentials.region || 'us-east-1',
-      startUrl: credentials.startUrl,
-      authMethod: credentials.authMethod,
-      provider: credentials.provider,
-      profileArn: account.profileArn,
-      accountId: account.id
-    }
-
-    let success = true
-    let errorMsg = ''
-
-    // 根据 switchTarget 设置决定切换目标
-    if (switchTarget === 'ide' || switchTarget === 'both') {
-      // 仅在 IDE 已安装时才调用 IDE 切换
-      const ideCheck = await window.api.checkKiroIdeInstalled()
-      if (ideCheck.installed) {
-        const result = await window.api.switchAccount(idePayload)
-        if (!result.success) {
-          success = false
-          errorMsg = result.error || ''
-        } else if (result.refreshedCredentials) {
-          // 同步 main 进程 refresh 后的最新 credentials 到 store，避免反代 store 留下已作废的 refreshToken
-          const rc = result.refreshedCredentials
-          useAccountsStore.setState((state) => {
-            const accounts = new Map(state.accounts)
-            const acc = accounts.get(account.id)
-            if (acc) {
-              accounts.set(account.id, {
-                ...acc,
-                credentials: {
-                  ...acc.credentials,
-                  accessToken: rc.accessToken,
-                  refreshToken: rc.refreshToken,
-                  expiresAt: Date.now() + rc.expiresIn * 1000
-                }
-              })
-            }
-            return { accounts }
-          })
-          useAccountsStore.getState().saveToStorage()
-        }
-      }
-    }
-    if (switchTarget === 'cli' || switchTarget === 'both') {
-      const result = await window.api.switchAccountCli(cliPayload)
-      if (!result.success && switchTarget === 'cli') { success = false; errorMsg = result.error || '' }
-    }
-
-    if (success) {
-      setActiveAccount(account.id)
-    } else {
-      alert(isEn ? `Switch failed: ${errorMsg}` : `切换失败: ${errorMsg}`)
+    // 切号的全部逻辑（目标探测 / 刷新 / 写盘 / 回写 rotate 后的凭证 / 标记当前使用）
+    // 都在 store.switchAccountTo → utils/accountSwitch 里，这里只负责报错文案
+    const outcome = await switchAccountTo(account.id)
+    if (!outcome.success) {
+      const message = t(`errors.${outcome.errorCode || 'unknownError'}`)
+      alert(outcome.errorDetail ? `${message}\n\n${outcome.errorDetail}` : message)
     }
   }
 
@@ -644,8 +557,14 @@ export const AccountCard = memo(function AccountCard({
                 {subscriptionLoading ? (isEn ? 'Loading...' : '加载中...') : (account.subscription.title || account.subscription.type)}
             </Badge>
             <Badge variant="outline" className="text-[10px] h-5 px-2 text-muted-foreground font-normal border-muted-foreground/30 bg-muted/30">
-                {account.idp}
+                {account.credentials?.provider || account.idp}
             </Badge>
+            {/* 凭证来源（kiro-cli / Kiro IDE / 在线登录），只在导入时记录过才显示 */}
+            {account.importSource && (
+              <Badge variant="outline" className="text-[10px] h-5 px-2 text-muted-foreground font-normal border-muted-foreground/30 bg-muted/30">
+                {t(`accounts.${sourceLabelKey(account.importSource)}`)}
+              </Badge>
+            )}
             {/* 代理绑定徽章：可点击解绑 */}
             {boundProxy && (
               <Badge

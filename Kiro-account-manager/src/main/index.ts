@@ -31,6 +31,20 @@ import {
   UpstreamRateLimitError,
   classifyAccountStatusFromError
 } from './kiroApi/errors'
+import {
+  writeKiroCliAuth,
+  kiroCliDbExists,
+  getKiroCliDbPath,
+  watchKiroCliDb,
+  kiroCliAuthSignature,
+  type KiroCliAuth
+} from './kiroCli'
+import {
+  collectLocalCredentialCandidates,
+  LOCAL_CREDENTIALS_NOT_FOUND,
+  LOCAL_CREDENTIALS_NO_CLIENT_REGISTRATION,
+  type LocalCredentialCandidate
+} from './localCredentials'
 import { openaiToKiro } from './proxy/translator'
 import { getSystemProxy, safeCreateProxyAgent } from './proxy/systemProxy'
 import { proxyLogStore, interceptConsole } from './proxy/logger'
@@ -1522,6 +1536,145 @@ async function syncIdeTokenChangeToStore(token: {
   }
 }
 
+
+// ============ kiro-cli 反向同步 ============
+//
+// kiro-cli 自己也会在 token 快到期时 refresh 并 rotate refresh token，直接改 SQLite。
+// 账号管理器不感知的话，store 里留着的就是已作废的 refresh，下次任何刷新都会失败。
+//
+// 匹配优先级与 IDE watcher 一致：
+//   1) refreshToken 精确匹配（还没 rotate 过）
+//   2) accessToken JWT 的 sub / email
+//   3) lastSwitchedCliAccountId（我们自己刚切过号的那一个）
+let stopKiroCliWatcher: (() => void) | null = null
+
+function startKiroCliWatcher(): void {
+  if (stopKiroCliWatcher) return
+  if (!kiroCliDbExists()) {
+    console.log('[KiroCliSync] kiro-cli database not found, watcher not started')
+    return
+  }
+  stopKiroCliWatcher = watchKiroCliDb(async (auth) => {
+    if (!auth.token) return
+    const sig = `${auth.token.accessToken}|${auth.token.refreshToken}`
+    if (sig === lastWrittenCliTokenSignature) return
+    const authSig = kiroCliAuthSignature(auth)
+    if (authSig === lastSyncedFromCliSignature) return
+    lastSyncedFromCliSignature = authSig
+    try {
+      await syncCliTokenChangeToStore(auth)
+    } catch (e) {
+      console.warn('[KiroCliSync] syncCliTokenChangeToStore failed:', e)
+    }
+  })
+  console.log('[KiroCliSync] Watching:', getKiroCliDbPath())
+}
+
+async function syncCliTokenChangeToStore(auth: KiroCliAuth): Promise<void> {
+  const token = auth.token
+  if (!token) return
+  if (!store) {
+    try {
+      await initStore()
+    } catch (e) {
+      console.warn('[KiroCliSync] initStore failed, cannot sync back:', e)
+      return
+    }
+  }
+  const accountData = store?.get('accountData') as
+    | {
+        accounts?: Record<
+          string,
+          {
+            id?: string
+            email?: string
+            profileArn?: string
+            credentials?: { accessToken?: string; refreshToken?: string; expiresAt?: number }
+          }
+        >
+      }
+    | null
+    | undefined
+  if (!accountData?.accounts) return
+
+  let matchedId: string | null = null
+  let matchedReason = ''
+
+  // 1) refreshToken 精确匹配
+  for (const [id, acc] of Object.entries(accountData.accounts)) {
+    if (acc.credentials?.refreshToken && acc.credentials.refreshToken === token.refreshToken) {
+      matchedId = id
+      matchedReason = 'refreshToken exact match'
+      break
+    }
+  }
+
+  // 2) accessToken JWT sub / email 匹配
+  if (!matchedId && token.accessToken) {
+    const newClaims = parseAccessTokenClaims(token.accessToken)
+    if (newClaims?.sub || newClaims?.email) {
+      for (const [id, acc] of Object.entries(accountData.accounts)) {
+        const oldClaims = acc.credentials?.accessToken
+          ? parseAccessTokenClaims(acc.credentials.accessToken)
+          : null
+        if (newClaims.sub && oldClaims?.sub === newClaims.sub) {
+          matchedId = id
+          matchedReason = 'JWT sub match'
+          break
+        }
+        if (newClaims.email && (oldClaims?.email === newClaims.email || acc.email === newClaims.email)) {
+          matchedId = id
+          matchedReason = 'JWT email match'
+          break
+        }
+      }
+    }
+  }
+
+  // 3) lastSwitchedCliAccountId 兜底
+  if (!matchedId && lastSwitchedCliAccountId && accountData.accounts[lastSwitchedCliAccountId]) {
+    matchedId = lastSwitchedCliAccountId
+    matchedReason = 'lastSwitchedCliAccountId fallback'
+  }
+
+  if (!matchedId) {
+    console.warn('[KiroCliSync] kiro-cli auth changed but no matching account in store')
+    return
+  }
+
+  const accountToUpdate = accountData.accounts[matchedId]
+  if (!accountToUpdate) return
+  const alreadyCurrent =
+    accountToUpdate.credentials?.accessToken === token.accessToken &&
+    accountToUpdate.credentials?.refreshToken === token.refreshToken
+  accountToUpdate.credentials = {
+    ...accountToUpdate.credentials,
+    accessToken: token.accessToken || accountToUpdate.credentials?.accessToken || '',
+    refreshToken: token.refreshToken,
+    expiresAt: Date.parse(token.expiresAt) || Date.now() + 3600 * 1000
+  }
+  const arn = token.profileArn || auth.profile?.arn
+  if (arn) accountToUpdate.profileArn = arn
+
+  store!.set('accountData', accountData)
+  lastSwitchedCliAccountId = matchedId
+  if (!alreadyCurrent) {
+    console.log(
+      `[KiroCliSync] Synced kiro-cli token back to account ${accountToUpdate.email || matchedId} (${matchedReason})`
+    )
+  }
+
+  try {
+    mainWindow?.webContents.send('kiro-cli-token-changed', {
+      accountId: matchedId,
+      reason: matchedReason,
+      kind: auth.kind
+    })
+  } catch (e) {
+    console.warn('[KiroCliSync] failed to notify renderer:', e)
+  }
+}
+
 // ============ 主动续期实现 ============
 //
 // 设计要点：
@@ -1788,6 +1941,11 @@ let lastSwitchedAccountId: string | null = null
 let lastWrittenTokenSignature: string | null = null
 // 上一次反向同步成功时刷写过的 store 数据签名，用于 dedupe webContents.send
 let lastSyncedFromIdeSignature: string | null = null
+
+// ============ kiro-cli 同步状态（与上面的 IDE 三兄弟一一对应） ============
+let lastSwitchedCliAccountId: string | null = null
+let lastWrittenCliTokenSignature: string | null = null
+let lastSyncedFromCliSignature: string | null = null
 
 // ============ 主动续期（Proactive Token Renewal） ============
 // 思路：在 Kiro IDE 内部 refresh loop 触发之前（token 剩 10 分钟时）抢先 refresh，
@@ -2382,6 +2540,9 @@ app.whenReady().then(async () => {
   // 启动 Kiro IDE token 文件监听（反向同步：IDE 自己 refresh 后把新 token 同步回反代 store）
   // 见 syncIdeTokenChangeToStore 注释
   startKiroAuthTokenWatcher()
+
+  // 同上，但监听 kiro-cli 的 SQLite（CLI-only 机器上这是唯一的反向同步来源）
+  startKiroCliWatcher()
 
   // 注册自定义协议
   registerProtocol()
@@ -4640,141 +4801,89 @@ app.whenReady().then(async () => {
     }
   })
 
-  // IPC: 获取本地 SSO 缓存中当前使用的账号信息
+  // IPC: 获取"本地当前正在使用"的账号信息
+  //
+  // 两个来源：Kiro IDE 的 ~/.aws/sso/cache/kiro-auth-token.json 与 kiro-cli 的 SQLite。
+  // 只有 IDE 一个来源时，CLI-only 机器上"当前使用"永远同步不了（旧行为）。
   ipcMain.handle('get-local-active-account', async () => {
-    const os = await import('os')
-    const path = await import('path')
-    
     try {
-      const ssoCache = path.join(os.homedir(), '.aws', 'sso', 'cache')
-      const tokenPath = path.join(ssoCache, 'kiro-auth-token.json')
-      
-      const tokenContent = await readFile(tokenPath, 'utf-8')
-      const tokenData = JSON.parse(tokenContent)
-      
-      if (!tokenData.refreshToken) {
-        return { success: false, error: '本地缓存中没有 refreshToken' }
+      const candidates = await collectLocalCredentialCandidates()
+      // IDE 优先（历史行为），没有则用 kiro-cli
+      const chosen =
+        candidates.find((c) => c.source === 'kiro-ide') || candidates.find((c) => c.source === 'kiro-cli')
+      if (!chosen) {
+        return { success: false, errorCode: LOCAL_CREDENTIALS_NOT_FOUND }
       }
-      
       return {
         success: true,
         data: {
-          refreshToken: tokenData.refreshToken,
-          accessToken: tokenData.accessToken,
-          authMethod: tokenData.authMethod,
-          provider: tokenData.provider
-        }
-      }
-    } catch {
-      return { success: false, error: '无法读取本地 SSO 缓存' }
-    }
-  })
-
-  // IPC: 从 Kiro 本地配置导入凭证
-  ipcMain.handle('load-kiro-credentials', async () => {
-    const os = await import('os')
-    const path = await import('path')
-    const crypto = await import('crypto')
-    const fs = await import('fs/promises')
-    
-    try {
-      // 从 ~/.aws/sso/cache/kiro-auth-token.json 读取 token
-      const ssoCache = path.join(os.homedir(), '.aws', 'sso', 'cache')
-      const tokenPath = path.join(ssoCache, 'kiro-auth-token.json')
-      console.log('[Kiro Credentials] Reading token from:', tokenPath)
-      
-      let tokenData: {
-        accessToken?: string
-        refreshToken?: string
-        clientIdHash?: string
-        region?: string
-        authMethod?: string
-        provider?: string
-      }
-      
-      try {
-        const tokenContent = await readFile(tokenPath, 'utf-8')
-        tokenData = JSON.parse(tokenContent)
-      } catch {
-        return { success: false, error: '找不到 kiro-auth-token.json 文件，请先在 Kiro IDE 中登录' }
-      }
-      
-      if (!tokenData.refreshToken) {
-        return { success: false, error: 'kiro-auth-token.json 中缺少 refreshToken' }
-      }
-      
-      // 确定 clientIdHash：优先使用文件中的，否则计算默认值
-      let clientIdHash = tokenData.clientIdHash
-      if (!clientIdHash) {
-        // 使用标准的 startUrl 计算 hash（与 Kiro 客户端一致）
-        const startUrl = 'https://view.awsapps.com/start'
-        clientIdHash = crypto.createHash('sha1')
-          .update(JSON.stringify({ startUrl }))
-          .digest('hex')
-        console.log('[Kiro Credentials] Calculated clientIdHash:', clientIdHash)
-      }
-      
-      // 读取客户端注册信息
-      let clientRegPath = path.join(ssoCache, `${clientIdHash}.json`)
-      console.log('[Kiro Credentials] Trying client registration from:', clientRegPath)
-      
-      let clientData: {
-        clientId?: string
-        clientSecret?: string
-      } | null = null
-      
-      try {
-        const clientContent = await readFile(clientRegPath, 'utf-8')
-        clientData = JSON.parse(clientContent)
-      } catch {
-        // 如果找不到，尝试搜索目录中的其他 .json 文件（排除 kiro-auth-token.json）
-        console.log('[Kiro Credentials] Client file not found, searching cache directory...')
-        try {
-          const files = await fs.readdir(ssoCache)
-          for (const file of files) {
-            if (file.endsWith('.json') && file !== 'kiro-auth-token.json') {
-              try {
-                const content = await readFile(path.join(ssoCache, file), 'utf-8')
-                const data = JSON.parse(content)
-                if (data.clientId && data.clientSecret) {
-                  clientData = data
-                  console.log('[Kiro Credentials] Found client registration in:', file)
-                  break
-                }
-              } catch {
-                // 忽略无法解析的文件
-              }
-            }
-          }
-        } catch {
-          // 忽略目录读取错误
-        }
-      }
-      
-      // 社交登录不需要 clientId/clientSecret
-      const isSocialAuth = tokenData.authMethod === 'social'
-      
-      if (!isSocialAuth && (!clientData || !clientData.clientId || !clientData.clientSecret)) {
-        return { success: false, error: '找不到客户端注册文件，请确保已在 Kiro IDE 中完成登录' }
-      }
-      
-      console.log(`[Kiro Credentials] Successfully loaded credentials (authMethod: ${tokenData.authMethod || 'IdC'})`)
-      
-      return {
-        success: true,
-        data: {
-          accessToken: tokenData.accessToken || '',
-          refreshToken: tokenData.refreshToken,
-          clientId: clientData?.clientId || '',
-          clientSecret: clientData?.clientSecret || '',
-          region: tokenData.region || 'us-east-1',
-          authMethod: tokenData.authMethod || 'IdC',
-          provider: tokenData.provider || 'BuilderId'
+          refreshToken: chosen.refreshToken,
+          accessToken: chosen.accessToken,
+          authMethod: chosen.authMethod,
+          provider: chosen.provider,
+          profileArn: chosen.profileArn,
+          source: chosen.source
         }
       }
     } catch (error) {
-      console.error('[Kiro Credentials] Error:', error)
-      return { success: false, error: error instanceof Error ? error.message : '未知错误' }
+      console.error('[LocalActiveAccount] Error:', error)
+      return { success: false, errorCode: LOCAL_CREDENTIALS_NOT_FOUND }
+    }
+  })
+
+  // IPC: 从本地（kiro-cli / Kiro IDE）发现所有可导入的凭证候选
+  //
+  // 返回候选列表，由 renderer 逐个 verify + 去重 + 落库。
+  // 错误一律以 errorCode 返回，由 renderer 做 i18n 映射（主进程不产出用户可见中文）。
+  const handleImportLocalCredentials = async (): Promise<{
+    success: boolean
+    candidates?: LocalCredentialCandidate[]
+    errorCode?: string
+  }> => {
+    try {
+      const candidates = await collectLocalCredentialCandidates()
+      if (candidates.length === 0) {
+        return { success: false, errorCode: LOCAL_CREDENTIALS_NOT_FOUND }
+      }
+      console.log(
+        `[LocalCredentials] Found ${candidates.length} candidate(s): ` +
+          candidates.map((c) => `${c.source}/${c.provider}`).join(', ')
+      )
+      return { success: true, candidates }
+    } catch (error) {
+      console.error('[LocalCredentials] Error:', error)
+      return { success: false, errorCode: LOCAL_CREDENTIALS_NOT_FOUND }
+    }
+  }
+
+  ipcMain.handle('import-local-credentials', handleImportLocalCredentials)
+
+  // IPC（兼容旧通道）：只返回第一个候选，形状与旧实现一致
+  ipcMain.handle('load-kiro-credentials', async () => {
+    const result = await handleImportLocalCredentials()
+    if (!result.success || !result.candidates?.length) {
+      return { success: false, errorCode: result.errorCode || LOCAL_CREDENTIALS_NOT_FOUND }
+    }
+    // IdC 没拿到 clientId/clientSecret 时，优先挑一个能用的候选
+    const usable =
+      result.candidates.find((c) => c.authMethod === 'social' || (c.clientId && c.clientSecret)) ||
+      result.candidates[0]
+    if (usable.authMethod !== 'social' && (!usable.clientId || !usable.clientSecret)) {
+      return { success: false, errorCode: LOCAL_CREDENTIALS_NO_CLIENT_REGISTRATION }
+    }
+    return {
+      success: true,
+      data: {
+        accessToken: usable.accessToken,
+        refreshToken: usable.refreshToken,
+        clientId: usable.clientId || '',
+        clientSecret: usable.clientSecret || '',
+        region: usable.region,
+        authMethod: usable.authMethod,
+        provider: usable.provider,
+        profileArn: usable.profileArn,
+        source: usable.source
+      }
     }
   })
 
@@ -4891,160 +5000,125 @@ app.whenReady().then(async () => {
     }
   })
 
-  // IPC: 切换账号到 Kiro CLI - 写入凭证到 SQLite 数据库
-  // kiro-cli 使用 ~/.local/share/kiro-cli/data.sqlite3 中的 auth_kv 表
+  // IPC: 切换账号到 kiro-cli —— 写入 SQLite（auth_kv / state）
+  //
+  // 与 IDE 切号对齐的三点（旧实现都没做）：
+  //   1. 先 refresh，失败直接 abort，不写"半坏"的记录
+  //   2. expires_at 用刷新返回的真实 expiresIn，rotate 后的 refreshToken 落盘并回传 renderer
+  //   3. social 记录用 kiroCli.writeKiroCliAuth 写（严格 5 字段 + 小写 provider + state profile），
+  //      不再把 BuilderId 结构塞进 kirocli:social:token
   ipcMain.handle('switch-account-cli', async (_event, credentials: {
     accessToken: string
     refreshToken: string
     clientId?: string
     clientSecret?: string
     region?: string
+    startUrl?: string
     profileArn?: string
+    authMethod?: 'IdC' | 'social' | 'external_idp'
     provider?: string
     scopes?: string[]
+    accountId?: string
   }) => {
-    const os = await import('os')
-    const path = await import('path')
-    const { mkdir } = await import('fs/promises')
-
     try {
       const {
         refreshToken,
         clientId,
         clientSecret,
         region = 'us-east-1',
+        startUrl,
         profileArn,
         provider,
-        scopes
+        scopes,
+        accountId
       } = credentials
-      let { accessToken } = credentials
 
-      // 切号前先刷新 token（和 IDE 切号一致）
+      // authMethod 现在由调用方显式给出；缺失时才退回"看 provider"的旧推断
+      const authMethod: 'IdC' | 'social' =
+        credentials.authMethod === 'social' || provider === 'Google' || provider === 'Github'
+          ? 'social'
+          : 'IdC'
+
+      let finalAccessToken = credentials.accessToken
+      let finalRefreshToken = refreshToken
+      let finalExpiresIn = 3600
+
       if (refreshToken) {
-        const authMethod = (provider === 'Google' || provider === 'Github') ? 'social' : undefined
-        console.log(`[Switch CLI] Refreshing token before switch (provider: ${provider})...`)
-        const refreshResult = await refreshTokenByMethod(refreshToken, clientId || '', clientSecret || '', region, authMethod)
+        console.log(`[Switch CLI] Refreshing token before switch (authMethod: ${authMethod})...`)
+        const refreshResult = await refreshTokenByMethod(
+          refreshToken,
+          clientId || '',
+          clientSecret || '',
+          region,
+          authMethod
+        )
         if (refreshResult.success && refreshResult.accessToken) {
-          accessToken = refreshResult.accessToken
-          console.log('[Switch CLI] Token refreshed successfully')
+          finalAccessToken = refreshResult.accessToken
+          finalRefreshToken = refreshResult.refreshToken || refreshToken
+          finalExpiresIn = refreshResult.expiresIn ?? 3600
+          console.log('[Switch CLI] Token refreshed successfully (rotated refreshToken updated)')
         } else {
-          console.warn(`[Switch CLI] Token refresh failed: ${refreshResult.error}, using existing token`)
+          // 和 IDE 切号一致：refresh 失败不写盘，避免 kiro-cli 拿到已失效的 token
+          const errMsg = refreshResult.error || 'Unknown refresh error'
+          console.warn(`[Switch CLI] Token refresh failed, aborting switch: ${errMsg}`)
+          return { success: false, errorCode: 'switchCliRefreshFailed', errorDetail: errMsg }
         }
       }
 
-      // kiro-cli SQLite 数据库路径
-      // Windows: %LOCALAPPDATA%\kiro-cli\data.sqlite3
-      // macOS/Linux: ~/.local/share/kiro-cli/data.sqlite3
-      const dataDir = process.platform === 'win32'
-        ? path.join(os.homedir(), 'AppData', 'Local', 'kiro-cli')
-        : path.join(os.homedir(), '.local', 'share', 'kiro-cli')
-      await mkdir(dataDir, { recursive: true })
-      const dbPath = path.join(dataDir, 'data.sqlite3')
-
-      // 判断 token key：social 登录用 social:token，IdC 登录用 odic:token
-      const isSocial = provider === 'Google' || provider === 'Github'
-      const preferredTokenKey = isSocial ? 'kirocli:social:token' : 'kirocli:odic:token'
-      const preferredRegKey = 'kirocli:odic:device-registration'
-
-      // profileArn 决策统一由 helper：BuilderId 不带 profileArn
-      // kiro-cli 同样不应该在 SQLite 里塞占位符 ARN（实测会触发 REST 端点 403）
       const resolvedProfileArn = resolveProfileArnForWrite({
         profileArn,
-        authMethod: isSocial ? 'social' : 'IdC',
+        authMethod,
         provider,
         region
       })
+      if (!resolvedProfileArn) {
+        return { success: false, errorCode: 'switchCliNoProfileArn' }
+      }
 
-      // 构建 token JSON（snake_case 字段名，与 kiro-cli Rust 结构一致）
-      // kiro-cli 反序列化为 struct BuilderIdToken { access_token, expires_at, refresh_token, region, start_url, oauth_flow, scopes }
-      // 其中 start_url 是必填字段（缺失会导致 "start_url is required" → whoami 报 Not logged in）
-      const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString()
-      const cliScopes = scopes || [
-        'codewhisperer:completions',
-        'codewhisperer:analysis',
-        'codewhisperer:conversations'
-      ]
-      const tokenData: Record<string, unknown> = {
-        access_token: accessToken,
-        refresh_token: refreshToken,
-        expires_at: expiresAt,
+      const expiresAt = Date.now() + finalExpiresIn * 1000
+      const { dbPath, tokenKey } = writeKiroCliAuth({
+        authMethod,
+        provider,
+        accessToken: finalAccessToken,
+        refreshToken: finalRefreshToken,
+        expiresAt,
+        profileArn: resolvedProfileArn,
         region,
-        start_url: 'https://view.awsapps.com/start',
-        oauth_flow: 'PKCE',
-        scopes: cliScopes
-      }
-      // profileArn 仅在解析出有效值时附加，BuilderId 等不带（避免 kiro-cli 拿占位符 ARN 调 REST 触发 403）
-      if (resolvedProfileArn) {
-        tokenData.profile_arn = resolvedProfileArn
-      }
+        startUrl,
+        clientId,
+        clientSecret,
+        scopes
+      })
 
-      // 使用 sqlite3 命令行操作（跨平台兼容，无需原生模块编译）
-      const { execFileSync } = await import('child_process')
-      const sqlite3Bin = process.platform === 'win32' ? 'sqlite3.exe' : 'sqlite3'
+      // watcher 回环保护：这份内容是我们自己刚写的
+      lastWrittenCliTokenSignature = `${finalAccessToken}|${finalRefreshToken}`
+      if (accountId) lastSwitchedCliAccountId = accountId
 
-      // 构建 SQL 语句
-      const sqlStatements: string[] = [
-        'CREATE TABLE IF NOT EXISTS auth_kv (key TEXT PRIMARY KEY, value TEXT);',
-        `INSERT OR REPLACE INTO auth_kv (key, value) VALUES ('${preferredTokenKey}', '${JSON.stringify(tokenData).replace(/'/g, "''")}');`
-      ]
-
-      // 写入 device-registration（仅 IdC 登录）
-      // kiro-cli 反序列化为 struct DeviceRegistration { client_id, client_secret, client_secret_expires_at, region, oauth_flow, scopes }
-      // 缺少 oauth_flow 会导致刷新时报 "Stored client registration has oauth flow: but current access token has oauth flow: PKCE"
-      if (clientId && clientSecret && !isSocial) {
-        const clientSecretExpiresAt = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString()
-        const regData = {
-          client_id: clientId,
-          client_secret: clientSecret,
-          client_secret_expires_at: clientSecretExpiresAt,
-          region,
-          oauth_flow: 'PKCE',
-          scopes: cliScopes
-        }
-        sqlStatements.push(
-          `INSERT OR REPLACE INTO auth_kv (key, value) VALUES ('${preferredRegKey}', '${JSON.stringify(regData).replace(/'/g, "''")}');`
-        )
-      }
-
-      // 清除其他优先级的旧 key
-      const cliTokenKeys = ['kirocli:social:token', 'kirocli:odic:token', 'codewhisperer:odic:token']
-      for (const key of cliTokenKeys) {
-        if (key !== preferredTokenKey) {
-          sqlStatements.push(`DELETE FROM auth_kv WHERE key = '${key}';`)
+      console.log(`[Switch CLI] Token saved to SQLite key ${tokenKey} in ${dbPath}`)
+      return {
+        success: true,
+        dbPath,
+        // 与 switch-account 相同的契约：把 rotate 后的 credentials 回传给 store
+        refreshedCredentials: {
+          accessToken: finalAccessToken,
+          refreshToken: finalRefreshToken,
+          expiresIn: finalExpiresIn
         }
       }
-
-      try {
-        execFileSync(sqlite3Bin, [dbPath], {
-          input: sqlStatements.join('\n'),
-          timeout: 10000,
-          encoding: 'utf-8'
-        })
-      } catch (sqlite3Error) {
-        // sqlite3 命令不存在，尝试用 Node.js 22+ 的内置 SQLite
-        console.log('[Switch CLI] sqlite3 command not available, trying Node.js built-in SQLite...')
-        try {
-          const { DatabaseSync } = await import('node:sqlite') as { DatabaseSync: new (path: string) => { exec: (sql: string) => void; close: () => void } }
-          const db = new DatabaseSync(dbPath)
-          try {
-            for (const sql of sqlStatements) {
-              db.exec(sql)
-            }
-          } finally {
-            db.close()
-          }
-        } catch {
-          throw new Error(`SQLite 操作失败: sqlite3 命令不可用 (${(sqlite3Error as Error).message})，且 Node.js 内置 SQLite 不支持。请确保系统安装了 sqlite3 命令行工具。`)
-        }
-      }
-
-      console.log(`[Switch CLI] Token saved to SQLite key: ${preferredTokenKey}`)
-      console.log(`[Switch CLI] Account switched successfully in ${dbPath}`)
-      return { success: true, dbPath }
     } catch (error) {
       console.error('[Switch CLI] Error:', error)
-      return { success: false, error: error instanceof Error ? error.message : 'CLI 切换失败' }
+      return {
+        success: false,
+        errorCode: 'switchCliFailed',
+        errorDetail: error instanceof Error ? error.message : String(error)
+      }
     }
+  })
+
+  // IPC: kiro-cli 是否可用（数据库是否存在）
+  ipcMain.handle('check-kiro-cli-installed', async () => {
+    const dbPath = getKiroCliDbPath()
+    return { installed: kiroCliDbExists(dbPath), path: kiroCliDbExists(dbPath) ? dbPath : null }
   })
 
 
@@ -7411,6 +7485,14 @@ app.on('will-quit', async (event) => {
   
   // 停止主进程池 token 刷新调度器
   stopMainPoolTokenRefresh()
+
+  // 停止本地凭证 watcher
+  try {
+    stopKiroCliWatcher?.()
+    stopKiroCliWatcher = null
+  } catch {
+    // ignore
+  }
 
   // 防止应用立即退出，先保存数据
   if (lastSavedData && store) {
