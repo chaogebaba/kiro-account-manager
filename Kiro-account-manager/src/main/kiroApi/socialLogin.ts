@@ -185,7 +185,11 @@ export const SOCIAL_EXCHANGE_TIMEOUT_MS = 30_000
  * 授权码换 token。
  * 头只有 Content-Type + `User-Agent: KiroIDE-<version>`（**不带 machineId**，
  * 与 refreshToken 那条刻意不同，见 kiro.rs social.rs:301-308 vs token_manager.rs:181-192）。
- * 请求体是 camelCase，没有 grant_type / client_id。
+ * 请求体是 **snake_case** `{code, code_verifier, redirect_uri}`（kiro.rs
+ * token_refresh.rs 的 SocialCreateTokenRequest 没有 rename_all=camelCase；
+ * 只有响应体是 camelCase）。发 camelCase 会被上游 400：
+ * "Value at 'redirectUri' ... Member must not be null"（错误信息用的是模型成员名，
+ * 不是 JSON 键名，别被它带偏）。没有 grant_type / client_id。
  *
  * 一定要带超时：上游挂住的话，用户会一直卡到会话 10 分钟 TTL 才知道失败。
  * 调用方传进来的 signal 与超时合并，取消登录时也能把这一发请求掐掉。
@@ -215,8 +219,8 @@ export async function exchangeSocialCode(p: {
         },
         body: JSON.stringify({
           code: p.code,
-          codeVerifier: p.codeVerifier,
-          redirectUri: p.redirectUri
+          code_verifier: p.codeVerifier,
+          redirect_uri: p.redirectUri
         }),
         signal
       },

@@ -966,7 +966,7 @@ test('socialLogin: providerFromLoginOption 大小写不敏感，认不出返回 
   assert.equal(providerFromLoginOption('builderId'), null)
 })
 
-test('socialLogin: exchangeSocialCode 的 URL / 方法 / 头 / camelCase 请求体', async () => {
+test('socialLogin: exchangeSocialCode 的 URL / 方法 / 头 / snake_case 请求体', async () => {
   resetAll()
   const calls = installFakeFetch(() => ({ json: { accessToken: 'AT', refreshToken: 'RT' } }))
   const out = await exchangeSocialCode({
@@ -982,14 +982,17 @@ test('socialLogin: exchangeSocialCode 的 URL / 方法 / 头 / camelCase 请求�
   // 交换这一条只带版本，不带 machineId（与 refreshToken 那条刻意不同）
   assert.equal(headers['User-Agent'], `KiroIDE-${KIRO_VERSION_FALLBACK}`)
   assert.ok(!headers['User-Agent'].includes(MID))
+  // 请求体是 snake_case（kiro.rs SocialCreateTokenRequest 无 rename_all）；
+  // 真机验证 2026-09-07：发 camelCase 上游 400 "redirectUri/codeVerifier must not be null"
   assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
     code: 'C1',
-    codeVerifier: 'V1',
-    redirectUri: 'http://127.0.0.1:3128/oauth/callback?login_option=Google'
+    code_verifier: 'V1',
+    redirect_uri: 'http://127.0.0.1:3128/oauth/callback?login_option=Google'
   })
-  // 没有 grant_type / client_id / code_verifier 蛇形键
+  // 没有 grant_type / client_id，也没有 camelCase 键
   assert.equal(String(calls[0].init.body).includes('grant_type'), false)
-  assert.equal(String(calls[0].init.body).includes('code_verifier'), false)
+  assert.equal(String(calls[0].init.body).includes('codeVerifier'), false)
+  assert.equal(String(calls[0].init.body).includes('redirectUri'), false)
   assert.equal(out.accessToken, 'AT')
   assert.equal(out.refreshToken, 'RT')
   assert.equal(out.expiresAt, undefined)
