@@ -17,7 +17,50 @@ export type SwitchTarget = 'auto' | 'ide' | 'cli' | 'both'
 export interface SwitchRefreshedCredentials {
   accessToken: string
   refreshToken: string
-  expiresIn: number
+  /** 上游返回的有效期（秒）；上游省略时 undefined */
+  expiresIn?: number
+  /** 绝对到期时间（毫秒 epoch）；undefined 表示沿用账号原有的值 */
+  expiresAt?: number
+}
+
+/** 写第二个目标时用的凭证（外加"上一步已经刷过了"的标记） */
+export interface SecondTargetCredentials {
+  accessToken: string
+  refreshToken: string
+  /**
+   * 上一步（写第一个目标时）已经 refresh 过。第二个目标必须原样落盘：
+   * 再刷一次会把刚写进第一个目标的 refreshToken 轮换作废，
+   * 那个客户端下次自刷就是 invalid_grant → 强制登出。
+   */
+  alreadyRefreshed: boolean
+  expiresIn?: number
+  expiresAt?: number
+}
+
+/**
+ * 组合切号里第二个目标该用哪份凭证。
+ * 有上一步的 refreshedCredentials 就用它并打上 alreadyRefreshed，
+ * 没有（上一步没跑或没回传）才让主进程自己刷一次。
+ */
+export function buildSecondTargetCredentials(
+  base: { accessToken?: string; refreshToken?: string; expiresAt?: number },
+  refreshed?: SwitchRefreshedCredentials
+): SecondTargetCredentials {
+  if (refreshed) {
+    return {
+      accessToken: refreshed.accessToken,
+      refreshToken: refreshed.refreshToken,
+      alreadyRefreshed: true,
+      expiresIn: refreshed.expiresIn,
+      expiresAt: refreshed.expiresAt
+    }
+  }
+  return {
+    accessToken: base.accessToken || '',
+    refreshToken: base.refreshToken || '',
+    alreadyRefreshed: false,
+    expiresAt: base.expiresAt
+  }
 }
 
 export interface SwitchOutcome {
@@ -105,9 +148,11 @@ export async function performAccountSwitch(
   const failures: Array<{ errorCode: string; errorDetail?: string }> = []
 
   if (wantIde) {
+    // IDE 通常是第一个目标，但 CLI 先跑的顺序也要兜住：已经刷过就原样落盘
+    const ideCreds = buildSecondTargetCredentials(credentials, outcome.refreshedCredentials)
     const result = await window.api.switchAccount({
-      accessToken: credentials.accessToken,
-      refreshToken: credentials.refreshToken || '',
+      accessToken: ideCreds.accessToken,
+      refreshToken: ideCreds.refreshToken,
       clientId: credentials.clientId || '',
       clientSecret: credentials.clientSecret || '',
       region,
@@ -115,7 +160,10 @@ export async function performAccountSwitch(
       authMethod: credentials.authMethod,
       provider: credentials.provider,
       profileArn,
-      accountId: account.id
+      accountId: account.id,
+      alreadyRefreshed: ideCreds.alreadyRefreshed,
+      expiresIn: ideCreds.expiresIn,
+      expiresAt: ideCreds.expiresAt
     })
     if (result?.success) {
       outcome.wroteIde = true
@@ -126,11 +174,13 @@ export async function performAccountSwitch(
   }
 
   if (wantCli) {
-    // IDE 那一步可能已经 rotate 过 refreshToken，这里必须用最新的，否则 CLI 拿到的是废票
-    const rc = outcome.refreshedCredentials
+    // IDE 那一步可能已经 rotate 过 refreshToken：这里既要用最新的那一对，
+    // 又必须带上 alreadyRefreshed —— 否则主进程会再刷一次，把刚写进 IDE
+    // 文件的 refreshToken 轮换作废，IDE 后续自刷必然 invalid_grant。
+    const cliCreds = buildSecondTargetCredentials(credentials, outcome.refreshedCredentials)
     const result = await window.api.switchAccountCli({
-      accessToken: rc?.accessToken || credentials.accessToken,
-      refreshToken: rc?.refreshToken || credentials.refreshToken || '',
+      accessToken: cliCreds.accessToken,
+      refreshToken: cliCreds.refreshToken,
       clientId: credentials.clientId,
       clientSecret: credentials.clientSecret,
       region,
@@ -138,7 +188,10 @@ export async function performAccountSwitch(
       profileArn,
       authMethod: credentials.authMethod,
       provider: credentials.provider,
-      accountId: account.id
+      accountId: account.id,
+      alreadyRefreshed: cliCreds.alreadyRefreshed,
+      expiresIn: cliCreds.expiresIn,
+      expiresAt: cliCreds.expiresAt
     })
     if (result?.success) {
       outcome.wroteCli = true

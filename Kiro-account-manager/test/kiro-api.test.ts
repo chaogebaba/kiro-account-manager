@@ -55,6 +55,7 @@ import {
   extractSubscriptionTitle
 } from '../src/main/kiroApi/usage'
 import { pickExternalRefreshToken } from '../src/main/externalRefresh'
+import { buildSecondTargetCredentials } from '../src/renderer/src/utils/accountSwitch'
 import {
   parseKiroVersionMetadata,
   refreshKiroVersion,
@@ -357,12 +358,14 @@ test('refresh: Social 端点/报文/轮换/expiresAt', async () => {
   resetAll()
 })
 
-test('refresh: Social 未轮换时回填入参 refreshToken，缺 expiresIn 用 3600', async () => {
+test('refresh: Social 未轮换时回填入参 refreshToken；缺 expiresIn 不编造有效期', async () => {
   resetAll()
   installFakeFetch(() => ({ json: { accessToken: 'AT' } }))
   const r = await refreshSocialToken(LONG_TOKEN)
   assert.equal(r.refreshToken, LONG_TOKEN)
-  assert.equal(r.expiresIn, 3600)
+  // 上游没给 ⇒ undefined，由调用方沿用账号原有的 expiresAt（不再默认 3600）
+  assert.equal(r.expiresIn, undefined)
+  assert.equal(r.expiresAt, undefined)
   resetAll()
 })
 
@@ -638,4 +641,92 @@ test('pickExternalRefreshToken: 注册后 readExternalRefreshToken 能拿到匹�
   })
   assert.equal(found, RT_A)
   resetAll()
+})
+
+
+// ============================ expiresIn 缺失 ============================
+
+test('refresh: 上游省略 expiresIn ⇒ expiresIn/expiresAt 均为 undefined（不编造 now+1h）', async () => {
+  resetAll()
+  installFakeFetch(() => ({ json: { accessToken: 'AT-no-exp' } }))
+  const r = await refreshSocialToken(LONG_TOKEN)
+  assert.equal(r.accessToken, 'AT-no-exp')
+  // 未轮换时回填入参
+  assert.equal(r.refreshToken, LONG_TOKEN)
+  assert.equal(r.expiresIn, undefined)
+  assert.equal(r.expiresAt, undefined)
+  resetAll()
+})
+
+test('refresh: 上游给了 expiresIn ⇒ expiresAt = now + expiresIn*1000', async () => {
+  resetAll()
+  const before = Date.now()
+  installFakeFetch(() => ({ json: { accessToken: 'AT', expiresIn: 1800 } }))
+  const r = await refreshSocialToken(LONG_TOKEN)
+  assert.equal(r.expiresIn, 1800)
+  assert.ok(r.expiresAt !== undefined)
+  assert.ok(r.expiresAt >= before + 1800 * 1000)
+  assert.ok(r.expiresAt <= Date.now() + 1800 * 1000)
+  resetAll()
+})
+
+test('refresh: expiresIn 非法（0 / 负数 / NaN）同样视为未给出', async () => {
+  for (const bad of [0, -1, 'x']) {
+    resetAll()
+    installFakeFetch(() => ({ json: { accessToken: 'AT', expiresIn: bad } }))
+    const r = await refreshSocialToken(LONG_TOKEN)
+    assert.equal(r.expiresIn, undefined, `expiresIn=${String(bad)}`)
+    assert.equal(r.expiresAt, undefined, `expiresIn=${String(bad)}`)
+  }
+  resetAll()
+})
+
+// ============================ 组合切号：不得二次刷新 ============================
+
+test('buildSecondTargetCredentials: 上一步刷过 ⇒ 带 alreadyRefreshed 并原样透传', () => {
+  const base = { accessToken: 'AT1', refreshToken: 'RT1', expiresAt: 111 }
+  const out = buildSecondTargetCredentials(base, {
+    accessToken: 'AT2',
+    refreshToken: 'RT2',
+    expiresIn: 1800,
+    expiresAt: 222
+  })
+  assert.deepEqual(out, {
+    accessToken: 'AT2',
+    refreshToken: 'RT2',
+    alreadyRefreshed: true,
+    expiresIn: 1800,
+    expiresAt: 222
+  })
+})
+
+test('buildSecondTargetCredentials: 上一步没刷 ⇒ 用账号原凭证，由主进程去刷', () => {
+  const out = buildSecondTargetCredentials(
+    { accessToken: 'AT1', refreshToken: 'RT1', expiresAt: 111 },
+    undefined
+  )
+  assert.deepEqual(out, {
+    accessToken: 'AT1',
+    refreshToken: 'RT1',
+    alreadyRefreshed: false,
+    expiresAt: 111
+  })
+})
+
+test('buildSecondTargetCredentials: 缺字段时补空串，不产生 undefined 落盘', () => {
+  const out = buildSecondTargetCredentials({}, undefined)
+  assert.equal(out.accessToken, '')
+  assert.equal(out.refreshToken, '')
+  assert.equal(out.alreadyRefreshed, false)
+})
+
+test('buildSecondTargetCredentials: 上一步刷过但没给有效期 ⇒ expiresIn/expiresAt 保持 undefined', () => {
+  const out = buildSecondTargetCredentials(
+    { accessToken: 'AT1', refreshToken: 'RT1', expiresAt: 111 },
+    { accessToken: 'AT2', refreshToken: 'RT2' }
+  )
+  assert.equal(out.alreadyRefreshed, true)
+  assert.equal(out.expiresIn, undefined)
+  // 上一步没给到期时间时不回填旧值：调用方（主进程）会沿用账号原有的 expiresAt
+  assert.equal(out.expiresAt, undefined)
 })

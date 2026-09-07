@@ -116,7 +116,6 @@ export function classifyRefreshError(
   let errorMsg: string
   if (status === 401) errorMsg = 'OAuth 凭证已过期或无效，需要重新认证'
   else if (status === 403) errorMsg = '权限不足，无法刷新 Token'
-  else if (status === 429) errorMsg = '请求过于频繁，已被限流'
   else if (status >= 500 && status <= 599) errorMsg = '服务器错误，AWS OAuth 服务暂时不可用'
   else errorMsg = 'Token 刷新失败'
 

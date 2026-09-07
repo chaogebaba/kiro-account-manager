@@ -56,7 +56,10 @@ function applyRefreshedCredentials(
         ...acc.credentials,
         accessToken: rc.accessToken,
         refreshToken: rc.refreshToken,
-        expiresAt: Date.now() + rc.expiresIn * 1000
+        // 上游没给有效期 ⇒ 保留账号原有的 expiresAt
+        expiresAt:
+          rc.expiresAt ??
+          (rc.expiresIn ? Date.now() + rc.expiresIn * 1000 : acc.credentials.expiresAt)
       }
     })
     return { accounts }
@@ -1482,6 +1485,12 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
           if (acc) {
             // Enterprise 账号刷新时主进程会返回真实 profileArn，持久化避免后续重复获取
             const resolvedProfileArn = result.data!.profileArn || acc.credentials.profileArn || acc.profileArn
+            // 上游省略 expiresIn / expiresAt ⇒ 保留账号原有的到期时间，不编造 now+1h
+            const resolvedExpiresAt =
+              result.data!.expiresAt ??
+              (result.data!.expiresIn
+                ? Date.now() + result.data!.expiresIn * 1000
+                : acc.credentials.expiresAt)
             accounts.set(id, {
               ...acc,
               profileArn: resolvedProfileArn,
@@ -1490,7 +1499,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
                 accessToken: result.data!.accessToken,
                 // 如果返回了新的 refreshToken，更新它
                 refreshToken: result.data!.refreshToken || acc.credentials.refreshToken,
-                expiresAt: Date.now() + result.data!.expiresIn * 1000,
+                expiresAt: resolvedExpiresAt,
                 profileArn: resolvedProfileArn
               },
               status: 'active',
@@ -1540,6 +1549,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         accessToken?: string
         provider?: string
         profileArn?: string
+        expiresAt?: number
       }
     }> = []
 
@@ -1559,7 +1569,8 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
           authMethod: account.credentials.authMethod,
           accessToken: account.credentials.accessToken,
           provider: account.credentials.provider || account.idp,
-          profileArn: account.credentials.profileArn
+          profileArn: account.credentials.profileArn,
+          expiresAt: account.credentials.expiresAt
         }
       })
     }
@@ -1599,12 +1610,16 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
           const acc = accounts.get(id)
           if (acc) {
             // 如果 token 被刷新，更新凭证
+            // 刷新响应回带的 profileArn 有则覆盖，绝不清空（顶层与 credentials 两个槽位都写）
+            const checkProfileArn =
+              result.data!.newCredentials?.profileArn || acc.credentials.profileArn || acc.profileArn
             const updatedCredentials = result.data!.newCredentials 
               ? {
                   ...acc.credentials,
                   accessToken: result.data!.newCredentials.accessToken,
                   refreshToken: result.data!.newCredentials.refreshToken ?? acc.credentials.refreshToken,
-                  expiresAt: result.data!.newCredentials.expiresAt ?? acc.credentials.expiresAt
+                  expiresAt: result.data!.newCredentials.expiresAt ?? acc.credentials.expiresAt,
+                  profileArn: checkProfileArn
                 }
               : acc.credentials
 
@@ -1646,6 +1661,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
 
             accounts.set(id, {
               ...acc,
+              ...(checkProfileArn ? { profileArn: checkProfileArn } : {}),
               // 更新邮箱（如果 API 返回了）
               email: result.data!.email ?? acc.email,
               userId: result.data!.userId ?? acc.userId,
@@ -2512,6 +2528,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         accessToken?: string
         provider?: string
         profileArn?: string
+        expiresAt?: number
       }
     }> = []
     
@@ -2542,7 +2559,8 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
             authMethod: account.credentials.authMethod,
             accessToken: account.credentials.accessToken,
             provider: account.credentials.provider,
-            profileArn: account.credentials.profileArn
+            profileArn: account.credentials.profileArn,
+            expiresAt: account.credentials.expiresAt
           }
         })
       }
@@ -2625,6 +2643,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         status?: string
         accountStatus?: 'throttled' | 'suspended'
         errorMessage?: string
+        expiresAt?: number
       } | undefined
 
       // 检测封禁 / 限流状态（accountStatus 优先于粗粒度的 status）
@@ -2650,7 +2669,12 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
           ...account.credentials,
           accessToken: refreshData?.accessToken || account.credentials.accessToken,
           refreshToken: refreshData?.refreshToken || account.credentials.refreshToken,
-          expiresAt: refreshData?.expiresIn ? now + refreshData.expiresIn * 1000 : account.credentials.expiresAt,
+          // 上游没给有效期 ⇒ 保留账号原有的 expiresAt
+          expiresAt:
+            refreshData?.expiresAt ??
+            (refreshData?.expiresIn
+              ? now + refreshData.expiresIn * 1000
+              : account.credentials.expiresAt),
           ...(bgProfileArn ? { profileArn: bgProfileArn } : {})
         },
         usage: refreshData?.usage ? (() => {

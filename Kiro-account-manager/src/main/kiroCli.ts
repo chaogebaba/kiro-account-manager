@@ -185,8 +185,10 @@ function openSqlite3Binary(dbPath: string): SqliteRunner {
   const { execFileSync } = require('child_process') as typeof import('child_process')
   const bin = process.platform === 'win32' ? 'sqlite3.exe' : 'sqlite3'
   const pending: string[] = []
+  // -bail：第一条失败的语句立刻中止整批。没有它，sqlite3 会跳过报错的语句继续跑到
+  // COMMIT，把半截写入提交掉；而 JS 侧的 ROLLBACK 只会被追加到 COMMIT 之后，形同虚设。
   const call = (input: string, json: boolean): string =>
-    execFileSync(bin, json ? ['-json', dbPath] : [dbPath], {
+    execFileSync(bin, json ? ['-bail', '-json', dbPath] : ['-bail', dbPath], {
       input,
       timeout: 10000,
       encoding: 'utf-8'
@@ -208,10 +210,14 @@ function openSqlite3Binary(dbPath: string): SqliteRunner {
       pending.push(sql.trim().endsWith(';') ? sql : sql + ';')
     },
     close() {
-      if (pending.length) {
-        call(pending.join('\n') + '\n', false)
-        pending.length = 0
-      }
+      if (!pending.length) return
+      const batch = pending.join('\n')
+      pending.length = 0
+      // 整批必须在一个显式事务里：配合 -bail，中途失败时 COMMIT 根本不会执行，
+      // 未提交的事务随 sqlite3 进程退出被自动回滚。
+      const alreadyWrapped = /(^|\n)\s*BEGIN\b/i.test(batch)
+      const sql = alreadyWrapped ? batch : `BEGIN;\n${batch}\nCOMMIT;`
+      call(sql + '\n', false)
     }
   }
 }
@@ -382,6 +388,10 @@ export function writeKiroCliAuth(
 
   const isSocial = input.authMethod === 'social'
   const tokenKey = isSocial ? KIROCLI_SOCIAL_TOKEN_KEY : KIROCLI_IDC_TOKEN_KEY
+  // 非有限值会让 toISOString() 抛 RangeError，把整次切号变成一句看不懂的报错
+  if (!Number.isFinite(input.expiresAt)) {
+    throw new Error(`KIRO_CLI_INVALID_EXPIRES_AT: ${String(input.expiresAt)}`)
+  }
   const expiresAtIso = new Date(input.expiresAt).toISOString()
 
   let record: Record<string, unknown>

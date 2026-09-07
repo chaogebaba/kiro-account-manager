@@ -28,10 +28,16 @@ export interface RefreshResult {
   accessToken: string
   /** 轮换后的 refreshToken；上游未轮换时回填入参值。必须持久化。 */
   refreshToken: string
-  /** 毫秒 epoch */
-  expiresAt: number
+  /**
+   * 毫秒 epoch。上游没给 expiresIn 时为 undefined —— 调用方必须保留原有的
+   * expiresAt（newExpiresAt ?? oldExpiresAt），绝不能凭空补一个 now+1h：
+   * 那会让一张实际还能用很久（或已经快过期）的 token 带上假的到期时间，
+   * 把主动续期和过期判定全部带偏。
+   */
+  expiresAt?: number
   profileArn?: string
-  expiresIn: number
+  /** 上游返回的有效期（秒）。上游未给出时为 undefined。 */
+  expiresIn?: number
 }
 
 export const DEFAULT_AUTH_REGION = 'us-east-1'
@@ -143,14 +149,15 @@ function toResult(data: RefreshResponseBody, fallbackRefreshToken: string): Refr
   if (!data.accessToken) {
     throw new Error('Token 刷新响应缺少 accessToken')
   }
+  // 上游省略 expiresIn 时不编造有效期：留 undefined，由调用方沿用旧的 expiresAt
   const expiresIn =
     typeof data.expiresIn === 'number' && Number.isFinite(data.expiresIn) && data.expiresIn > 0
       ? data.expiresIn
-      : DEFAULT_EXPIRES_IN
+      : undefined
   return {
     accessToken: data.accessToken,
     refreshToken: data.refreshToken || fallbackRefreshToken,
-    expiresAt: Date.now() + expiresIn * 1000,
+    expiresAt: expiresIn === undefined ? undefined : Date.now() + expiresIn * 1000,
     profileArn: data.profileArn,
     expiresIn
   }

@@ -78,6 +78,8 @@ const api = {
       authMethod?: string
       accessToken?: string
       provider?: string
+      /** 账号当前的到期时间；上游省略 expiresIn 时沿用它 */
+      expiresAt?: number
     }
   }>, concurrency?: number, syncInfo?: boolean): Promise<{ success: boolean; completed: number; successCount: number; failedCount: number }> => {
     return ipcRenderer.invoke('background-batch-refresh', accounts, concurrency, syncInfo)
@@ -159,10 +161,14 @@ const api = {
     provider?: 'BuilderId' | 'Github' | 'Google' | 'Enterprise'
     profileArn?: string
     accountId?: string
+    /** 上一步已 refresh 过：原样落盘，不得再刷（否则把上一步写出去的 refreshToken 轮换作废） */
+    alreadyRefreshed?: boolean
+    expiresIn?: number
+    expiresAt?: number
   }): Promise<{
     success: boolean
     error?: string
-    refreshedCredentials?: { accessToken: string; refreshToken: string; expiresIn: number }
+    refreshedCredentials?: { accessToken: string; refreshToken: string; expiresIn?: number; expiresAt?: number }
   }> => {
     return ipcRenderer.invoke('switch-account', credentials)
   },
@@ -215,12 +221,16 @@ const api = {
     provider?: string
     scopes?: string[]
     accountId?: string
+    /** 上一步已 refresh 过：原样落盘，不得再刷 */
+    alreadyRefreshed?: boolean
+    expiresIn?: number
+    expiresAt?: number
   }): Promise<{
     success: boolean
     errorCode?: string
     errorDetail?: string
     dbPath?: string
-    refreshedCredentials?: { accessToken: string; refreshToken: string; expiresIn: number }
+    refreshedCredentials?: { accessToken: string; refreshToken: string; expiresIn?: number; expiresAt?: number }
   }> => {
     return ipcRenderer.invoke('switch-account-cli', credentials)
   },

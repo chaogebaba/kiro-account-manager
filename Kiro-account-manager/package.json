@@ -21,6 +21,7 @@
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:linux": "electron-vite build && electron-builder --linux",
     "test:kiroapi": "bun test test/kiro-api.test.ts",
+    "test:kirocli": "node --test test/kiro-cli-sync.test.mjs",
     "test:e2e": "node test/e2e-fullsuite/run.mjs",
     "test:e2e:only": "node test/e2e-fullsuite/run.mjs --only"
   },

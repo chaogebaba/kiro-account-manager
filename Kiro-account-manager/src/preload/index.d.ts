@@ -74,7 +74,10 @@ interface RefreshResult {
   data?: {
     accessToken: string
     refreshToken?: string
-    expiresIn: number
+    /** 上游返回的有效期（秒）。上游省略时为 undefined —— 调用方保留原有到期时间 */
+    expiresIn?: number
+    /** 绝对到期时间（毫秒 epoch）。undefined 表示"沿用旧值" */
+    expiresAt?: number
     /**
      * 反代在 main 进程中是否已经把新 token 同步写入 ~/.aws/sso/cache/kiro-auth-token.json。
      * 仅当该账号被识别为 Kiro IDE 当前激活账号时才会同步，否则为 false。
@@ -152,6 +155,8 @@ interface StatusResult {
       accessToken: string
       refreshToken?: string
       expiresAt?: number
+      /** 刷新响应回带的 profileArn（有则覆盖，绝不清空） */
+      profileArn?: string
     }
   }
   error?: { message: string } & AccountErrorSignals
@@ -183,6 +188,8 @@ interface KiroApi {
       authMethod?: string
       accessToken?: string
       provider?: string
+      /** 账号当前的到期时间；上游省略 expiresIn 时沿用它 */
+      expiresAt?: number
     }
   }>, concurrency?: number, syncInfo?: boolean) => Promise<{ success: boolean; completed: number; successCount: number; failedCount: number }>
   onBackgroundRefreshProgress: (callback: (data: { completed: number; total: number; success: number; failed: number }) => void) => () => void
@@ -221,6 +228,10 @@ interface KiroApi {
     profileArn?: string
     /** 反代 store 里的 account.id，用于 main 进程记忆 lastSwitchedAccountId 供 watcher 反向同步 */
     accountId?: string
+    /** 上一步已 refresh 过：原样落盘，不得再刷（否则把上一步写出去的 refreshToken 轮换作废） */
+    alreadyRefreshed?: boolean
+    expiresIn?: number
+    expiresAt?: number
   }) => Promise<{
     success: boolean
     error?: string
@@ -228,7 +239,10 @@ interface KiroApi {
     refreshedCredentials?: {
       accessToken: string
       refreshToken: string
-      expiresIn: number
+      /** 上游返回的有效期（秒）；上游省略时 undefined */
+      expiresIn?: number
+      /** 绝对到期时间（毫秒 epoch）；undefined 表示沿用账号原有的值 */
+      expiresAt?: number
     }
   }>
 
@@ -271,6 +285,10 @@ interface KiroApi {
     provider?: string
     scopes?: string[]
     accountId?: string
+    /** 上一步已 refresh 过：原样落盘，不得再刷 */
+    alreadyRefreshed?: boolean
+    expiresIn?: number
+    expiresAt?: number
   }) => Promise<{
     success: boolean
     /** i18n 错误码，renderer 用 t(`errors.${errorCode}`) 展示 */
@@ -279,7 +297,12 @@ interface KiroApi {
     errorDetail?: string
     dbPath?: string
     /** 切号前 main 进程会做一次 refresh；这是最新（可能已 rotate）的凭证 */
-    refreshedCredentials?: { accessToken: string; refreshToken: string; expiresIn: number }
+    refreshedCredentials?: {
+      accessToken: string
+      refreshToken: string
+      expiresIn?: number
+      expiresAt?: number
+    }
   }>
 
   // 检查 Kiro IDE 是否已安装

@@ -1,7 +1,7 @@
 /**
  * kiro-cli 认证同步单元测试
  *
- * 运行： node --test test/kiro-cli-sync.test.mjs
+ * 运行： bun run test:kirocli   （等价于 node --test test/kiro-cli-sync.test.mjs）
  * （Node 22 内置 TypeScript type-stripping，可直接 import src/main/kiroCli.ts）
  *
  * 安全约定：
@@ -17,7 +17,17 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { execFileSync } from 'node:child_process'
 
-const SCRATCH = process.env.KIRO_CLI_TEST_DIR || '/data/claude-scratch/worker-scratch/wp-a/xdg'
+// 临时 XDG_DATA_HOME 的落地目录。默认写外置 SSD（/data），绝不写 /tmp、$HOME 或仓库里；
+// /data 不可用时用 KIRO_CLI_TEST_DIR 显式指定一个别的目录。
+const SCRATCH =
+  process.env.KIRO_CLI_TEST_DIR || '/data/claude-scratch/worker-scratch/kiro-cli-test/xdg'
+
+if (!process.env.KIRO_CLI_TEST_DIR && !fs.existsSync('/data')) {
+  throw new Error(
+    '/data 未挂载：请挂载后重跑，或用 KIRO_CLI_TEST_DIR 指定一个可写的临时目录。' +
+      '（本测试不会退回 /tmp 或 $HOME）'
+  )
+}
 const SOCIAL_ARN = 'arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK'
 const BUILDER_ARN = 'arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX'
 
@@ -62,7 +72,7 @@ function seedDb(xdgHome) {
 const kiroCliAvailable = hasKiroCli()
 
 // 动态 import，避免 kiroCli.ts 里读到宿主的 XDG_DATA_HOME
-const mod = await import('../Kiro-account-manager/src/main/kiroCli.ts')
+const mod = await import('../src/main/kiroCli.ts')
 const {
   readKiroCliAuth,
   writeKiroCliAuth,
