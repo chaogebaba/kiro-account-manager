@@ -42,6 +42,7 @@ import {
   refreshTokenWithReload,
   resolveAuthMethod,
   setExternalRefreshTokenReader,
+  readExternalRefreshToken,
   validateRefreshTokenStr
 } from '../src/main/kiroApi/refresh'
 import {
@@ -53,6 +54,7 @@ import {
   extractEmail,
   extractSubscriptionTitle
 } from '../src/main/kiroApi/usage'
+import { pickExternalRefreshToken } from '../src/main/externalRefresh'
 import {
   parseKiroVersionMetadata,
   refreshKiroVersion,
@@ -555,5 +557,85 @@ test('version: 拉取成功后 headers 用实时版本；失败静默回退', as
     buildSocialRefreshHeaders(MID)['User-Agent'],
     `KiroIDE-${KIRO_VERSION_FALLBACK}-${MID}`
   )
+  resetAll()
+})
+
+
+// ============ 外部凭证源匹配（integration: setExternalRefreshTokenReader 注册的那个 reader） ============
+
+/** 造一个只有 payload 有意义的假 JWT（parseAccessTokenClaims 不校验签名） */
+function fakeJwt(payload: Record<string, unknown>): string {
+  const b64 = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  return `header.${b64}.sig`
+}
+
+const RT_A = 'a'.repeat(120)
+const RT_B = 'b'.repeat(120)
+const RT_STALE = 's'.repeat(120)
+
+test('pickExternalRefreshToken: JWT sub 命中对应候选', () => {
+  const account = {
+    email: 'alice@example.com',
+    refreshToken: RT_STALE,
+    accessToken: fakeJwt({ sub: 'user-1', email: 'alice@example.com' })
+  }
+  const candidates = [
+    { refreshToken: RT_B, accessToken: fakeJwt({ sub: 'user-2', email: 'bob@example.com' }) },
+    { refreshToken: RT_A, accessToken: fakeJwt({ sub: 'user-1', email: 'alice@example.com' }) }
+  ]
+  assert.equal(pickExternalRefreshToken(account, candidates), RT_A)
+})
+
+test('pickExternalRefreshToken: sub 缺失时回落到 email 匹配', () => {
+  const account = { email: 'alice@example.com', refreshToken: RT_STALE }
+  const candidates = [
+    { refreshToken: RT_B, accessToken: fakeJwt({ email: 'bob@example.com' }) },
+    { refreshToken: RT_A, accessToken: fakeJwt({ email: 'ALICE@example.com' }) }
+  ]
+  assert.equal(pickExternalRefreshToken(account, candidates), RT_A)
+})
+
+test('pickExternalRefreshToken: 匹配不上任何候选时返回 undefined（绝不乱串号）', () => {
+  const account = {
+    email: 'alice@example.com',
+    refreshToken: RT_STALE,
+    accessToken: fakeJwt({ sub: 'user-1' })
+  }
+  const candidates = [
+    { refreshToken: RT_B, accessToken: fakeJwt({ sub: 'user-2', email: 'bob@example.com' }) }
+  ]
+  assert.equal(pickExternalRefreshToken(account, candidates), undefined)
+})
+
+test('pickExternalRefreshToken: 候选与账号持有的是同一张票 ⇒ 视为无更新', () => {
+  const account = {
+    email: 'alice@example.com',
+    refreshToken: RT_A,
+    accessToken: fakeJwt({ sub: 'user-1' })
+  }
+  const candidates = [{ refreshToken: RT_A, accessToken: fakeJwt({ sub: 'user-1' }) }]
+  assert.equal(pickExternalRefreshToken(account, candidates), undefined)
+})
+
+test('pickExternalRefreshToken: 账号没有任何身份信息时不做猜测', () => {
+  assert.equal(
+    pickExternalRefreshToken({ refreshToken: RT_STALE }, [{ refreshToken: RT_A }]),
+    undefined
+  )
+  assert.equal(pickExternalRefreshToken({ email: 'a@b.c' }, []), undefined)
+})
+
+test('pickExternalRefreshToken: 注册后 readExternalRefreshToken 能拿到匹配结果', async () => {
+  resetAll()
+  const candidates = [
+    { refreshToken: RT_A, accessToken: fakeJwt({ sub: 'user-1', email: 'alice@example.com' }) }
+  ]
+  setExternalRefreshTokenReader(async (acc) => pickExternalRefreshToken(acc, candidates))
+  const found = await readExternalRefreshToken({
+    email: 'alice@example.com',
+    refreshToken: RT_STALE,
+    accessToken: fakeJwt({ sub: 'user-1' })
+  })
+  assert.equal(found, RT_A)
   resetAll()
 })

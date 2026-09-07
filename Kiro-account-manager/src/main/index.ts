@@ -45,6 +45,7 @@ import {
   LOCAL_CREDENTIALS_NO_CLIENT_REGISTRATION,
   type LocalCredentialCandidate
 } from './localCredentials'
+import { pickExternalRefreshToken } from './externalRefresh'
 import { openaiToKiro } from './proxy/translator'
 import { getSystemProxy, safeCreateProxyAgent } from './proxy/systemProxy'
 import { proxyLogStore, interceptConsole } from './proxy/logger'
@@ -2536,6 +2537,19 @@ app.whenReady().then(async () => {
   kiroApi.setKiroApiFetch((url, init, proxyUrl) => fetchWithAppProxy(url, init, proxyUrl))
   // 实时 Kiro IDE 版本：24h 缓存写 electron-store，启动即拉一次；失败忽略（回退常量）
   void initKiroVersionRefresh()
+
+  // invalid_grant 回源重读：kiro-cli / Kiro IDE 可能已经自己 rotate 过 refreshToken。
+  // 见 kiroApi/refresh.readExternalRefreshToken（kiro.rs try_reload_credential_from_file）。
+  // 任何异常都吞掉——这只是一次「碰运气」的补救，绝不能让刷新链路因此抛错。
+  kiroApi.setExternalRefreshTokenReader(async (account) => {
+    try {
+      const candidates = await collectLocalCredentialCandidates()
+      return pickExternalRefreshToken(account, candidates)
+    } catch (e) {
+      console.warn('[ExternalRefresh] failed to re-read local credentials:', e)
+      return undefined
+    }
+  })
 
   // 启动 Kiro IDE token 文件监听（反向同步：IDE 自己 refresh 后把新 token 同步回反代 store）
   // 见 syncIdeTokenChangeToStore 注释
@@ -5043,14 +5057,23 @@ app.whenReady().then(async () => {
       let finalRefreshToken = refreshToken
       let finalExpiresIn = 3600
 
+      // 账号绑定的代理：切号前的这次 refresh 也必须走它，否则该账号的出口 IP 会在切号时漂移
+      const boundProxyUrl = proxyServer
+        ? proxyServer.getAccountPool().getAccount(accountId || '')?.proxyUrl
+        : undefined
+
       if (refreshToken) {
-        console.log(`[Switch CLI] Refreshing token before switch (authMethod: ${authMethod})...`)
+        console.log(
+          `[Switch CLI] Refreshing token before switch (authMethod: ${authMethod})...${boundProxyUrl ? ' [via bound proxy]' : ''}`
+        )
         const refreshResult = await refreshTokenByMethod(
           refreshToken,
           clientId || '',
           clientSecret || '',
           region,
-          authMethod
+          authMethod,
+          boundProxyUrl,
+          { accountId, provider }
         )
         if (refreshResult.success && refreshResult.accessToken) {
           finalAccessToken = refreshResult.accessToken
