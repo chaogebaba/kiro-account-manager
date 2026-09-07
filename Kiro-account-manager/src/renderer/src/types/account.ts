@@ -6,7 +6,16 @@ export type IdpType = 'Google' | 'Github' | 'BuilderId' | 'Enterprise' | 'AWSIdC
 
 export type SubscriptionType = 'Free' | 'Pro' | 'Pro_Plus' | 'Enterprise' | 'Teams'
 
-export type AccountStatus = 'active' | 'expired' | 'error' | 'refreshing' | 'unknown'
+// 'throttled'  上游 429 / 账号级风控：账号本身有效，只是被限流，不得当作失效
+// 'suspended'  上游 403 正文同时出现 suspended + locked your account：终态，需人工联系客服
+export type AccountStatus =
+  | 'active'
+  | 'expired'
+  | 'error'
+  | 'refreshing'
+  | 'unknown'
+  | 'throttled'
+  | 'suspended'
 
 /**
  * 账号凭证信息

@@ -25,6 +25,12 @@ import {
   resolveProfileArnForWrite,
   KIRO_AUTH_TOKEN_PATH
 } from './kiroAuthSync'
+import * as kiroApi from './kiroApi'
+import {
+  RefreshTokenInvalidError,
+  UpstreamRateLimitError,
+  classifyAccountStatusFromError
+} from './kiroApi/errors'
 import { openaiToKiro } from './proxy/translator'
 import { getSystemProxy, safeCreateProxyAgent } from './proxy/systemProxy'
 import { proxyLogStore, interceptConsole } from './proxy/logger'
@@ -99,31 +105,8 @@ function setupAutoUpdater(): void {
 
 // ============ Kiro API 调用 ============
 const KIRO_API_BASE = 'https://app.kiro.dev/service/KiroWebPortalService/operation'
-// REST API 端点配置 - 官方 Kiro 插件仅支持 us-east-1 和 eu-central-1
-const KIRO_REST_API_ENDPOINTS: Record<string, string> = {
-  'us-east-1': 'https://q.us-east-1.amazonaws.com',
-  'eu-central-1': 'https://q.eu-central-1.amazonaws.com'
-}
-
-// 根据 SSO 区域映射到最近的 REST API 端点
-function getRestApiBase(ssoRegion?: string): string {
-  if (!ssoRegion) return KIRO_REST_API_ENDPOINTS['us-east-1']
-  // 如果是支持的端点区域，直接使用
-  if (KIRO_REST_API_ENDPOINTS[ssoRegion]) return KIRO_REST_API_ENDPOINTS[ssoRegion]
-  // EU 区域映射到 eu-central-1
-  if (ssoRegion.startsWith('eu-')) return KIRO_REST_API_ENDPOINTS['eu-central-1']
-  // 其他区域默认 us-east-1
-  return KIRO_REST_API_ENDPOINTS['us-east-1']
-}
-
-// 获取备用 REST API 端点（用于 fallback）
-function getFallbackRestApiBase(ssoRegion?: string): string {
-  const primary = getRestApiBase(ssoRegion)
-  // 返回另一个端点作为 fallback
-  return primary === KIRO_REST_API_ENDPOINTS['eu-central-1']
-    ? KIRO_REST_API_ENDPOINTS['us-east-1']
-    : KIRO_REST_API_ENDPOINTS['eu-central-1']
-}
+// REST API 端点区域选择已迁移到 kiroApi/usage.ts（restApiRegionCandidates / usageApiHost），
+// 与 kiro.rs rest_api_region_candidates 一致：eu-* → [eu-central-1, us-east-1]，否则反之。
 
 // API 类型配置
 type UsageApiType = 'rest' | 'cbor'
@@ -205,9 +188,20 @@ function getKProxyAgent(): Dispatcher | undefined {
 interface OidcRefreshResult {
   success: boolean
   accessToken?: string
+  /** 轮换后的 refreshToken（上游未轮换时回填入参值）。调用方必须持久化。 */
   refreshToken?: string
   expiresIn?: number
+  /** 毫秒 epoch，等价于 Date.now() + expiresIn * 1000 */
+  expiresAt?: number
+  /** 上游在刷新响应里回带的 profileArn（有则覆盖，绝不清空） */
+  profileArn?: string
   error?: string
+  /** 上游 429：临时限流，不代表凭据失效，绝不能据此把账号标记为 error */
+  rateLimited?: boolean
+  /** Retry-After（毫秒），上游未给出时 undefined */
+  retryAfterMs?: number
+  /** 400 + invalid_grant：refreshToken 永久失效 */
+  invalidGrant?: boolean
 }
 
 // 社交登录 (GitHub/Google) 的 Token 刷新端点
@@ -376,15 +370,17 @@ function initProxyServer(): ProxyServer {
             account.clientSecret || '',
             account.region || 'us-east-1',
             account.authMethod,
-            account.proxyUrl  // 账号绑定的代理（如有）
+            account.proxyUrl,  // 账号绑定的代理（如有）
+            { accountId: account.id, email: account.email, provider: account.provider }
           )
 
           if (refreshResult.success && refreshResult.accessToken) {
             return {
               success: true,
               accessToken: refreshResult.accessToken,
+              // 轮换后的 refreshToken：池必须写回，否则下轮用旧 token 会 invalid_grant
               refreshToken: refreshResult.refreshToken,
-              expiresAt: Date.now() + (refreshResult.expiresIn || 3600) * 1000
+              expiresAt: refreshResult.expiresAt ?? Date.now() + (refreshResult.expiresIn || 3600) * 1000
             }
           }
           return { success: false, error: refreshResult.error || 'Token 刷新失败' }
@@ -658,133 +654,81 @@ function openBrowserInPrivateMode(url: string): void {
   }
 }
 
-// IdC (BuilderId) 的 OIDC Token 刷新
-async function refreshOidcToken(
-  refreshToken: string,
-  clientId: string,
-  clientSecret: string,
-  region: string = 'us-east-1',
-  proxyUrl?: string  // 账号绑定的代理 URL（可选，优先级最高）
+/**
+ * 把 kiroApi 的「抛异常」契约转成老的 `{success, ...}` 形状，并保留错误分类信息。
+ * - 429 → rateLimited=true（调用方不得据此判定账号失效）
+ * - invalid_grant → invalidGrant=true
+ */
+async function toLegacyRefreshResult(
+  run: () => Promise<kiroApi.RefreshResult>,
+  logTag: string
 ): Promise<OidcRefreshResult> {
-  console.log(`[OIDC] Refreshing token with clientId: ${clientId.substring(0, 20)}...${proxyUrl ? ' [via bound proxy]' : ''}`)
-
-  const url = `https://oidc.${region}.amazonaws.com/token`
-
-  const payload = {
-    clientId,
-    clientSecret,
-    refreshToken,
-    grantType: 'refresh_token'
-  }
-
   try {
-    const response = await fetchWithAppProxy(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    }, proxyUrl)
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`[OIDC] Refresh failed: ${response.status} - ${errorText}`)
-      return { success: false, error: `HTTP ${response.status}: ${errorText}` }
-    }
-    
-    const data = await response.json()
-    console.log(`[OIDC] Token refreshed successfully, expires in ${data.expiresIn}s`)
-    
+    const r = await run()
+    console.log(`${logTag} Token refreshed successfully, expires in ${r.expiresIn}s`)
     return {
       success: true,
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken || refreshToken, // 可能不返回新的 refreshToken
-      expiresIn: data.expiresIn
+      accessToken: r.accessToken,
+      refreshToken: r.refreshToken,
+      expiresIn: r.expiresIn,
+      expiresAt: r.expiresAt,
+      profileArn: r.profileArn
     }
   } catch (error) {
-    console.error(`[OIDC] Refresh error:`, error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    if (error instanceof UpstreamRateLimitError) {
+      console.warn(`${logTag} Rate limited by upstream: ${error.message}`)
+      return {
+        success: false,
+        error: error.message,
+        rateLimited: true,
+        retryAfterMs: error.retryAfterMs
+      }
+    }
+    if (error instanceof RefreshTokenInvalidError) {
+      console.error(`${logTag} refreshToken permanently invalid: ${error.message}`)
+      return { success: false, error: error.message, invalidGrant: true }
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error(`${logTag} Refresh error:`, message)
+    return { success: false, error: message }
   }
 }
 
-// 社交登录 (GitHub/Google) 的 Token 刷新
-async function refreshSocialToken(
-  refreshToken: string,
-  proxyUrl?: string  // 账号绑定的代理 URL（可选，优先级最高）
-): Promise<OidcRefreshResult> {
-  console.log(`[Social] Refreshing token...${proxyUrl ? ' [via bound proxy]' : ''}`)
-
-  const url = `${KIRO_AUTH_ENDPOINT}/refreshToken`
-  const machineId = getCurrentMachineId()
-
-  try {
-    const response = await fetchWithAppProxy(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': getKiroUserAgent(machineId)
-      },
-      body: JSON.stringify({ refreshToken })
-    }, proxyUrl)
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`[Social] Refresh failed: ${response.status} - ${errorText}`)
-      return { success: false, error: `HTTP ${response.status}: ${errorText}` }
-    }
-    
-    const data = await response.json()
-    console.log(`[Social] Token refreshed successfully, expires in ${data.expiresIn}s`)
-    
-    return {
-      success: true,
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken || refreshToken,
-      expiresIn: data.expiresIn
-    }
-  } catch (error) {
-    console.error(`[Social] Refresh error:`, error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
-  }
-}
-
-// 通用 Token 刷新 - 根据 authMethod 选择刷新方式
+/**
+ * 通用 Token 刷新 —— 旧的位置参数签名保留为 wrapper（调用方无需改动），
+ * 内部走 kiroApi/refresh 的 authMethod 分派：
+ *   显式 authMethod 优先；未指定时 clientId && clientSecret 都在 → IdC，否则 social。
+ * 返回值额外带上 refreshToken / expiresIn / expiresAt / profileArn，调用方必须持久化轮换后的 refreshToken。
+ */
 async function refreshTokenByMethod(
   token: string,
   clientId: string,
   clientSecret: string,
   region: string = 'us-east-1',
   authMethod?: string,
-  proxyUrl?: string  // 账号绑定的代理 URL（可选，优先级最高）
+  proxyUrl?: string,  // 账号绑定的代理 URL（可选，优先级最高）
+  extra?: { accountId?: string; email?: string; provider?: string }
 ): Promise<OidcRefreshResult> {
-  // 如果是社交登录，使用 Kiro Auth Service 刷新
-  if (authMethod === 'social') {
-    return refreshSocialToken(token, proxyUrl)
-  }
-  // 否则使用 OIDC 刷新 (IdC/BuilderId)
-  return refreshOidcToken(token, clientId, clientSecret, region, proxyUrl)
+  const method = kiroApi.resolveAuthMethod({ authMethod, clientId, clientSecret })
+  const logTag = method === 'social' ? '[Social]' : '[OIDC]'
+  return toLegacyRefreshResult(
+    () =>
+      kiroApi.refreshTokenWithReload({
+        refreshToken: token,
+        authMethod: method,
+        provider: extra?.provider,
+        clientId,
+        clientSecret,
+        region,
+        machineId: getCurrentMachineId(),
+        proxyUrl,
+        accountId: extra?.accountId,
+        email: extra?.email
+      }),
+    logTag
+  )
 }
 
-function generateInvocationId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0
-    const v = c === 'x' ? r : (r & 0x3) | 0x8
-    return v.toString(16)
-  })
-}
-
-// Kiro 版本和 User-Agent 生成
-const KIRO_VERSION = '0.6.18'
-
-function getKiroUserAgent(machineId?: string): string {
-  const suffix = machineId ? `KiroIDE-${KIRO_VERSION}-${machineId}` : `KiroIDE-${KIRO_VERSION}`
-  return `aws-sdk-js/1.0.18 ua/2.1 os/windows lang/js md/nodejs#20.16.0 api/codewhispererstreaming#1.0.18 m/E ${suffix}`
-}
-
-function getKiroAmzUserAgent(machineId?: string): string {
-  const suffix = machineId ? `KiroIDE ${KIRO_VERSION} ${machineId}` : `KiroIDE-${KIRO_VERSION}`
-  return `aws-sdk-js/1.0.18 ${suffix}`
-}
 
 function getCurrentMachineId(): string | undefined {
   const kproxyService = getKProxyService()
@@ -992,16 +936,8 @@ async function kiroApiRequest<T>(
   const agent = getKProxyAgent()
   
   // 使用 undici fetch 支持代理
-  const headers: Record<string, string> = {
-    'accept': 'application/cbor',
-    'content-type': 'application/cbor',
-    'smithy-protocol': 'rpc-v2-cbor',
-    'amz-sdk-invocation-id': generateInvocationId(),
-    'amz-sdk-request': 'attempt=1; max=1',
-    'x-amz-user-agent': getKiroAmzUserAgent(machineId),
-    'authorization': `Bearer ${accessToken}`,
-    'cookie': `Idp=${idp}; AccessToken=${accessToken}`
-  }
+  // app.kiro.dev 门户 CBOR 头（kiro.rs 无此接口）：形状不变，版本号改为实时 Kiro 版本
+  const headers: Record<string, string> = kiroApi.buildPortalCborHeaders(accessToken, idp, machineId)
   
   let response: Response
   if (agent) {
@@ -1132,83 +1068,32 @@ function normalizeResetDate(value: number | string | undefined): string | undefi
   return value
 }
 
-async function fetchRestApi(
-  baseUrl: string,
-  path: string,
-  accessToken: string,
-  machineId?: string
-): Promise<Response> {
-  const agent = getKProxyAgent()
-  const headers: Record<string, string> = {
-    'Accept': 'application/json',
-    'Authorization': `Bearer ${accessToken}`,
-    'User-Agent': getKiroUserAgent(machineId),
-    'x-amz-user-agent': getKiroAmzUserAgent(machineId)
-  }
-  const url = `${baseUrl}${path}`
-  if (agent) {
-    return await undiciFetch(url, {
-      method: 'GET',
-      headers,
-      dispatcher: agent
-    } as UndiciRequestInit) as unknown as Response
-  }
-  return await fetchWithAppProxy(url, { method: 'GET', headers })
-}
-
+/**
+ * GetUsageLimits —— 走 kiroApi/usage 的候选梯子（区域 × 带不带 profileArn，共 4 次）。
+ * 与 kiro.rs token_manager.rs:455-620 一致：403/400 换下一候选，5xx 直接抛。
+ */
 async function getUsageLimitsRest(
   accessToken: string,
   profileArn?: string,
   accountMachineId?: string,  // 账户绑定的设备 ID
-  ssoRegion?: string,         // SSO 区域，用于选择正确的 REST API 端点
-  email?: string              // 用于日志标识
+  ssoRegion?: string,         // SSO 区域，用于选择区域候选顺序
+  email?: string,             // 用于日志标识
+  proxyUrl?: string           // 账号绑定的代理 URL
 ): Promise<UsageLimitsResponse> {
   // 优先使用账户绑定的设备 ID，其次使用 K-Proxy 全局设备 ID
   const machineId = accountMachineId || getCurrentMachineId()
   const logTag = email || `token:${accessToken?.slice(-6) || '?'}`
   console.log(`[Kiro REST API] GetUsageLimits [${logTag}] region=${ssoRegion || 'default'}`)
-  
-  const buildPath = (arn?: string): string => {
-    const params = new URLSearchParams({
-      origin: 'AI_EDITOR',
-      resourceType: 'AGENTIC_REQUEST',
-      isEmailRequired: 'true'
-    })
-    if (arn) params.set('profileArn', arn)
-    return `/getUsageLimits?${params.toString()}`
-  }
 
-  // 根据 SSO 区域选择主端点
-  const primaryBase = getRestApiBase(ssoRegion)
-  const fallbackBase = getFallbackRestApiBase(ssoRegion)
-
-  // 尝试组合（依次降级，仅在 400/403 这类"权限/参数"错误上继续，5xx 直接抛）：
-  //   1) 主端点 + profileArn        —— 正常路径
-  //   2) 备用端点 + profileArn      —— 区域绑定账号：token 区域与 ARN 区域不一致时主端点会 400/403
-  //   3) 主端点不带 profileArn      —— 旧行为兜底（万一后端又允许省略，或兜底 ARN 推错）
-  const attempts: Array<{ base: string; arn?: string }> = profileArn
-    ? [{ base: primaryBase, arn: profileArn }, { base: fallbackBase, arn: profileArn }, { base: primaryBase }]
-    : [{ base: primaryBase }, { base: fallbackBase }]
-
-  const describe = (a: { base: string; arn?: string }): string =>
-    `${a.base}${a.arn ? ' +profileArn' : ' (no profileArn)'}`
-
-  let response = await fetchRestApi(attempts[0].base, buildPath(attempts[0].arn), accessToken, machineId)
-  for (let i = 1; i < attempts.length; i++) {
-    if (response.ok || (response.status !== 403 && response.status !== 400)) break
-    console.log(`[Kiro REST API] ${response.status} on ${describe(attempts[i - 1])}, retry → ${describe(attempts[i])}`)
-    response = await fetchRestApi(attempts[i].base, buildPath(attempts[i].arn), accessToken, machineId)
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error(`[Kiro REST API] GetUsageLimits failed: ${response.status}`, errorText)
-    throw new Error(`HTTP ${response.status}: ${errorText}`)
-  }
-  
-  const result = await response.json()
-  console.log(`[Kiro REST API] GetUsageLimits [${logTag}] → ${response.status}`, result)
-  return result
+  const result = await kiroApi.getUsageLimits(accessToken, {
+    profileArn,
+    ssoRegion,
+    machineId,
+    email,
+    proxyUrl
+  })
+  console.log(`[Kiro REST API] GetUsageLimits [${logTag}] → ok`, result)
+  return result as UsageLimitsResponse
 }
 
 // 统一的用量查询接口 - 根据配置选择 API 类型
@@ -1271,8 +1156,9 @@ async function getUsageAndLimits(
   idp: string = 'BuilderId',
   profileArn?: string,
   accountMachineId?: string,  // 账户绑定的设备 ID
-  ssoRegion?: string,         // SSO 区域，用于选择正确的 REST API 端点
-  email?: string              // 用于日志标识
+  ssoRegion?: string,         // SSO 区域，用于选择区域候选顺序
+  email?: string,             // 用于日志标识
+  proxyUrl?: string           // 账号绑定的代理 URL
 ): Promise<UnifiedUsageResponse> {
   // Kiro 后端对 GetUsageLimits 强制要求 profileArn：不带该字段一律
   //   403 {"message":"User is not authorized to make this call.","reason":null}
@@ -1285,7 +1171,7 @@ async function getUsageAndLimits(
 
   if (currentUsageApiType === 'rest') {
     // 使用 REST API (GetUsageLimits)
-    const result = await getUsageLimitsRest(accessToken, effectiveProfileArn, accountMachineId, ssoRegion, email)
+    const result = await getUsageLimitsRest(accessToken, effectiveProfileArn, accountMachineId, ssoRegion, email, proxyUrl)
     // REST API 返回的字段名和 CBOR API 相同，直接返回
     return {
       usageBreakdownList: result.usageBreakdownList?.map(b => ({
@@ -1352,7 +1238,7 @@ async function getUsageAndLimits(
       // CBOR 401/403 时自动 fallback 到 REST API
       if (errorMsg.includes('401') || errorMsg.includes('403')) {
         console.log(`[API] CBOR API failed (${errorMsg}), falling back to REST API...`)
-        const result = await getUsageLimitsRest(accessToken, effectiveProfileArn, accountMachineId, ssoRegion, email)
+        const result = await getUsageLimitsRest(accessToken, effectiveProfileArn, accountMachineId, ssoRegion, email, proxyUrl)
         return {
           usageBreakdownList: result.usageBreakdownList?.map(b => ({
             resourceType: b.resourceType || b.type,
@@ -1427,6 +1313,25 @@ let store: {
 
 // 最后保存的数据（用于崩溃恢复）
 let lastSavedData: unknown = null
+
+/**
+ * B7：实时 Kiro IDE 版本。
+ * app ready 时拉一次，之后每 24h 一次；全部非阻塞，出错忽略（回退 KIRO_VERSION_FALLBACK）。
+ * 缓存 {version, fetchedAt} 落在 electron-store 的 kiroVersionCache 键上，跨重启有效。
+ */
+async function initKiroVersionRefresh(): Promise<void> {
+  try {
+    await initStore()
+    kiroApi.setKiroVersionCacheAdapter({
+      get: () =>
+        (store?.get('kiroVersionCache') as { version: string; fetchedAt: number } | undefined) ?? undefined,
+      set: (value) => store?.set('kiroVersionCache', value)
+    })
+  } catch (e) {
+    console.warn('[KiroVersion] store unavailable, using memory cache only:', e)
+  }
+  kiroApi.startKiroVersionAutoRefresh()
+}
 
 async function initStore(): Promise<void> {
   if (store) return
@@ -1693,13 +1598,23 @@ async function runProactiveRenewal(accountId: string): Promise<void> {
       creds.clientSecret || '',
       creds.region || 'us-east-1',
       creds.authMethod,
-      account.proxyUrl
+      account.proxyUrl,
+      { accountId, email: account.email, provider: creds.provider }
     )
   } catch (e) {
     console.warn('[ProactiveRenewal] refreshTokenByMethod threw, stop scheduling:', e)
     return
   }
   if (!refreshResult.success || !refreshResult.accessToken) {
+    // B3：上游 429 是临时限流，账号并未失效 —— 退避后重排，而不是彻底放弃续期
+    if (refreshResult.rateLimited) {
+      const retryMs = Math.max(refreshResult.retryAfterMs ?? 5 * 60 * 1000, 60_000)
+      console.warn(
+        `[ProactiveRenewal] Rate limited by upstream, retrying in ${Math.round(retryMs / 1000)}s`
+      )
+      scheduleProactiveRenewal(accountId, Date.now() + retryMs + PROACTIVE_RENEWAL_LEAD_MS)
+      return
+    }
     console.warn(
       `[ProactiveRenewal] Renewal failed: ${refreshResult.error || 'unknown'}. ` +
         `Stop scheduling; IDE's own refresh loop will take over as fallback.`
@@ -1929,9 +1844,12 @@ function isBannedAccountErrorMain(error?: string): boolean {
     || /\b423\b/.test(e)
 }
 
-/** 刷新提前量：≥ 2× 检查间隔且不少于 10 分钟，确保 token 不会在两次 tick 之间过期。 */
+/**
+ * 刷新提前量：≥ 2× 检查间隔且不少于 kiroApi/expiry 的 REFRESH_LEAD_MS（10 分钟，
+ * 与 kiro.rs is_token_expiring_soon 一致），确保 token 不会在两次 tick 之间过期。
+ */
 function mainTokenRefreshLeadMs(intervalMin: number): number {
-  return Math.max(intervalMin * 2 * 60 * 1000, 10 * 60 * 1000)
+  return Math.max(intervalMin * 2 * 60 * 1000, kiroApi.REFRESH_LEAD_MS)
 }
 
 /** 读取 store 里的账号，刷新即将过期的池内 token（仅刷 token，信息同步仍由渲染进程负责）。 */
@@ -2456,6 +2374,11 @@ app.whenReady().then(async () => {
   proxyLogStore.initialize(app.getPath('userData'))
   interceptConsole()
 
+  // kiroApi 出站请求走主进程的代理链（K-Proxy / 用户代理 / 系统代理 / 账号绑定代理）
+  kiroApi.setKiroApiFetch((url, init, proxyUrl) => fetchWithAppProxy(url, init, proxyUrl))
+  // 实时 Kiro IDE 版本：24h 缓存写 electron-store，启动即拉一次；失败忽略（回退常量）
+  void initKiroVersionRefresh()
+
   // 启动 Kiro IDE token 文件监听（反向同步：IDE 自己 refresh 后把新 token 同步回反代 store）
   // 见 syncIdeTokenChangeToStore 注释
   startKiroAuthTokenWatcher()
@@ -2892,7 +2815,8 @@ app.whenReady().then(async () => {
     try {
       // 1) Token 即将过期/已过期 → 先刷新（走账号绑定代理）
       let accessToken = acc.accessToken
-      const needsRefresh = acc.expiresAt ? (acc.expiresAt - Date.now() < 60_000) : false
+      // kiroApi/expiry：剩余 ≤10 分钟即刷新；expiresAt 缺失/不可解析时不强刷（诊断路径宁可暴露真实错误）
+      const needsRefresh = acc.expiresAt ? kiroApi.needsTokenRefresh(acc.expiresAt) : false
       if (needsRefresh && acc.refreshToken) {
         try {
           const r = await refreshTokenByMethod(
@@ -3017,11 +2941,22 @@ app.whenReady().then(async () => {
         clientSecret || '',
         region || 'us-east-1',
         authMethod,
-        boundProxyUrl
+        boundProxyUrl,
+        { accountId: account.id, email: account.email, provider }
       )
 
       if (!refreshResult.success || !refreshResult.accessToken) {
-        return { success: false, error: { message: refreshResult.error || 'Token 刷新失败' } }
+        // B3：429 不是账号失效，交由渲染层保持 active + lastError
+        return {
+          success: false,
+          error: {
+            message: refreshResult.error || 'Token 刷新失败',
+            accountStatus: refreshResult.rateLimited ? ('throttled' as const) : undefined,
+            rateLimited: refreshResult.rateLimited,
+            retryAfterMs: refreshResult.retryAfterMs,
+            invalidGrant: refreshResult.invalidGrant
+          }
+        }
       }
 
       const newAccess = refreshResult.accessToken
@@ -3552,27 +3487,48 @@ app.whenReady().then(async () => {
 
       // 第一次尝试：使用当前 accessToken
       try {
-        // 并行调用 GetUserInfo 和 getUsageAndLimits
-        const [userInfoResult, usageResult] = await Promise.all([
-          getUserInfo(accessToken, idp, accountMachineId, account?.email).catch((err: Error) => {
-            // 封禁错误不能吞掉，必须向上抛出
-            if (err.message.includes('423') || err.message.includes('AccountSuspended')) {
-              throw err
-            }
-            return undefined
-          }),
-          getUsageAndLimits(accessToken, idp, accountProfileArn, accountMachineId, region, account?.email)
-        ])
+        // B4：邮箱/订阅/用量都来自 getUsageLimits(isEmailRequired=true)；
+        // 只有响应里没有邮箱时才补一次 CBOR GetUserInfo（kiro.rs 根本没有独立的 user-info 端点）。
+        const usageResult = await getUsageAndLimits(
+          accessToken, idp, accountProfileArn, accountMachineId, region, account?.email, boundProxyUrl
+        )
+        const userInfoResult = usageResult.userInfo?.email
+          ? undefined
+          : await getUserInfo(accessToken, idp, accountMachineId, account?.email).catch((err: Error) => {
+              // 封禁错误不能吞掉，必须向上抛出
+              if (err.message.includes('423') || err.message.includes('AccountSuspended')) {
+                throw err
+              }
+              return undefined
+            })
         return parseUsageResponse(usageResult, undefined, userInfoResult)
       } catch (apiError) {
         const errorMsg = apiError instanceof Error ? apiError.message : ''
-        
+
+        // B3：上游正文特征优先（kiro.rs endpoint/mod.rs 的两短语判定），再退到状态码
+        const classified = classifyAccountStatusFromError(errorMsg)
+        if (classified === 'suspended') {
+          console.log('[IPC] Account suspended (upstream body matched)')
+          return {
+            success: false,
+            error: { message: errorMsg, isBanned: true, accountStatus: 'suspended' as const }
+          }
+        }
+        if (classified === 'throttled') {
+          // 账号级风控 / 限流：账号本身有效，绝不能标记为 error
+          console.warn('[IPC] Account throttled by upstream, not an account failure')
+          return {
+            success: false,
+            error: { message: errorMsg, accountStatus: 'throttled' as const, rateLimited: true }
+          }
+        }
+
         // 检查是否是明确封禁错误（423 或 AccountSuspendedException）
         if (errorMsg.includes('AccountSuspendedException') || errorMsg.includes('423')) {
           console.log('[IPC] Account suspended/banned')
           return {
             success: false,
-            error: { message: errorMsg, isBanned: true }
+            error: { message: errorMsg, isBanned: true, accountStatus: 'suspended' as const }
           }
         }
         
@@ -3594,29 +3550,47 @@ app.whenReady().then(async () => {
           
           if (refreshResult.success && refreshResult.accessToken) {
             console.log('[IPC] Token refreshed, retrying API call...')
-            
-            // 用新 token 并行调用 GetUserInfo 和 getUsageAndLimits
-            const [userInfoResult, usageResult] = await Promise.all([
-              getUserInfo(refreshResult.accessToken, idp, accountMachineId).catch((err: Error) => {
-                if (err.message.includes('423') || err.message.includes('AccountSuspended')) {
-                  throw err
-                }
-                return undefined
-              }),
-              getUsageAndLimits(refreshResult.accessToken, idp, accountProfileArn, accountMachineId, region)
-            ])
-            
-            // 返回结果并包含新凭证
+
+            const usageResult = await getUsageAndLimits(
+              refreshResult.accessToken, idp, accountProfileArn, accountMachineId, region, account?.email, boundProxyUrl
+            )
+            const userInfoResult = usageResult.userInfo?.email
+              ? undefined
+              : await getUserInfo(refreshResult.accessToken, idp, accountMachineId).catch((err: Error) => {
+                  if (err.message.includes('423') || err.message.includes('AccountSuspended')) {
+                    throw err
+                  }
+                  return undefined
+                })
+
+            // 返回结果并包含新凭证（refreshToken 可能已被上游轮换，调用方必须持久化）
             return parseUsageResponse(usageResult, {
               accessToken: refreshResult.accessToken,
               refreshToken: refreshResult.refreshToken,
               expiresIn: refreshResult.expiresIn
             }, userInfoResult)
+          } else if (refreshResult.rateLimited) {
+            // B3：刷新被上游限流 ≠ 账号失效。保持账号可用，只在 lastError 里说明。
+            const seconds = refreshResult.retryAfterMs ? Math.ceil(refreshResult.retryAfterMs / 1000) : undefined
+            return {
+              success: false,
+              error: {
+                message: seconds
+                  ? `Token 刷新被上游限流，请在 ${seconds}s 后重试`
+                  : 'Token 刷新被上游限流，请稍后重试',
+                accountStatus: 'throttled' as const,
+                rateLimited: true,
+                retryAfterMs: refreshResult.retryAfterMs
+              }
+            }
           } else {
             console.error('[IPC] Token refresh failed:', refreshResult.error)
             return {
               success: false,
-              error: { message: `Token 过期且刷新失败: ${refreshResult.error}` }
+              error: {
+                message: `Token 过期且刷新失败: ${refreshResult.error}`,
+                invalidGrant: refreshResult.invalidGrant
+              }
             }
           }
         }
@@ -3690,17 +3664,22 @@ app.whenReady().then(async () => {
                 clientSecret || '',
                 region || 'us-east-1',
                 authMethod,
-                boundProxyUrl
+                boundProxyUrl,
+                { accountId: account.id, provider }
               )
 
               if (!refreshResult.success) {
                 failed++
                 completed++
-                // 通知渲染进程刷新失败
+                // 通知渲染进程刷新失败（429 单独标注：账号未失效，仅限流）
                 mainWindow?.webContents.send('background-refresh-result', {
                   id: account.id,
                   success: false,
-                  error: refreshResult.error
+                  error: refreshResult.error,
+                  accountStatus: refreshResult.rateLimited ? 'throttled' : undefined,
+                  rateLimited: refreshResult.rateLimited,
+                  retryAfterMs: refreshResult.retryAfterMs,
+                  invalidGrant: refreshResult.invalidGrant
                 })
                 return
               }
@@ -4419,10 +4398,17 @@ app.whenReady().then(async () => {
       
       // Step 1: 使用合适的方式刷新获取 accessToken
       console.log(`[Verify] Step 1: Refreshing token (authMethod: ${authMethod || 'IdC'})...`)
-      const refreshResult = await refreshTokenByMethod(refreshToken, clientId, clientSecret, region, authMethod)
-      
+      const refreshResult = await refreshTokenByMethod(
+        refreshToken, clientId, clientSecret, region, authMethod, undefined, { provider }
+      )
+
       if (!refreshResult.success || !refreshResult.accessToken) {
-        return { success: false, error: `Token 刷新失败: ${refreshResult.error}` }
+        return {
+          success: false,
+          error: `Token 刷新失败: ${refreshResult.error}`,
+          rateLimited: refreshResult.rateLimited,
+          invalidGrant: refreshResult.invalidGrant
+        }
       }
       
       console.log('[Verify] Step 2: Getting user info...')

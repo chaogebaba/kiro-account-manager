@@ -1627,7 +1627,9 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         expired: 0,
         error: 0,
         refreshing: 0,
-        unknown: 0
+        unknown: 0,
+        throttled: 0,
+        suspended: 0
       },
       bySubscription: {
         Free: 0,
