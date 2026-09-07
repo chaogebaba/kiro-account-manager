@@ -287,6 +287,75 @@ export function isBannedAccountError(error?: string): boolean {
   return false
 }
 
+// ============ WP-B 错误细分信号（throttled / suspended / invalid_grant） ============
+
+/** 主进程随刷新/检查结果一起下发的错误细分信息，与 error 平级 */
+export interface AccountErrorSignals {
+  accountStatus?: 'throttled' | 'suspended'
+  rateLimited?: boolean
+  retryAfterMs?: number
+  invalidGrant?: boolean
+  /** check-account-status 的旧字段 */
+  isBanned?: boolean
+}
+
+/** 后台批量刷新/检查逐条推送的结果 */
+export interface BackgroundResultItem extends AccountErrorSignals {
+  id: string
+  success: boolean
+  data?: unknown
+  error?: string
+}
+
+/** 429：账号本身有效，只是被限流；文案里必须带上重试时间，否则用户会以为账号坏了 */
+export function formatThrottledError(error?: string, retryAfterMs?: number): string {
+  if (retryAfterMs && retryAfterMs > 0) {
+    const seconds = Math.ceil(retryAfterMs / 1000)
+    return error
+      ? `rate limited, retry after ${seconds}s — ${error}`
+      : `rate limited, retry after ${seconds}s`
+  }
+  return error ? `rate limited — ${error}` : 'rate limited'
+}
+
+/** refreshToken 已失效（invalid_grant）：需要重新登录，和普通网络错误区分开 */
+export function formatInvalidGrantError(error?: string): string {
+  return error ? `invalid_grant: ${error}` : 'invalid_grant: refresh token 已失效，请重新登录'
+}
+
+/**
+ * suspended 走的是"封禁"路径，lastError 里保留"账户已封禁"以便 isBannedAccountError、
+ * 封禁筛选、封禁徽章这些既有逻辑继续生效。
+ */
+export function formatSuspendedError(error?: string): string {
+  return error ? `账户已封禁: ${error}` : '账户已封禁'
+}
+
+/** 账号是否处于封禁终态（新的 suspended 状态 或 旧的 lastError 文本判定） */
+export function isAccountBanned(account: { status: AccountStatus; lastError?: string }): boolean {
+  return account.status === 'suspended' || isBannedAccountError(account.lastError)
+}
+
+/**
+ * 把主进程的 accountStatus / rateLimited / invalidGrant 映射成 renderer 的状态 + lastError。
+ * throttled 不是失效：账号仍然可用，只是这次调用被限流。
+ */
+export function resolveErrorOutcome(
+  signals: AccountErrorSignals | undefined,
+  error?: string
+): { status: AccountStatus; lastError: string | undefined } {
+  if (signals?.accountStatus === 'suspended' || signals?.isBanned) {
+    return { status: 'suspended', lastError: formatSuspendedError(error) }
+  }
+  if (signals?.accountStatus === 'throttled' || signals?.rateLimited) {
+    return { status: 'throttled', lastError: formatThrottledError(error, signals.retryAfterMs) }
+  }
+  if (signals?.invalidGrant) {
+    return { status: 'error', lastError: formatInvalidGrantError(error) }
+  }
+  return { status: 'error', lastError: error }
+}
+
 // 自动换号定时器
 let autoSwitchTimer: ReturnType<typeof setInterval> | null = null
 
@@ -508,12 +577,12 @@ interface AccountsActions {
   checkAndRefreshExpiringTokens: () => Promise<void>
   refreshExpiredTokensOnly: () => Promise<void>
   triggerBackgroundRefresh: () => Promise<void>
-  handleBackgroundRefreshResult: (data: { id: string; success: boolean; data?: unknown; error?: string }) => void
-  handleBackgroundCheckResult: (data: { id: string; success: boolean; data?: unknown; error?: string }) => void
+  handleBackgroundRefreshResult: (data: BackgroundResultItem) => void
+  handleBackgroundCheckResult: (data: BackgroundResultItem) => void
   /** 批量处理后台刷新结果：一次 set 应用 N 条结果，消除 N 次 Map 全量复制 */
-  applyBackgroundRefreshResults: (items: Array<{ id: string; success: boolean; data?: unknown; error?: string }>) => void
+  applyBackgroundRefreshResults: (items: BackgroundResultItem[]) => void
   /** 批量处理后台检查结果：一次 set 应用 N 条结果 */
-  applyBackgroundCheckResults: (items: Array<{ id: string; success: boolean; data?: unknown; error?: string }>) => void
+  applyBackgroundCheckResults: (items: BackgroundResultItem[]) => void
 
   // 定时自动保存（防止数据丢失）
   startAutoSave: () => void
@@ -1077,7 +1146,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
 
     // 封禁筛选
     if (filter.bannedOnly) {
-      result = result.filter((a) => isBannedAccountError(a.lastError))
+      result = result.filter((a) => isAccountBanned(a))
     }
 
     // 应用排序
@@ -1352,8 +1421,10 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
   // ==================== 状态管理 ====================
 
   updateAccountStatus: (id, status, error) => {
-    const wasBanned = isBannedAccountError(get().accounts.get(id)?.lastError)
-    const isBanned = isBannedAccountError(error)
+    const prevAccount = get().accounts.get(id)
+    const wasBanned = prevAccount ? isAccountBanned(prevAccount) : false
+    // suspended 是终态封禁；throttled 只是限流，绝不能触发封禁 webhook
+    const isBanned = status === 'suspended' || isBannedAccountError(error)
     set((state) => {
       const accounts = new Map(state.accounts)
       const account = accounts.get(id)
@@ -1432,14 +1503,18 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         get().saveToStorage()
         return true
       } else {
-        updateAccountStatus(id, 'error', result.error?.message)
-        // 触发 webhook：Token 刷新失败
-        triggerWebhook('token-expired', {
-          title: 'Token 刷新失败',
-          message: `账号 ${account.email} Token 刷新失败`,
-          level: 'warn',
-          fields: { 邮箱: account.email, 错误: result.error?.message || '-' }
-        })
+        // WP-B：主进程把 429 / 封禁 / invalid_grant 作为 error 的兄弟字段一起下发
+        const outcome = resolveErrorOutcome(result.error, result.error?.message)
+        updateAccountStatus(id, outcome.status, outcome.lastError)
+        // 限流不是刷新失败，别拿它去打 token-expired webhook
+        if (outcome.status !== 'throttled') {
+          triggerWebhook('token-expired', {
+            title: 'Token 刷新失败',
+            message: `账号 ${account.email} Token 刷新失败`,
+            level: 'warn',
+            fields: { 邮箱: account.email, 错误: outcome.lastError || '-' }
+          })
+        }
         return false
       }
     } catch (error) {
@@ -1592,14 +1667,9 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
           console.log(`[Account] Token refreshed for ${account?.email}`)
         }
       } else {
-        // 检查是否是封禁错误
-        const isBanned = (result.error as { isBanned?: boolean })?.isBanned
-        if (isBanned) {
-          // 封禁账户：设置错误状态并标记为封禁
-          updateAccountStatus(id, 'error', `账户已封禁: ${result.error?.message}`)
-        } else {
-          updateAccountStatus(id, 'error', result.error?.message)
-        }
+        // WP-B：accountStatus / rateLimited / invalidGrant 与 error 平级下发
+        const outcome = resolveErrorOutcome(result.error, result.error?.message)
+        updateAccountStatus(id, outcome.status, outcome.lastError)
       }
     } catch (error) {
       updateAccountStatus(id, 'error', error instanceof Error ? error.message : 'Unknown error')
@@ -1720,7 +1790,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         stats.expiringSoonCount++
       }
       // 统计封禁账号
-      if (isBannedAccountError(account.lastError)) {
+      if (isAccountBanned(account)) {
         stats.bannedCount++
       }
     }
@@ -2236,8 +2306,10 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
       const availableAccount = Array.from(accounts.values()).find(acc => {
         // 排除当前账号
         if (acc.id === activeAccount.id) return false
-        // 排除被封禁的账号
-        if (isBannedAccountError(acc.lastError)) return false
+        // 排除被封禁的账号（含新的 suspended 终态）
+        if (isAccountBanned(acc)) return false
+        // 正在被限流的账号可用但不适合此刻切过去（只在"挑新号"时跳过，不禁用它）
+        if (acc.status === 'throttled') return false
         // 排除余额不足的账号
         const accRemaining = acc.usage.limit - acc.usage.current
         if (accRemaining <= autoSwitchThreshold) return false
@@ -2274,7 +2346,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
     
     for (const [id, account] of accounts) {
       // 跳过已封禁或错误状态的账号
-      if (isBannedAccountError(account.lastError)) {
+      if (isAccountBanned(account)) {
         console.log(`[AutoRefresh] Skipping ${account.email} (banned/error)`)
         continue
       }
@@ -2341,7 +2413,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
     
     for (const [id, account] of accounts) {
       // 跳过已封禁或错误状态的账号
-      if (isBannedAccountError(account.lastError)) {
+      if (isAccountBanned(account)) {
         continue
       }
 
@@ -2445,7 +2517,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
     
     for (const [id, account] of accounts) {
       // 跳过已封禁或错误状态的账号
-      if (isBannedAccountError(account.lastError)) {
+      if (isAccountBanned(account)) {
         continue
       }
 
@@ -2496,6 +2568,8 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
   applyBackgroundRefreshResults: (items) => {
     if (!items || items.length === 0) return
 
+    const newlySuspended: Array<{ id: string; email: string; error?: string }> = []
+
     set((state) => {
       // 仅一次完整 Map 复制
       const accounts = new Map(state.accounts)
@@ -2507,10 +2581,14 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         if (!account) continue
 
         if (!success) {
+          const outcome = resolveErrorOutcome(data, error)
+          if (outcome.status === 'suspended' && !isAccountBanned(account)) {
+            newlySuspended.push({ id, email: account.email, error: outcome.lastError })
+          }
           accounts.set(id, {
             ...account,
-            status: 'error',
-            lastError: error,
+            status: outcome.status,
+            lastError: outcome.lastError,
             lastCheckedAt: now
           })
           continue
@@ -2545,12 +2623,23 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         subscription?: { type?: string; title?: string; daysRemaining?: number; expiresAt?: number; overageCapability?: string; upgradeCapability?: string; subscriptionManagementTarget?: string }
         userInfo?: { email?: string; userId?: string }
         status?: string
+        accountStatus?: 'throttled' | 'suspended'
         errorMessage?: string
       } | undefined
 
-      // 检测封禁状态
-      const newStatus = refreshData?.status === 'error' ? 'error' as AccountStatus : 'active' as AccountStatus
-      const newError = refreshData?.errorMessage
+      // 检测封禁 / 限流状态（accountStatus 优先于粗粒度的 status）
+      const refreshOutcome = refreshData?.accountStatus
+        ? resolveErrorOutcome({ accountStatus: refreshData.accountStatus }, refreshData.errorMessage)
+        : undefined
+      const newStatus: AccountStatus = refreshOutcome
+        ? refreshOutcome.status
+        : refreshData?.status === 'error'
+          ? 'error'
+          : 'active'
+      const newError = refreshOutcome ? refreshOutcome.lastError : refreshData?.errorMessage
+      if (newStatus === 'suspended' && !isAccountBanned(account)) {
+        newlySuspended.push({ id, email: account.email, error: newError })
+      }
 
       // 后台刷新时主进程可能返回自动获取的 profileArn，持久化到顶层和 credentials
       const bgProfileArn = refreshData?.profileArn || account.credentials.profileArn || account.profileArn
@@ -2603,6 +2692,16 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
 
       return { accounts }
     })
+
+    // 封禁 webhook：批量应用绕过了 updateAccountStatus，这里补上（只对"刚变成封禁"的账号触发）
+    for (const acc of newlySuspended) {
+      triggerWebhook('account-banned', {
+        title: '账号被封禁',
+        message: `账号 ${acc.email || acc.id} 状态变为封禁`,
+        level: 'error',
+        fields: { 邮箱: acc.email || '-', 错误: acc.error || '-' }
+      })
+    }
   },
 
   // 处理后台检查结果（兼容入口；高频场景请走 applyBackgroundCheckResults 批量）
@@ -2614,6 +2713,8 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
   applyBackgroundCheckResults: (items) => {
     if (!items || items.length === 0) return
 
+    const newlySuspended: Array<{ id: string; email: string; error?: string }> = []
+
     set((state) => {
       const accounts = new Map(state.accounts)
       const now = Date.now()
@@ -2624,10 +2725,14 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         if (!account) continue
 
         if (!success) {
+          const outcome = resolveErrorOutcome(data, error)
+          if (outcome.status === 'suspended' && !isAccountBanned(account)) {
+            newlySuspended.push({ id, email: account.email, error: outcome.lastError })
+          }
           accounts.set(id, {
             ...account,
-            status: 'error',
-            lastError: error,
+            status: outcome.status,
+            lastError: outcome.lastError,
             lastCheckedAt: now
           })
           continue
@@ -2658,18 +2763,29 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
         subscription?: { type?: string; title?: string; daysRemaining?: number; expiresAt?: number; overageCapability?: string; upgradeCapability?: string; subscriptionManagementTarget?: string }
         userInfo?: { email?: string; userId?: string }
         status?: string
+        accountStatus?: 'throttled' | 'suspended'
         errorMessage?: string
         needsRefresh?: boolean
       } | undefined
 
-      // 检测状态
+      // 检测状态：accountStatus（throttled / suspended）比 status 更细，优先采用
       let newStatus: AccountStatus = 'active'
-      if (checkData?.status === 'error') {
+      let newError = checkData?.errorMessage
+      if (checkData?.accountStatus) {
+        const outcome = resolveErrorOutcome(
+          { accountStatus: checkData.accountStatus },
+          checkData.errorMessage
+        )
+        newStatus = outcome.status
+        newError = outcome.lastError
+      } else if (checkData?.status === 'error') {
         newStatus = 'error'
       } else if (checkData?.status === 'expired' || checkData?.needsRefresh) {
         newStatus = 'expired'
       }
-      const newError = checkData?.errorMessage
+      if (newStatus === 'suspended' && !isAccountBanned(account)) {
+        newlySuspended.push({ id, email: account.email, error: newError })
+      }
 
       accounts.set(id, {
         ...account,
@@ -2712,6 +2828,16 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
 
       return { accounts }
     })
+
+    // 封禁 webhook：批量应用绕过了 updateAccountStatus，这里补上（只对"刚变成封禁"的账号触发）
+    for (const acc of newlySuspended) {
+      triggerWebhook('account-banned', {
+        title: '账号被封禁',
+        message: `账号 ${acc.email || acc.id} 状态变为封禁`,
+        level: 'error',
+        fields: { 邮箱: acc.email || '-', 错误: acc.error || '-' }
+      })
+    }
   },
 
   // ==================== 定时自动保存 ====================

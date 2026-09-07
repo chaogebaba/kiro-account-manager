@@ -6,7 +6,7 @@ import { HomePage, AboutPage, SettingsPage, MachineIdPage, KiroSettingsPage, Pro
 import { useWebhookStore } from './store/webhooks'
 import { UpdateDialog } from './components/UpdateDialog'
 import { CloseConfirmDialog } from './components/CloseConfirmDialog'
-import { useAccountsStore, isBannedAccountError } from './store/accounts'
+import { useAccountsStore, isAccountBanned, type BackgroundResultItem } from './store/accounts'
 
 // 托盘信息防抖延迟：后台刷新风暴时合并多次跨进程 IPC 为单次
 const TRAY_UPDATE_DEBOUNCE_MS = 400
@@ -180,7 +180,7 @@ function App(): React.JSX.Element {
     const currentBanned: string[] = []
     const fresh: { email: string; nickname?: string }[] = []
     for (const a of accounts.values()) {
-      if (isBannedAccountError(a.lastError)) {
+      if (isAccountBanned(a)) {
         currentBanned.push(a.id)
         if (!notifiedSet.has(a.id)) fresh.push({ email: a.email, nickname: a.nickname })
       }
@@ -245,7 +245,7 @@ function App(): React.JSX.Element {
 
   // 监听后台刷新结果：缓冲 + 批量化 flush，N 条结果合并为一次 set，消除 Map 复制风暴
   useEffect(() => {
-    const refreshBuffer: Array<{ id: string; success: boolean; data?: unknown; error?: string }> = []
+    const refreshBuffer: BackgroundResultItem[] = []
     let flushTimer: ReturnType<typeof setTimeout> | null = null
 
     const flush = (): void => {
@@ -273,7 +273,7 @@ function App(): React.JSX.Element {
 
   // 监听后台检查结果：同样的批量化策略
   useEffect(() => {
-    const checkBuffer: Array<{ id: string; success: boolean; data?: unknown; error?: string }> = []
+    const checkBuffer: BackgroundResultItem[] = []
     let flushTimer: ReturnType<typeof setTimeout> | null = null
 
     const flush = (): void => {

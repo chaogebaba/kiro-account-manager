@@ -345,6 +345,8 @@ const zh = {
     error: '异常',
     banned: '已封禁',
     expired: '已过期',
+    throttled: '限流',
+    suspended: '已封禁',
     unknown: '未知'
   },
 

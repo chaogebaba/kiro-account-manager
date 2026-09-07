@@ -345,6 +345,8 @@ const en = {
     error: 'Error',
     banned: 'Banned',
     expired: 'Expired',
+    throttled: 'Rate limited',
+    suspended: 'Suspended',
     unknown: 'Unknown'
   },
 

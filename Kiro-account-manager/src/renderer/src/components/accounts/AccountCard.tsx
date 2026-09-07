@@ -98,7 +98,9 @@ const StatusLabelsZh: Record<string, string> = {
   expired: '已过期',
   error: '错误',
   refreshing: '刷新中',
-  unknown: '未知'
+  unknown: '未知',
+  throttled: '限流',
+  suspended: '已封禁'
 }
 
 const StatusLabelsEn: Record<string, string> = {
@@ -106,7 +108,9 @@ const StatusLabelsEn: Record<string, string> = {
   expired: 'Expired',
   error: 'Error',
   refreshing: 'Refreshing',
-  unknown: 'Unknown'
+  unknown: 'Unknown',
+  throttled: 'Rate limited',
+  suspended: 'Suspended'
 }
 
 // 获取账户显示名称：昵称优先，无则邮箱，无邮箱则 userId
@@ -293,7 +297,7 @@ export const AccountCard = memo(function AccountCard({
 
   // 检测账号是否被封禁/暂停（多种错误格式）
   const lowerError = account.lastError?.toLowerCase()
-  const isUnauthorized = !!lowerError && (
+  const isUnauthorized = account.status === 'suspended' || (!!lowerError && (
     lowerError.includes('accountsuspendedexception') ||
     lowerError.includes('account suspended') ||
     lowerError.includes('temporarily_suspended') ||
@@ -302,7 +306,7 @@ export const AccountCard = memo(function AccountCard({
     lowerError.includes('账户已封禁') ||
     lowerError.includes('已封禁') ||
     /\b423\b/.test(lowerError)
-  )
+  ))
   
   // 封禁详情弹窗状态
   const [showBanDialog, setShowBanDialog] = useState(false)
@@ -514,6 +518,8 @@ export const AccountCard = memo(function AccountCard({
                     account.status === 'active' ? "text-success bg-success/10" :
                     account.status === 'error' ? "text-destructive bg-destructive/10" :
                     account.status === 'expired' ? "text-warning bg-warning/10" :
+                    account.status === 'throttled' ? "text-amber-500 bg-amber-500/10" :
+                    account.status === 'suspended' ? "text-destructive bg-destructive/10" :
                     account.status === 'refreshing' ? "text-primary bg-primary/10" :
                     "text-muted-foreground bg-muted"
                  )}>

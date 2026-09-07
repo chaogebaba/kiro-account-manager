@@ -106,7 +106,9 @@ export const StatusLabelsZh: Record<string, string> = {
   expired: '已过期',
   error: '错误',
   refreshing: '刷新中',
-  unknown: '未知'
+  unknown: '未知',
+  throttled: '限流',
+  suspended: '已封禁'
 }
 
 export const StatusLabelsEn: Record<string, string> = {
@@ -114,7 +116,9 @@ export const StatusLabelsEn: Record<string, string> = {
   expired: 'Expired',
   error: 'Error',
   refreshing: 'Refreshing',
-  unknown: 'Unknown'
+  unknown: 'Unknown',
+  throttled: 'Rate limited',
+  suspended: 'Suspended'
 }
 
 // 状态徽章 Tailwind class
@@ -124,6 +128,9 @@ export function getStatusBadgeClass(status: string, isUnauthorized: boolean): st
     case 'active': return 'text-success bg-success/10'
     case 'error': return 'text-destructive bg-destructive/10'
     case 'expired': return 'text-warning bg-warning/10'
+    // 429 限流：账号可用，只是这次被挡了 → 琥珀色警示，不是红色
+    case 'throttled': return 'text-amber-500 bg-amber-500/10'
+    case 'suspended': return 'text-destructive bg-destructive/10'
     case 'refreshing': return 'text-primary bg-primary/10'
     default: return 'text-muted-foreground bg-muted'
   }

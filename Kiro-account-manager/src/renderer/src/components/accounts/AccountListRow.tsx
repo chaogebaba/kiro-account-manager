@@ -83,7 +83,7 @@ function AccountListRowComponent({
   const [emailCopied, setEmailCopied] = useState(false)
 
   // 封禁判定
-  const isUnauthorized = isBannedError(account.lastError)
+  const isUnauthorized = account.status === 'suspended' || isBannedError(account.lastError)
 
   // 标签
   const accountTags = useMemo(

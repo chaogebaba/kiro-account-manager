@@ -2,6 +2,24 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { LocalCredentialCandidate } from '../main/localCredentials'
 
+/**
+ * WP-B 在后台刷新/检查失败时附带的错误细分信息（与 error 平级）。
+ * throttled = 429 限流（账号仍可用），suspended = 账号被封禁，invalidGrant = refreshToken 失效。
+ */
+interface AccountErrorSignals {
+  accountStatus?: 'throttled' | 'suspended'
+  rateLimited?: boolean
+  retryAfterMs?: number
+  invalidGrant?: boolean
+}
+
+type BackgroundResultPayload = {
+  id: string
+  success: boolean
+  data?: unknown
+  error?: string
+} & AccountErrorSignals
+
 // Custom APIs for renderer
 const api = {
   // 打开外部链接
@@ -77,8 +95,8 @@ const api = {
   },
 
   // 监听后台刷新结果（单个账号）
-  onBackgroundRefreshResult: (callback: (data: { id: string; success: boolean; data?: unknown; error?: string }) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, data: { id: string; success: boolean; data?: unknown; error?: string }): void => {
+  onBackgroundRefreshResult: (callback: (data: BackgroundResultPayload) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: BackgroundResultPayload): void => {
       callback(data)
     }
     ipcRenderer.on('background-refresh-result', handler)
@@ -119,8 +137,8 @@ const api = {
   },
 
   // 监听后台检查结果（单个账号）
-  onBackgroundCheckResult: (callback: (data: { id: string; success: boolean; data?: unknown; error?: string }) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, data: { id: string; success: boolean; data?: unknown; error?: string }): void => {
+  onBackgroundCheckResult: (callback: (data: BackgroundResultPayload) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: BackgroundResultPayload): void => {
       callback(data)
     }
     ipcRenderer.on('background-check-result', handler)

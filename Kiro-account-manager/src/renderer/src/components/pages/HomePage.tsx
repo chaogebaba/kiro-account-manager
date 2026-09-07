@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useAccountsStore, isBannedAccountError } from '@/store/accounts'
+import { useAccountsStore, isAccountBanned } from '@/store/accounts'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui'
 import { Users, CheckCircle, AlertTriangle, Clock, Zap, Shield, Fingerprint, FolderPlus, Tag, TrendingUp, Activity, BarChart3, Ban, ChevronRight } from 'lucide-react'
 import kiroLogo from '@/assets/kiro-high-resolution-logo-transparent.png'
@@ -36,7 +36,7 @@ export function HomePage() {
     const expiring: Account[] = []
     const quotaHigh: Account[] = []
     for (const a of accounts.values()) {
-      if (isBannedAccountError(a.lastError)) {
+      if (isAccountBanned(a)) {
         banned.push(a)
         continue // 已封禁的不再重复计入其它告警
       }

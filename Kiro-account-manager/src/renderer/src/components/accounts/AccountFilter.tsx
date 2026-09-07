@@ -16,6 +16,8 @@ const StatusOptionsZh: { value: AccountStatus; label: string }[] = [
   { value: 'active', label: '正常' },
   { value: 'expired', label: '已过期' },
   { value: 'error', label: '错误' },
+  { value: 'throttled', label: '限流' },
+  { value: 'suspended', label: '已封禁' },
   { value: 'unknown', label: '未知' }
 ]
 
@@ -23,6 +25,8 @@ const StatusOptionsEn: { value: AccountStatus; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'expired', label: 'Expired' },
   { value: 'error', label: 'Error' },
+  { value: 'throttled', label: 'Rate limited' },
+  { value: 'suspended', label: 'Suspended' },
   { value: 'unknown', label: 'Unknown' }
 ]
 

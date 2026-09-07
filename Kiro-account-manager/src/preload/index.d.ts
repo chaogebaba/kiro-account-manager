@@ -48,6 +48,27 @@ interface AccountData {
   accountProxyBindings?: Record<string, string>
 }
 
+/**
+ * WP-B 附带的上游错误细分信息。
+ * throttled = 429 限流（账号仍可用），suspended = 账号被封禁，invalidGrant = refreshToken 失效。
+ */
+interface AccountErrorSignals {
+  accountStatus?: 'throttled' | 'suspended'
+  rateLimited?: boolean
+  retryAfterMs?: number
+  invalidGrant?: boolean
+  /** 旧字段：check-account-status 对封禁的标记 */
+  isBanned?: boolean
+}
+
+/** 后台批量刷新/检查逐条推送的结果 */
+interface BackgroundResultPayload extends AccountErrorSignals {
+  id: string
+  success: boolean
+  data?: unknown
+  error?: string
+}
+
 interface RefreshResult {
   success: boolean
   data?: {
@@ -64,7 +85,7 @@ interface RefreshResult {
     /** Enterprise 账号刷新时主进程自动获取的真实 profileArn */
     profileArn?: string
   }
-  error?: { message: string }
+  error?: { message: string } & AccountErrorSignals
 }
 
 /** Kiro IDE 自己 refresh 完写回 token 文件、被反代检测到后通知 renderer 的 payload */
@@ -133,7 +154,7 @@ interface StatusResult {
       expiresAt?: number
     }
   }
-  error?: { message: string }
+  error?: { message: string } & AccountErrorSignals
 }
 
 interface KiroApi {
@@ -165,7 +186,7 @@ interface KiroApi {
     }
   }>, concurrency?: number, syncInfo?: boolean) => Promise<{ success: boolean; completed: number; successCount: number; failedCount: number }>
   onBackgroundRefreshProgress: (callback: (data: { completed: number; total: number; success: number; failed: number }) => void) => () => void
-  onBackgroundRefreshResult: (callback: (data: { id: string; success: boolean; data?: unknown; error?: string }) => void) => () => void
+  onBackgroundRefreshResult: (callback: (data: BackgroundResultPayload) => void) => () => void
   
   // 后台批量检查账号状态（不刷新 Token）
   backgroundBatchCheck: (accounts: Array<{
@@ -185,7 +206,7 @@ interface KiroApi {
     idp?: string
   }>, concurrency?: number) => Promise<{ success: boolean; completed: number; successCount: number; failedCount: number }>
   onBackgroundCheckProgress: (callback: (data: { completed: number; total: number; success: number; failed: number }) => void) => () => void
-  onBackgroundCheckResult: (callback: (data: { id: string; success: boolean; data?: unknown; error?: string }) => void) => () => void
+  onBackgroundCheckResult: (callback: (data: BackgroundResultPayload) => void) => () => void
   
   // 切换账号 - 写入凭证到本地 SSO 缓存
   switchAccount: (credentials: {

@@ -72,6 +72,8 @@ export function AccountSelectDialog({
 
   // 检测是否为封禁账号（通过 lastError 判断）
   const isBannedAccount = (acc: Account): boolean => {
+    // WP-B 的 'suspended' 是上游明确给出的封禁终态，优先于文本判定
+    if (acc.status === 'suspended') return true
     const lowerError = acc.lastError?.toLowerCase()
     if (!lowerError) return false
     const hasSuspendedSignal =
@@ -119,6 +121,12 @@ export function AccountSelectDialog({
           icon: <Ban className="h-3.5 w-3.5" />,
           text: isEn ? 'Expired' : '已过期',
           color: 'bg-warning/10 text-warning'
+        }
+      case 'throttled':
+        return {
+          icon: <AlertCircle className="h-3.5 w-3.5" />,
+          text: isEn ? 'Rate limited' : '限流',
+          color: 'bg-amber-500/10 text-amber-500'
         }
       case 'refreshing':
         return {
