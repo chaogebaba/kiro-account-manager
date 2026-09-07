@@ -15,7 +15,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 VERSION=$(grep '"version"' "$PROJECT_DIR/package.json" | head -1 | sed 's/.*"\([0-9.]*\)".*/\1/')
-BUILD_DIR="/tmp/kiro-rpm-build"
+BUILD_DIR="${KIRO_RPM_BUILD_DIR:-/data/claude-scratch/kiro-account-manager/rpm-build}"
 DIST_DIR="$PROJECT_DIR/dist/linux-unpacked"
 
 echo "=== Kiro Account Manager RPM Builder ==="
@@ -104,7 +104,7 @@ SPECEOF
 rpmbuild -bb \
   --define "_topdir $BUILD_DIR" \
   --define "_rpmdir $BUILD_DIR/RPMS" \
-  --define "_tmppath /tmp" \
+  --define "_tmppath $BUILD_DIR/tmp" \
   "$BUILD_DIR/SPECS/kiro-account-manager.spec"
 
 RPM_FILE=$(find "$BUILD_DIR/RPMS" -name "*.rpm" | head -1)
