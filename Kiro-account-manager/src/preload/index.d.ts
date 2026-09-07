@@ -35,6 +35,7 @@ interface AccountData {
   autoSwitchThreshold?: number
   autoSwitchInterval?: number
   switchTarget?: 'auto' | 'ide' | 'cli' | 'both'
+  socialSyncAfterLogin?: boolean | null // 社交登录后设为当前账号；null=用户没改过，按本地客户端探测决定
   theme?: string
   darkMode?: boolean
   language?: 'auto' | 'en' | 'zh'

@@ -431,6 +431,9 @@ interface AccountsState {
   // auto=写入所有已存在的目标（默认）, ide=仅 Kiro IDE, cli=仅 kiro-cli, both=两者都切
   switchTarget: SwitchTarget
 
+  // 社交登录后是否设为当前账号（持久化用户的勾选；null=从未手动改过，弹窗按本地客户端探测决定默认值）
+  socialSyncAfterLogin: boolean | null
+
   // 主题设置
   theme: string // 主题名称: default, purple, emerald, orange, rose, cyan, amber
   darkMode: boolean // 深色模式
@@ -569,6 +572,7 @@ interface AccountsActions {
 
   // 切号目标设置
   setSwitchTarget: (target: SwitchTarget) => void
+  setSocialSyncAfterLogin: (enabled: boolean) => void
 
   /** 把账号凭证写入本地客户端（IDE / kiro-cli），成功后才 setActiveAccount */
   switchAccountTo: (accountId: string, targetOverride?: SwitchTarget) => Promise<SwitchOutcome>
@@ -705,6 +709,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
   batchImportConcurrency: 100,
   loginPrivateMode: false,
   switchTarget: 'auto' as SwitchTarget,
+  socialSyncAfterLogin: null,
   theme: 'default',
   darkMode: false,
   language: 'auto',
@@ -1871,6 +1876,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
           autoSwitchThreshold: data.autoSwitchThreshold ?? 0,
           autoSwitchInterval: data.autoSwitchInterval ?? 5,
           switchTarget: migrateSwitchTarget(data.switchTarget),
+          socialSyncAfterLogin: typeof data.socialSyncAfterLogin === 'boolean' ? data.socialSyncAfterLogin : null,
           theme: data.theme ?? 'default',
           darkMode: data.darkMode ?? false,
           language: data.language ?? 'auto',
@@ -1984,6 +1990,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
       autoSwitchThreshold,
       autoSwitchInterval,
       switchTarget,
+      socialSyncAfterLogin,
       theme,
       darkMode,
       language,
@@ -2017,6 +2024,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
           autoSwitchThreshold,
           autoSwitchInterval,
           switchTarget,
+          socialSyncAfterLogin,
           theme,
           darkMode,
           language,
@@ -2240,6 +2248,11 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
 
   setSwitchTarget: (target) => {
     set({ switchTarget: target })
+    get().saveToStorage()
+  },
+
+  setSocialSyncAfterLogin: (enabled) => {
+    set({ socialSyncAfterLogin: enabled })
     get().saveToStorage()
   },
 

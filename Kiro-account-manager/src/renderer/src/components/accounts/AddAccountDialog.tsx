@@ -61,7 +61,16 @@ type ImportMode = 'oidc' | 'sso' | 'login'
 type LoginType = 'builderid' | 'google' | 'github' | 'iamsso'
 
 export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): React.ReactNode {
-  const { addAccount, accounts, batchImportConcurrency, loginPrivateMode, groups, activeGroupTab } = useAccountsStore()
+  const {
+    addAccount,
+    accounts,
+    batchImportConcurrency,
+    loginPrivateMode,
+    groups,
+    activeGroupTab,
+    socialSyncAfterLogin,
+    setSocialSyncAfterLogin
+  } = useAccountsStore()
 
   // 检查账户是否已存在（同userId 或 同邮箱+同provider 才算重复）
   const isAccountExists = (email: string, userId: string, provider?: string): boolean => {
@@ -146,7 +155,8 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
   const [socialPasteUrl, setSocialPasteUrl] = useState('')
   const [isCompletingSocial, setIsCompletingSocial] = useState(false)
   // 登录成功后是否顺手把本地客户端也切到这个账号；检测到 kiro-cli / IDE 时默认勾上
-  const [syncAfterLogin, setSyncAfterLogin] = useState(false)
+  // 用户手动改过就用持久化的值；否则打开弹窗时按本地客户端探测决定默认值
+  const [syncAfterLogin, setSyncAfterLogin] = useState(socialSyncAfterLogin ?? false)
   const socialCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // 清理轮询
@@ -162,8 +172,13 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
   }, [])
 
   // 打开弹窗时探测本地客户端：装了 kiro-cli 或 Kiro IDE 才默认勾上"登录后设为当前账号"
+  // 用户手动改过（持久化非 null）就尊重用户的选择，不再探测覆盖
   useEffect(() => {
     if (!isOpen) return
+    if (socialSyncAfterLogin !== null) {
+      setSyncAfterLogin(socialSyncAfterLogin)
+      return
+    }
     let cancelled = false
     void (async () => {
       const [ide, cli] = await Promise.all([
@@ -175,7 +190,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     return () => {
       cancelled = true
     }
-  }, [isOpen])
+  }, [isOpen, socialSyncAfterLogin])
 
   // 打开弹窗时默认选中"当前打开的分组"（activeGroupTab 为真实分组时），否则未分组
   useEffect(() => {
@@ -1488,7 +1503,10 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                       <input
                         type="checkbox"
                         checked={syncAfterLogin}
-                        onChange={(e) => setSyncAfterLogin(e.target.checked)}
+                        onChange={(e) => {
+                          setSyncAfterLogin(e.target.checked)
+                          setSocialSyncAfterLogin(e.target.checked)
+                        }}
                         className="h-4 w-4 accent-primary"
                       />
                       <span className="text-sm text-muted-foreground">{t('addAccount.social.syncAfterLogin')}</span>
