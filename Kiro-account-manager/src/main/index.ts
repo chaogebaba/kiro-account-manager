@@ -4043,8 +4043,9 @@ app.whenReady().then(async () => {
               idp = provider
             }
 
-            // 调用 API 获取用量和用户信息（根据配置选择 REST 或 CBOR 格式）
-            const [usageRes, userInfoRes] = await Promise.allSettled([
+            // B4：用量/邮箱/订阅一次拿齐（isEmailRequired=true）；
+            // 只有响应里没有邮箱时才补一次 CBOR GetUserInfo。
+            const usageRes = await (
               getUsageAndLimits(accessToken, idp, account.profileArn || account.credentials?.profileArn, undefined, account.credentials?.region, account.email) as Promise<{
                 usageBreakdownList?: Array<{
                   resourceType?: string
@@ -4089,20 +4090,38 @@ app.whenReady().then(async () => {
                   email?: string
                   userId?: string
                 }
-              }>,
-              kiroApiRequest<{
-                email?: string
-                userId?: string
-                status?: string
-                idp?: string
-              }>('GetUserInfo', { origin: 'KIRO_IDE' }, accessToken, idp, undefined, account.email).catch((err: Error) => {
-                // 封禁错误不能吞掉，需要在后续逻辑中检测
-                if (err.message.includes('423') || err.message.includes('AccountSuspended')) {
-                  throw err
-                }
-                return null
-              })
-            ])
+              }>
+            ).then(
+              (value) => ({ status: 'fulfilled' as const, value }),
+              (reason) => ({ status: 'rejected' as const, reason })
+            )
+
+            type BatchUserInfo = { email?: string; userId?: string; status?: string; idp?: string }
+            const usageEmail =
+              usageRes.status === 'fulfilled' ? usageRes.value.userInfo?.email : undefined
+            const userInfoRes: { status: 'fulfilled'; value: BatchUserInfo | null } | { status: 'rejected'; reason: unknown } =
+              usageEmail
+                ? {
+                    status: 'fulfilled' as const,
+                    value: { email: usageEmail, userId: usageRes.status === 'fulfilled' ? usageRes.value.userInfo?.userId : undefined }
+                  }
+                : await kiroApiRequest<BatchUserInfo>(
+                    'GetUserInfo',
+                    { origin: 'KIRO_IDE' },
+                    accessToken,
+                    idp,
+                    undefined,
+                    account.email
+                  ).then(
+                    (value) => ({ status: 'fulfilled' as const, value: value as BatchUserInfo | null }),
+                    (reason: Error) => {
+                      // 封禁错误不能吞掉，需要在后续逻辑中检测
+                      if (reason.message.includes('423') || reason.message.includes('AccountSuspended')) {
+                        return { status: 'rejected' as const, reason }
+                      }
+                      return { status: 'fulfilled' as const, value: null }
+                    }
+                  )
 
             // 解析响应（kiroApiRequest 直接返回数据或抛出异常）
             let usageData: {
@@ -4141,6 +4160,8 @@ app.whenReady().then(async () => {
               status?: string
             } | null = null
             let status = 'active'
+            /** B3：细分账号状态（AccountStatus 的新成员），渲染层接入后可覆盖 status */
+            let accountStatus: 'throttled' | 'suspended' | undefined
             let errorMessage: string | undefined
 
             // 处理用量响应
@@ -4242,10 +4263,25 @@ app.whenReady().then(async () => {
               }
             } else if (usageRes.status === 'rejected') {
               // API 调用失败（可能是封禁或 Token 过期）
-              const errorMsg = usageRes.reason?.message || String(usageRes.reason)
+              const errorMsg = (usageRes.reason as Error)?.message || String(usageRes.reason)
               console.log(`[BackgroundCheck] Usage API failed for ${account.email}:`, errorMsg)
-              if (errorMsg.includes('AccountSuspendedException') || errorMsg.includes('423')) {
+              // B3：上游正文特征优先 —— 429/风控是 throttled（账号仍有效），封禁是 suspended。
+              // `status` 保持渲染层当前认识的取值（'error' / 'expired' / 'active'），
+              // 细分结果放在 accountStatus 里，待 WP-A 把 AccountStatus 的两个新成员接进
+              // applyBackgroundCheckResults 后即可直接采用。
+              const classified = classifyAccountStatusFromError(errorMsg)
+              if (classified === 'throttled') {
+                // 限流不是账号失效：保持 active，只记 lastError
+                status = 'active'
+                accountStatus = 'throttled'
+                errorMessage = errorMsg
+              } else if (classified === 'suspended') {
                 status = 'error'
+                accountStatus = 'suspended'
+                errorMessage = errorMsg
+              } else if (errorMsg.includes('AccountSuspendedException') || errorMsg.includes('423')) {
+                status = 'error'
+                accountStatus = 'suspended'
                 errorMessage = errorMsg
               } else if (errorMsg.includes('401')) {
                 status = 'expired'
@@ -4271,9 +4307,10 @@ app.whenReady().then(async () => {
               }
             } else if (userInfoRes.status === 'rejected') {
               // GetUserInfo 失败（封禁错误会到这里）
-              const errMsg = userInfoRes.reason?.message || String(userInfoRes.reason)
+              const errMsg = (userInfoRes.reason as Error)?.message || String(userInfoRes.reason)
               if (errMsg.includes('423') || errMsg.includes('AccountSuspended')) {
                 status = 'error'
+                accountStatus = 'suspended'
                 errorMessage = errMsg
               }
             }
@@ -4290,6 +4327,7 @@ app.whenReady().then(async () => {
                 subscription: subscriptionData,
                 userInfo: userInfoData,
                 status,
+                accountStatus,
                 errorMessage
               }
             })
