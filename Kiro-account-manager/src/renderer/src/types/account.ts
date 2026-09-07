@@ -6,6 +6,9 @@ export type IdpType = 'Google' | 'Github' | 'BuilderId' | 'Enterprise' | 'AWSIdC
 
 export type SubscriptionType = 'Free' | 'Pro' | 'Pro_Plus' | 'Enterprise' | 'Teams'
 
+/** 账号凭证的来源 */
+export type AccountSource = 'kiro-cli' | 'kiro-ide' | 'oauth' | 'manual'
+
 export type AccountStatus = 'active' | 'expired' | 'error' | 'refreshing' | 'unknown'
 
 /**
@@ -106,6 +109,8 @@ export interface Account {
   visitorId?: string
   machineId?: string // 账户绑定的设备 ID（64位十六进制）
   profileArn?: string // AWS Profile ARN
+  /** 账号从哪里来：kiro-cli 数据库 / Kiro IDE token 文件 / 在线登录 / 手工录入 */
+  importSource?: AccountSource
 
   // 认证信息
   credentials: AccountCredentials

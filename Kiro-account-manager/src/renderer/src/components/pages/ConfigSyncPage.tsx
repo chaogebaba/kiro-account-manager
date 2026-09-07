@@ -288,7 +288,7 @@ export function ConfigSyncPage(): React.ReactNode {
         if (s.privacyMode != null) store.setPrivacyMode(s.privacyMode)
         if (s.usagePrecision != null) store.setUsagePrecision(s.usagePrecision)
         if (s.autoSwitchEnabled != null) store.setAutoSwitch(s.autoSwitchEnabled, s.autoSwitchThreshold, s.autoSwitchInterval)
-        if (s.switchTarget != null && (s.switchTarget === 'ide' || s.switchTarget === 'cli' || s.switchTarget === 'both')) {
+        if (s.switchTarget != null && (s.switchTarget === 'auto' || s.switchTarget === 'ide' || s.switchTarget === 'cli' || s.switchTarget === 'both')) {
           store.setSwitchTarget(s.switchTarget)
         }
         counts['App 设置'] = 1

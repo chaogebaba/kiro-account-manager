@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { LocalCredentialCandidate } from '../main/localCredentials'
 
 // Custom APIs for renderer
 const api = {
@@ -159,6 +160,22 @@ const api = {
     }
   },
 
+  // 订阅 kiro-cli 自己 refresh token（rotate）后主进程检测到的事件
+  onKiroCliTokenChanged: (
+    callback: (data: { accountId: string; reason: string; kind: string }) => void
+  ): (() => void) => {
+    const handler = (
+      _event: unknown,
+      data: { accountId: string; reason: string; kind: string }
+    ): void => {
+      callback(data)
+    }
+    ipcRenderer.on('kiro-cli-token-changed', handler)
+    return (): void => {
+      ipcRenderer.removeListener('kiro-cli-token-changed', handler)
+    }
+  },
+
   // 主动续期开关：开启后账号管理器会在 IDE refresh 阈值前抢先 refresh，IDE 永不自刷
   setProactiveRenewalEnabled: (enabled: boolean): Promise<{ success: boolean; enabled?: boolean; error?: string }> => {
     return ipcRenderer.invoke('set-proactive-renewal-enabled', enabled)
@@ -167,23 +184,37 @@ const api = {
     return ipcRenderer.invoke('get-proactive-renewal-enabled')
   },
 
-  // 切换账号到 Kiro CLI - 写入凭证到 SQLite 数据库
+  // 切换账号到 kiro-cli - 写入凭证到 SQLite 数据库
   switchAccountCli: (credentials: {
     accessToken: string
     refreshToken: string
     clientId?: string
     clientSecret?: string
     region?: string
+    startUrl?: string
     profileArn?: string
+    authMethod?: 'IdC' | 'social' | 'external_idp'
     provider?: string
     scopes?: string[]
-  }): Promise<{ success: boolean; error?: string; dbPath?: string }> => {
+    accountId?: string
+  }): Promise<{
+    success: boolean
+    errorCode?: string
+    errorDetail?: string
+    dbPath?: string
+    refreshedCredentials?: { accessToken: string; refreshToken: string; expiresIn: number }
+  }> => {
     return ipcRenderer.invoke('switch-account-cli', credentials)
   },
 
   // 检查 Kiro IDE 是否已安装
   checkKiroIdeInstalled: (): Promise<{ installed: boolean; path: string | null }> => {
     return ipcRenderer.invoke('check-kiro-ide-installed')
+  },
+
+  // 检查 kiro-cli 是否可用（数据库是否存在）
+  checkKiroCliInstalled: (): Promise<{ installed: boolean; path: string | null }> => {
+    return ipcRenderer.invoke('check-kiro-cli-installed')
   },
 
   // 退出登录 - 清除本地 SSO 缓存
@@ -228,7 +259,7 @@ const api = {
     return ipcRenderer.invoke('verify-account-credentials', credentials)
   },
 
-  // 获取本地 SSO 缓存中当前使用的账号信息
+  // 获取本地（Kiro IDE / kiro-cli）当前正在使用的账号信息
   getLocalActiveAccount: (): Promise<{
     success: boolean
     data?: {
@@ -236,13 +267,24 @@ const api = {
       accessToken?: string
       authMethod?: string
       provider?: string
+      profileArn?: string
+      source?: 'kiro-cli' | 'kiro-ide'
     }
-    error?: string
+    errorCode?: string
   }> => {
     return ipcRenderer.invoke('get-local-active-account')
   },
 
-  // 从 Kiro 本地配置导入凭证
+  // 发现本地所有可导入的凭证（kiro-cli + Kiro IDE）
+  importLocalCredentials: (): Promise<{
+    success: boolean
+    candidates?: LocalCredentialCandidate[]
+    errorCode?: string
+  }> => {
+    return ipcRenderer.invoke('import-local-credentials')
+  },
+
+  // 从 Kiro 本地配置导入凭证（旧通道，返回第一个可用候选）
   loadKiroCredentials: (): Promise<{
     success: boolean
     data?: {
@@ -253,8 +295,10 @@ const api = {
       region: string
       authMethod: string  // 'IdC' 或 'social'
       provider: string    // 'BuilderId', 'Github', 'Google'
+      profileArn?: string
+      source?: 'kiro-cli' | 'kiro-ide'
     }
-    error?: string
+    errorCode?: string
   }> => {
     return ipcRenderer.invoke('load-kiro-credentials')
   },

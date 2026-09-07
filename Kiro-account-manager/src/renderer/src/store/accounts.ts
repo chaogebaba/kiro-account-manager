@@ -13,7 +13,8 @@ import type {
   BatchOperationResult,
   AccountSubscription,
   SubscriptionType,
-  IdpType
+  IdpType,
+  AccountSource
 } from '../types/account'
 import type {
   ProxyEntry,
@@ -23,6 +24,44 @@ import type {
 } from '../types/proxy'
 import { DEFAULT_PROXY_POOL_CONFIG } from '../types/proxy'
 import { useWebhookStore, type WebhookEvent, type WebhookMessage } from './webhooks'
+import {
+  performAccountSwitch,
+  type SwitchTarget,
+  type SwitchOutcome,
+  type SwitchRefreshedCredentials
+} from '../utils/accountSwitch'
+
+/**
+ * 旧版默认值是 'ide'，在没装 Kiro IDE 的机器上等于"切号什么都不写"。
+ * 迁移到 'auto'（写入所有存在的目标）。显式选了 cli / both 的用户保持原样。
+ */
+function migrateSwitchTarget(value: unknown): SwitchTarget {
+  if (value === 'cli' || value === 'both' || value === 'auto') return value
+  return 'auto'
+}
+
+/** 把切号时刷新出来的最新 credentials 写回 store */
+function applyRefreshedCredentials(
+  set: SetFn,
+  accountId: string,
+  rc: SwitchRefreshedCredentials
+): void {
+  set((state) => {
+    const accounts = new Map(state.accounts)
+    const acc = accounts.get(accountId)
+    if (!acc) return { accounts }
+    accounts.set(accountId, {
+      ...acc,
+      credentials: {
+        ...acc.credentials,
+        accessToken: rc.accessToken,
+        refreshToken: rc.refreshToken,
+        expiresAt: Date.now() + rc.expiresIn * 1000
+      }
+    })
+    return { accounts }
+  })
+}
 
 // ============================================
 // 账号管理 Store
@@ -93,14 +132,24 @@ async function syncLocalSsoAccountAsync(
     if (!localResult.success || !localResult.data?.refreshToken) return
 
     const localRefreshToken = localResult.data.refreshToken
+    const localAccessToken = localResult.data.accessToken
     const currentAccounts = get().accounts
 
-    // 查找匹配的账号
+    // 查找匹配的账号：refreshToken 精确匹配优先，其次 accessToken
+    // （kiro-cli / IDE 自己 rotate 过 refresh 之后，只有 access 还对得上）
     let foundAccountId: string | null = null
     for (const [id, account] of currentAccounts) {
       if (account.credentials.refreshToken === localRefreshToken) {
         foundAccountId = id
         break
+      }
+    }
+    if (!foundAccountId && localAccessToken) {
+      for (const [id, account] of currentAccounts) {
+        if (account.credentials.accessToken && account.credentials.accessToken === localAccessToken) {
+          foundAccountId = id
+          break
+        }
       }
     }
 
@@ -127,6 +176,7 @@ async function syncLocalSsoAccountAsync(
     console.log('[Store] Local account not found in app, importing...')
     const importResult = await window.api.loadKiroCredentials()
     if (!importResult.success || !importResult.data) return
+    const importSource: AccountSource = importResult.data.source === 'kiro-cli' ? 'kiro-cli' : 'kiro-ide'
 
     const verifyResult = await window.api.verifyAccountCredentials({
       refreshToken: importResult.data.refreshToken,
@@ -146,6 +196,8 @@ async function syncLocalSsoAccountAsync(
       userId: verifyResult.data.userId,
       nickname: verifyResult.data.email ? verifyResult.data.email.split('@')[0] : undefined,
       idp: (importResult.data.provider || 'BuilderId') as 'BuilderId' | 'Google' | 'Github',
+      profileArn: importResult.data.profileArn,
+      importSource,
       credentials: {
         accessToken: verifyResult.data.accessToken,
         csrfToken: '',
@@ -155,7 +207,8 @@ async function syncLocalSsoAccountAsync(
         region: importResult.data.region || 'us-east-1',
         expiresAt: verifyResult.data.expiresIn ? now + verifyResult.data.expiresIn * 1000 : now + 3600 * 1000,
         authMethod: importResult.data.authMethod as 'IdC' | 'social',
-        provider: (importResult.data.provider || 'BuilderId') as 'BuilderId' | 'Github' | 'Google'
+        provider: (importResult.data.provider || 'BuilderId') as 'BuilderId' | 'Github' | 'Google',
+        profileArn: importResult.data.profileArn
       },
       subscription: {
         type: verifyResult.data.subscriptionType as SubscriptionType,
@@ -300,7 +353,8 @@ interface AccountsState {
   loginPrivateMode: boolean // 登录时使用浏览器隐私/无痕模式
 
   // 切号目标设置
-  switchTarget: 'ide' | 'cli' | 'both' // ide=仅 Kiro IDE, cli=仅 Kiro CLI, both=两者都切
+  // auto=写入所有已存在的目标（默认）, ide=仅 Kiro IDE, cli=仅 kiro-cli, both=两者都切
+  switchTarget: SwitchTarget
 
   // 主题设置
   theme: string // 主题名称: default, purple, emerald, orange, rose, cyan, amber
@@ -439,7 +493,10 @@ interface AccountsActions {
   setLoginPrivateMode: (enabled: boolean) => void
 
   // 切号目标设置
-  setSwitchTarget: (target: 'ide' | 'cli' | 'both') => void
+  setSwitchTarget: (target: SwitchTarget) => void
+
+  /** 把账号凭证写入本地客户端（IDE / kiro-cli），成功后才 setActiveAccount */
+  switchAccountTo: (accountId: string, targetOverride?: SwitchTarget) => Promise<SwitchOutcome>
 
   startAutoSwitch: () => void
   stopAutoSwitch: () => void
@@ -572,7 +629,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
   autoSwitchInterval: 5,
   batchImportConcurrency: 100,
   loginPrivateMode: false,
-  switchTarget: 'ide' as const,
+  switchTarget: 'auto' as SwitchTarget,
   theme: 'default',
   darkMode: false,
   language: 'auto',
@@ -1722,7 +1779,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
           autoSwitchEnabled: data.autoSwitchEnabled ?? false,
           autoSwitchThreshold: data.autoSwitchThreshold ?? 0,
           autoSwitchInterval: data.autoSwitchInterval ?? 5,
-          switchTarget: data.switchTarget ?? 'ide',
+          switchTarget: migrateSwitchTarget(data.switchTarget),
           theme: data.theme ?? 'default',
           darkMode: data.darkMode ?? false,
           language: data.language ?? 'auto',
@@ -2095,6 +2152,30 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
     get().saveToStorage()
   },
 
+  // ==================== 切号（单一实现） ====================
+  //
+  // 三个入口（卡片、列表行、自动换号）都走这里，保证"没写成盘就不标记当前使用"。
+  switchAccountTo: async (accountId, targetOverride) => {
+    const account = get().accounts.get(accountId)
+    if (!account) {
+      return { success: false, wroteIde: false, wroteCli: false, errorCode: 'accountNotFound' }
+    }
+    const target = targetOverride || get().switchTarget || 'auto'
+    const outcome = await performAccountSwitch(account, target)
+
+    // main 进程 refresh 后 refreshToken 可能已经 rotate，必须回写 store，
+    // 否则下一次任何刷新都会撞到已作废的旧 refresh
+    if (outcome.refreshedCredentials) {
+      applyRefreshedCredentials(set, accountId, outcome.refreshedCredentials)
+      get().saveToStorage()
+    }
+
+    if (outcome.success) {
+      await get().setActiveAccount(accountId)
+    }
+    return outcome
+  },
+
   startAutoSwitch: () => {
     const { autoSwitchEnabled, autoSwitchInterval, checkAndAutoSwitch } = get()
     
@@ -2125,7 +2206,7 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
   },
 
   checkAndAutoSwitch: async () => {
-    const { accounts, autoSwitchThreshold, checkAccountStatus, setActiveAccount } = get()
+    const { accounts, autoSwitchThreshold, checkAccountStatus } = get()
     const activeAccount = get().getActiveAccount()
     
     if (!activeAccount) {
@@ -2163,62 +2244,13 @@ export const useAccountsStore = create<AccountsStore>()((set, get) => ({
 
       if (availableAccount) {
         console.log(`[AutoSwitch] Switching to: ${availableAccount.email}`)
-        setActiveAccount(availableAccount.id)
-        // 根据 switchTarget 设置决定切换目标
-        const { switchTarget: target } = get()
-        const creds = availableAccount.credentials
-        if (target === 'ide' || target === 'both') {
-          // 仅在 IDE 已安装时才调用 IDE 切换
-          const ideCheck = await window.api.checkKiroIdeInstalled()
-          if (ideCheck.installed) {
-            const switchResult = await window.api.switchAccount({
-              accessToken: creds.accessToken || '',
-              refreshToken: creds.refreshToken || '',
-              clientId: creds.clientId || '',
-              clientSecret: creds.clientSecret || '',
-              region: creds.region || 'us-east-1',
-              startUrl: creds.startUrl,
-              authMethod: creds.authMethod,
-              provider: creds.provider,
-              profileArn: (availableAccount as { profileArn?: string }).profileArn,
-              accountId: availableAccount.id
-            })
-            // 把 main 进程 refresh 后的最新 credentials 同步回 store，
-            // 否则 store 里的 refreshToken 仍是 v1（已被服务端 rotate 作废），下次任何 refresh 都会失败
-            if (switchResult?.success && switchResult.refreshedCredentials) {
-              const rc = switchResult.refreshedCredentials
-              set((state) => {
-                const accounts = new Map(state.accounts)
-                const acc = accounts.get(availableAccount.id)
-                if (acc) {
-                  accounts.set(availableAccount.id, {
-                    ...acc,
-                    credentials: {
-                      ...acc.credentials,
-                      accessToken: rc.accessToken,
-                      refreshToken: rc.refreshToken,
-                      expiresAt: Date.now() + rc.expiresIn * 1000
-                    }
-                  })
-                }
-                return { accounts }
-              })
-              get().saveToStorage()
-            }
-          } else {
-            console.warn('[AutoSwitch] IDE not installed, skipping IDE switch')
-          }
-        }
-        if (target === 'cli' || target === 'both') {
-          window.api.switchAccountCli?.({
-            accessToken: creds.accessToken || '',
-            refreshToken: creds.refreshToken || '',
-            clientId: creds.clientId,
-            clientSecret: creds.clientSecret,
-            region: creds.region || 'us-east-1',
-            profileArn: (availableAccount as { profileArn?: string }).profileArn,
-            provider: creds.provider
-          }).catch(err => console.warn('[AutoSwitch CLI] Failed:', err))
+        // 统一走 switchAccountTo：写盘成功才会 setActiveAccount，
+        // 并且 rotate 后的 refreshToken 会被回写 store
+        const outcome = await get().switchAccountTo(availableAccount.id)
+        if (!outcome.success) {
+          console.warn(
+            `[AutoSwitch] Switch failed (${outcome.errorCode || 'unknown'}): ${outcome.errorDetail || ''}`
+          )
         }
       } else {
         console.log('[AutoSwitch] No available account to switch to')

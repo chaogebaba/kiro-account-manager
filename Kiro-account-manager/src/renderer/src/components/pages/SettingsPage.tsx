@@ -577,10 +577,11 @@ export function SettingsPage() {
             <select
               className="h-9 px-3 rounded-lg border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
               value={switchTarget}
-              onChange={(e) => setSwitchTarget(e.target.value as 'ide' | 'cli' | 'both')}
+              onChange={(e) => setSwitchTarget(e.target.value as 'auto' | 'ide' | 'cli' | 'both')}
             >
+              <option value="auto">{isEn ? 'Auto (every installed client)' : '自动（所有已安装的客户端）'}</option>
               <option value="ide">Kiro IDE</option>
-              <option value="cli">Kiro CLI</option>
+              <option value="cli">kiro-cli</option>
               <option value="both">{isEn ? 'Both (IDE + CLI)' : '两者 (IDE + CLI)'}</option>
             </select>
           </div>

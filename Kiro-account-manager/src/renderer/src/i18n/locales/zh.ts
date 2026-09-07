@@ -91,6 +91,10 @@ const zh = {
 
   // 账户管理页
   accounts: {
+    sourceKiroCli: 'kiro-cli',
+    sourceKiroIde: 'Kiro IDE',
+    sourceOauth: '在线登录',
+    sourceManual: '手动添加',
     title: '账户管理',
     addAccount: '添加账号',
     batchAdd: '批量添加',
@@ -137,6 +141,8 @@ const zh = {
 
   // 添加账号对话框
   addAccount: {
+    importFromLocal: '本地导入',
+    localImportSummary: '本地导入完成：新增 {imported} 个，已存在 {skipped} 个，失败 {failed} 个',
     title: '添加账号',
     description: '添加新的 Kiro 账号',
     tabs: {
@@ -363,6 +369,19 @@ const zh = {
 
   // 错误
   errors: {
+    localCredentialsNotFound: '未找到 Kiro IDE 或 kiro-cli 的登录凭证，请先在其中一个客户端登录',
+    localCredentialsNoRefreshToken: '本地凭证中缺少 refreshToken',
+    localCredentialsNoClientRegistration: '未找到客户端注册信息，请确保已在 Kiro IDE 中完成登录',
+    accountAlreadyExists: '该账号已存在，无需重复添加',
+    accountNotFound: '账号不存在',
+    switchIncompleteCredentials: '账号凭证不完整，无法切换',
+    switchIdeNotInstalled: '未检测到 Kiro IDE。请检查是否已安装，或在「设置」→「通用」中配置自定义安装路径。',
+    switchCliNotInstalled: '未检测到 kiro-cli 的数据库，请先安装并登录一次 kiro-cli',
+    switchNoTargetAvailable: '未检测到 Kiro IDE 或 kiro-cli，切号没有可写入的目标，账号未标记为当前使用',
+    switchIdeFailed: '写入 Kiro IDE 凭证失败',
+    switchCliFailed: '写入 kiro-cli 凭证失败',
+    switchCliRefreshFailed: '刷新 Token 失败，未写入 kiro-cli，避免留下已失效的登录态',
+    switchCliNoProfileArn: '无法确定 profileArn，已放弃写入 kiro-cli',
     networkError: '网络错误，请检查网络连接',
     authError: '认证失败',
     tokenExpired: 'Token 已过期，请刷新',

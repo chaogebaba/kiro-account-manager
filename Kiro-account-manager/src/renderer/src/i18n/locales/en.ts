@@ -91,6 +91,10 @@ const en = {
 
   // Accounts Page
   accounts: {
+    sourceKiroCli: 'kiro-cli',
+    sourceKiroIde: 'Kiro IDE',
+    sourceOauth: 'Online login',
+    sourceManual: 'Manual',
     title: 'Account Management',
     addAccount: 'Add Account',
     batchAdd: 'Batch Add',
@@ -137,6 +141,8 @@ const en = {
 
   // Add Account Dialog
   addAccount: {
+    importFromLocal: 'Import Local',
+    localImportSummary: 'Local import done: {imported} added, {skipped} already existed, {failed} failed',
     title: 'Add Account',
     description: 'Add a new Kiro account',
     tabs: {
@@ -363,6 +369,19 @@ const en = {
 
   // Errors
   errors: {
+    localCredentialsNotFound: 'No Kiro IDE or kiro-cli login found. Sign in with one of them first.',
+    localCredentialsNoRefreshToken: 'Local credentials have no refreshToken',
+    localCredentialsNoClientRegistration: 'Client registration not found. Complete a login in Kiro IDE first.',
+    accountAlreadyExists: 'This account already exists',
+    accountNotFound: 'Account not found',
+    switchIncompleteCredentials: 'Incomplete credentials, cannot switch',
+    switchIdeNotInstalled: 'Kiro IDE not found. Check that it is installed, or set a custom install path in Settings -> General.',
+    switchCliNotInstalled: 'kiro-cli database not found. Install kiro-cli and sign in once first.',
+    switchNoTargetAvailable: 'Neither Kiro IDE nor kiro-cli was found, so there was nothing to switch; the account was not marked as current.',
+    switchIdeFailed: 'Failed to write Kiro IDE credentials',
+    switchCliFailed: 'Failed to write kiro-cli credentials',
+    switchCliRefreshFailed: 'Token refresh failed; nothing was written to kiro-cli to avoid leaving a broken login',
+    switchCliNoProfileArn: 'Could not determine a profileArn, aborted the kiro-cli write',
     networkError: 'Network error, please check your connection',
     authError: 'Authentication failed',
     tokenExpired: 'Token expired, please refresh',

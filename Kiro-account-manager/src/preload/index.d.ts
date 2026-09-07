@@ -1,4 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
+import type { LocalCredentialCandidate } from '../main/localCredentials'
 
 interface AccountData {
   accounts: Record<string, unknown>
@@ -17,7 +18,7 @@ interface AccountData {
   autoSwitchEnabled?: boolean
   autoSwitchThreshold?: number
   autoSwitchInterval?: number
-  switchTarget?: 'ide' | 'cli' | 'both'
+  switchTarget?: 'auto' | 'ide' | 'cli' | 'both'
   theme?: string
   darkMode?: boolean
   language?: 'auto' | 'en' | 'zh'
@@ -236,20 +237,40 @@ interface KiroApi {
     error?: string
   }>
 
-  // 切换账号到 Kiro CLI - 写入凭证到 SQLite 数据库
+  // 切换账号到 kiro-cli - 写入凭证到 SQLite 数据库
   switchAccountCli: (credentials: {
     accessToken: string
     refreshToken: string
     clientId?: string
     clientSecret?: string
     region?: string
+    startUrl?: string
     profileArn?: string
+    authMethod?: 'IdC' | 'social' | 'external_idp'
     provider?: string
     scopes?: string[]
-  }) => Promise<{ success: boolean; error?: string; dbPath?: string }>
+    accountId?: string
+  }) => Promise<{
+    success: boolean
+    /** i18n 错误码，renderer 用 t(`errors.${errorCode}`) 展示 */
+    errorCode?: string
+    /** 原始错误详情（英文/服务端返回），仅作为附加说明 */
+    errorDetail?: string
+    dbPath?: string
+    /** 切号前 main 进程会做一次 refresh；这是最新（可能已 rotate）的凭证 */
+    refreshedCredentials?: { accessToken: string; refreshToken: string; expiresIn: number }
+  }>
 
   // 检查 Kiro IDE 是否已安装
   checkKiroIdeInstalled: () => Promise<{ installed: boolean; path: string | null }>
+
+  // 检查 kiro-cli 是否可用（数据库是否存在）
+  checkKiroCliInstalled: () => Promise<{ installed: boolean; path: string | null }>
+
+  /** 订阅 kiro-cli 自己 rotate token 后主进程检测到的事件 */
+  onKiroCliTokenChanged: (
+    callback: (data: { accountId: string; reason: string; kind: string }) => void
+  ) => () => void
 
   // 退出登录 - 清除本地 SSO 缓存
   logoutAccount: () => Promise<{ success: boolean; deletedCount?: number; error?: string }>
@@ -318,11 +339,20 @@ interface KiroApi {
       accessToken?: string
       authMethod?: string
       provider?: string
+      profileArn?: string
+      source?: 'kiro-cli' | 'kiro-ide'
     }
-    error?: string
+    errorCode?: string
   }>
 
-  // 从 Kiro 本地配置导入凭证
+  /** 发现本地所有可导入的凭证（kiro-cli + Kiro IDE），供"本地导入"一键使用 */
+  importLocalCredentials: () => Promise<{
+    success: boolean
+    candidates?: LocalCredentialCandidate[]
+    errorCode?: string
+  }>
+
+  // 从 Kiro 本地配置导入凭证（旧通道，返回第一个可用候选）
   loadKiroCredentials: () => Promise<{
     success: boolean
     data?: {
@@ -333,8 +363,10 @@ interface KiroApi {
       region: string
       authMethod: string  // 'IdC' 或 'social'
       provider: string    // 'BuilderId', 'Github', 'Google'
+      profileArn?: string
+      source?: 'kiro-cli' | 'kiro-ide'
     }
-    error?: string
+    errorCode?: string
   }>
 
   // 从 AWS SSO Token (x-amz-sso_authn) 导入账号
