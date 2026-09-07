@@ -256,3 +256,6 @@ test('readKiroCliAuth on a missing database returns kind none', () => {
   assert.equal(auth.kind, 'none')
   assert.equal(auth.token, undefined)
 })
+
+// 注：src/main/localCredentials.ts 用的是 bundler 风格的无扩展名 import（'./kiroAuthSync'），
+// 纯 node 的 ESM 解析器加载不了，所以它的单测放在应用构建体系里跑，这里只覆盖 kiroCli.ts。
