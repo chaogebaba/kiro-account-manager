@@ -200,6 +200,8 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
     provider?: string
     profileArn?: string
     importSource?: AccountSource
+    /** 来源里记录的到期时间：还没到期就让主进程直接复用 accessToken，不做刷新 */
+    expiresAt?: number
   }): Promise<{ ok: boolean; accountId?: string; email?: string; errorCode?: string; errorDetail?: string }> => {
     const result = await window.api.verifyAccountCredentials({
       refreshToken: tokenData.refreshToken,
@@ -207,7 +209,10 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
       clientSecret: tokenData.clientSecret || '',
       region: tokenData.region || 'us-east-1',
       authMethod: tokenData.authMethod,
-      provider: tokenData.provider
+      provider: tokenData.provider,
+      // 复用来源的 accessToken，避免导入这一步就把 kiro-cli / IDE 手上的票轮换掉
+      accessToken: tokenData.accessToken,
+      expiresAt: tokenData.expiresAt
     })
 
     if (!result.success || !result.data) {
@@ -239,7 +244,13 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
         clientSecret: tokenData.clientSecret || '',
         region: tokenData.region || 'us-east-1',
         startUrl: tokenData.startUrl,
-        expiresAt: result.data.expiresIn ? now + result.data.expiresIn * 1000 : now + 3600 * 1000,
+        // 优先用主进程回传的绝对到期时间；都没有时退回来源记录的那个，
+        // 再没有才用默认 1h（credentials.expiresAt 是必填）
+        expiresAt:
+          result.data.tokenExpiresAt ??
+          (result.data.expiresIn
+            ? now + result.data.expiresIn * 1000
+            : tokenData.expiresAt ?? now + 3600 * 1000),
         authMethod: tokenData.authMethod as 'IdC' | 'social',
         provider: (tokenData.provider || 'BuilderId') as 'BuilderId' | 'Github' | 'Google',
         profileArn
@@ -550,7 +561,8 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
           authMethod: candidate.authMethod,
           provider: candidate.provider,
           profileArn: candidate.profileArn,
-          importSource: candidate.source
+          importSource: candidate.source,
+          expiresAt: candidate.expiresAt
         })
         if (outcome.ok) {
           imported.push(outcome.email || candidate.provider)

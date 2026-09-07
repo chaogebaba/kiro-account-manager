@@ -268,6 +268,10 @@ const api = {
     region?: string
     authMethod?: string  // 'IdC' 或 'social'
     provider?: string    // 'BuilderId', 'Github', 'Google'
+    /** 来源已有的 accessToken：未到刷新窗口就直接复用，避免多一次 refreshToken 轮换 */
+    accessToken?: string
+    /** 上面那个 accessToken 的到期时间（毫秒 epoch） */
+    expiresAt?: number
   }): Promise<{
     success: boolean
     data?: {
@@ -325,6 +329,8 @@ const api = {
       provider: string    // 'BuilderId', 'Github', 'Google'
       profileArn?: string
       source?: 'kiro-cli' | 'kiro-ide'
+      /** 来源记录的 accessToken 到期时间（毫秒 epoch） */
+      expiresAt?: number
     }
     errorCode?: string
   }> => {

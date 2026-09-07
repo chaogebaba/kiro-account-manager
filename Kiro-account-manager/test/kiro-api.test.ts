@@ -56,6 +56,7 @@ import {
 } from '../src/main/kiroApi/usage'
 import { pickExternalRefreshToken } from '../src/main/externalRefresh'
 import { buildSecondTargetCredentials } from '../src/renderer/src/utils/accountSwitch'
+import { decideTokenWriteBack, shouldRefreshBeforeVerify } from '../src/main/localTokenSync'
 import {
   parseKiroVersionMetadata,
   refreshKiroVersion,
@@ -729,4 +730,101 @@ test('buildSecondTargetCredentials: 上一步刷过但没给有效期 ⇒ expire
   assert.equal(out.expiresIn, undefined)
   // 上一步没给到期时间时不回填旧值：调用方（主进程）会沿用账号原有的 expiresAt
   assert.equal(out.expiresAt, undefined)
+})
+
+
+// ============ 轮换后回写本地客户端的判定 ============
+
+const R_OLD = 'o'.repeat(120)
+const R_NEW = 'n'.repeat(120)
+const R_OTHER = 'z'.repeat(120)
+
+test('decideTokenWriteBack: 目标记录的正是刚被换掉的那张票 ⇒ 回写', () => {
+  const d = decideTokenWriteBack({
+    currentRefreshToken: R_OLD,
+    oldRefreshToken: R_OLD,
+    newRefreshToken: R_NEW
+  })
+  assert.equal(d.write, true)
+  assert.equal(d.reason, 'refreshToken match')
+})
+
+test('decideTokenWriteBack: 目标登录着别的账号 ⇒ 不写', () => {
+  const d = decideTokenWriteBack({
+    currentRefreshToken: R_OTHER,
+    oldRefreshToken: R_OLD,
+    newRefreshToken: R_NEW,
+    accountId: 'a1',
+    lastSwitchedAccountId: 'a2'
+  })
+  assert.equal(d.write, false)
+  assert.equal(d.reason, 'not-this-account')
+})
+
+test('decideTokenWriteBack: 目标已经是新票 ⇒ 不写', () => {
+  const d = decideTokenWriteBack({
+    currentRefreshToken: R_NEW,
+    oldRefreshToken: R_OLD,
+    newRefreshToken: R_NEW
+  })
+  assert.equal(d.write, false)
+  assert.equal(d.reason, 'already-current')
+})
+
+test('decideTokenWriteBack: 目标已自刷过、票对不上，但就是我们刚切进去的账号 ⇒ 回写', () => {
+  const d = decideTokenWriteBack({
+    currentRefreshToken: R_OTHER,
+    oldRefreshToken: R_OLD,
+    newRefreshToken: R_NEW,
+    accountId: 'a1',
+    lastSwitchedAccountId: 'a1'
+  })
+  assert.equal(d.write, true)
+  assert.equal(d.reason, 'lastSwitchedAccountId fallback')
+})
+
+test('decideTokenWriteBack: 目标不存在（IDE 未登录 / CLI 没建库）⇒ 不写', () => {
+  const d = decideTokenWriteBack({
+    targetExists: false,
+    oldRefreshToken: R_OLD,
+    newRefreshToken: R_NEW,
+    accountId: 'a1',
+    lastSwitchedAccountId: 'a1'
+  })
+  assert.equal(d.write, false)
+  assert.equal(d.reason, 'target-not-present')
+})
+
+test('decideTokenWriteBack: 没有新 refreshToken（未轮换）⇒ 不写', () => {
+  const d = decideTokenWriteBack({ currentRefreshToken: R_OLD, oldRefreshToken: R_OLD })
+  assert.equal(d.write, false)
+  assert.equal(d.reason, 'no-new-refresh-token')
+})
+
+test('shouldRefreshBeforeVerify: 没有 accessToken（手填表单）⇒ 必须先刷', () => {
+  assert.equal(
+    shouldRefreshBeforeVerify({ expiresAt: Date.now() + 3600_000, needsRefresh: () => false }),
+    true
+  )
+})
+
+test('shouldRefreshBeforeVerify: 有 accessToken 且未进刷新窗口 ⇒ 直接复用，不轮换', () => {
+  const calls: Array<number | undefined> = []
+  const out = shouldRefreshBeforeVerify({
+    accessToken: 'AT',
+    expiresAt: 1234,
+    needsRefresh: (e) => {
+      calls.push(e)
+      return false
+    }
+  })
+  assert.equal(out, false)
+  assert.deepEqual(calls, [1234])
+})
+
+test('shouldRefreshBeforeVerify: 有 accessToken 但已到刷新窗口 ⇒ 先刷', () => {
+  assert.equal(
+    shouldRefreshBeforeVerify({ accessToken: 'AT', expiresAt: 1, needsRefresh: () => true }),
+    true
+  )
 })

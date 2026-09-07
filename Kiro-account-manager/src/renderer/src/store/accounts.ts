@@ -187,7 +187,10 @@ async function syncLocalSsoAccountAsync(
       clientSecret: importResult.data.clientSecret || '',
       region: importResult.data.region,
       authMethod: importResult.data.authMethod,
-      provider: importResult.data.provider
+      provider: importResult.data.provider,
+      // 复用来源的 accessToken，避免这一步就把本地客户端手上的票轮换掉
+      accessToken: importResult.data.accessToken,
+      expiresAt: importResult.data.expiresAt
     })
     if (!verifyResult.success || !verifyResult.data) return
 

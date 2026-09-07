@@ -267,5 +267,78 @@ test('readKiroCliAuth on a missing database returns kind none', () => {
   assert.equal(auth.token, undefined)
 })
 
+test('rotation write-back: R1 -> R2 round-trips and kiro-cli stays logged in', () => {
+  const xdg = makeXdg('rotation')
+  const dbPath = seedDb(xdg)
+
+  // 1) 初始记录 R1（模拟 kiro-cli 自己登录 / 我们切号写进去的那一份）
+  writeKiroCliAuth(
+    {
+      authMethod: 'social',
+      provider: 'Github',
+      accessToken: 'access-v1',
+      refreshToken: 'refresh-v1',
+      expiresAt: futureMs(),
+      profileArn: SOCIAL_ARN
+    },
+    dbPath
+  )
+  const before = readKiroCliAuth(dbPath)
+  assert.equal(before.token.refreshToken, 'refresh-v1')
+
+  // 2) 账号管理器刷新了这个账号，上游把 R1 轮换成 R2。
+  //    决策：CLI 记录的正是我们刚换掉的 R1 ⇒ 必须回写，否则它下次自刷就是 invalid_grant。
+  assert.equal(before.token.refreshToken, 'refresh-v1', 'CLI 仍持有旧票，属于要回写的情形')
+  writeKiroCliAuth(
+    {
+      authMethod: 'social',
+      provider: 'Github',
+      accessToken: 'access-v2',
+      refreshToken: 'refresh-v2',
+      expiresAt: futureMs(),
+      profileArn: SOCIAL_ARN
+    },
+    dbPath
+  )
+
+  // 3) 回读拿到 R2，且记录形状没有被破坏
+  const after = readKiroCliAuth(dbPath)
+  assert.equal(after.kind, 'social')
+  assert.equal(after.token.accessToken, 'access-v2')
+  assert.equal(after.token.refreshToken, 'refresh-v2')
+  assert.equal(after.token.provider, 'github')
+  assert.equal(after.token.profileArn, SOCIAL_ARN)
+  assert.equal(after.profile.arn, SOCIAL_ARN)
+  assert.equal(after.profile.profileName, 'Social_Default_Profile')
+  assert.ok(Date.parse(after.token.expiresAt) > Date.now())
+
+  // 4) 回写之后 kiro-cli 依然是登录态
+  if (kiroCliAvailable) {
+    const out = whoami(xdg)
+    console.log(`[whoami rotation] ${out}`)
+    assert.equal(out, 'Logged in with GitHub')
+  }
+})
+
+test('writeKiroCliAuth rejects a non-finite expiresAt instead of throwing RangeError', () => {
+  const xdg = makeXdg('bad-expires')
+  const dbPath = seedDb(xdg)
+  assert.throws(
+    () =>
+      writeKiroCliAuth(
+        {
+          authMethod: 'social',
+          provider: 'Github',
+          accessToken: 'a',
+          refreshToken: 'r',
+          expiresAt: Number.NaN,
+          profileArn: SOCIAL_ARN
+        },
+        dbPath
+      ),
+    /KIRO_CLI_INVALID_EXPIRES_AT/
+  )
+})
+
 // 注：src/main/localCredentials.ts 用的是 bundler 风格的无扩展名 import（'./kiroAuthSync'），
 // 纯 node 的 ESM 解析器加载不了，所以它的单测放在应用构建体系里跑，这里只覆盖 kiroCli.ts。
